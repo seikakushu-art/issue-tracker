@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service firebase.storage {
+match /b/{bucket}/o {
+function member(projectId) {
+return request.auth != null &&
+firestore.get(/databases/(default)/documents/projects/$(projectId)).data.memberIds[request.auth.uid] != null ||
+(request.auth.uid in firestore.get(/databases/(default)/documents/projects/$(projectId)).data.memberIds);
+}
+
+
+match /attachments/{projectId}/{taskId}/{fileId} {
+allow read, write: if member(projectId);
+}
+}
+}

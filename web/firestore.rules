@@ -1,0 +1,57 @@
+rules_version = '2';//「プロジェクトのメンバーのみ読み書き」 を守る最小ルール
+service cloud.firestore {
+match /databases/{database}/documents {
+function signedIn() { return request.auth != null; }
+function isMember(projectId) {
+return signedIn() && (request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.memberIds);
+}
+function role(projectId) {
+return get(/databases/$(database)/documents/projects/$(projectId)).data.roles[request.auth.uid];
+}
+
+
+match /users/{uid} {
+allow read, write: if signedIn() && uid == request.auth.uid;
+}
+
+
+match /projects/{projectId} {
+allow create: if signedIn();
+allow read: if isMember(projectId);
+allow update, delete: if isMember(projectId) && role(projectId) == 'admin';
+
+
+match /issues/{issueId} {
+allow read: if isMember(projectId);
+allow create, update: if isMember(projectId);
+allow delete: if isMember(projectId) && role(projectId) == 'admin';
+
+
+match /tasks/{taskId} {
+allow read: if isMember(projectId);
+allow create, update: if isMember(projectId);
+allow delete: if isMember(projectId) && role(projectId) == 'admin';
+
+
+match /comments/{commentId} {
+allow read: if isMember(projectId);
+allow create: if isMember(projectId);
+allow delete: if isMember(projectId) && (resource.data.authorId == request.auth.uid || role(projectId) == 'admin');
+}
+}
+}
+
+
+match /invites/{inviteId} {
+allow read: if isMember(projectId); // 受け取り側で照合する想定
+allow create, update, delete: if isMember(projectId) && role(projectId) == 'admin';
+}
+}
+
+
+// フラットなコレクションを使う MVP 用（後で削除可）
+match /tasks/{taskId} {
+allow read, write: if signedIn();
+}
+}
+}

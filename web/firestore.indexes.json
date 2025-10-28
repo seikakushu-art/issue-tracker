@@ -1,0 +1,14 @@
+{
+  "indexes": [
+  {
+  "collectionGroup": "tasks",
+  "queryScope": "COLLECTION",
+  "fields": [
+  { "fieldPath": "assigneeIds", "arrayConfig": "CONTAINS" },
+  { "fieldPath": "endDate", "order": "ASCENDING" },
+  { "fieldPath": "status", "order": "ASCENDING" }
+  ]
+  }
+  ],
+  "fieldOverrides": []
+  }
