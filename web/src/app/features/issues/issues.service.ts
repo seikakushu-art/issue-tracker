@@ -160,6 +160,29 @@ export class IssuesService {
       return [];
     }
   }
+  /**
+   * プロジェクト配下の課題数を取得する（一覧表示での統計用）
+   * @param projectId プロジェクトID
+   * @param includeArchived アーカイブ済み課題も含めるかどうか
+   */
+  async countIssues(projectId: string, includeArchived = false): Promise<number> {
+    const uid = (await this.waitForUser())?.uid;
+    if (!uid) {
+      return 0;
+    }
+
+    try {
+      const q = includeArchived
+        ? query(collection(this.db, `projects/${projectId}/issues`))
+        : query(collection(this.db, `projects/${projectId}/issues`), where('archived', '==', false));
+      const snap = await getDocs(q);
+      return snap.docs.length;
+    } catch (error) {
+      console.error('Error counting issues:', error);
+      return 0;
+    }
+  }
+
 
   /**
    * 特定の課題を取得する

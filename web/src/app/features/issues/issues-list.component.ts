@@ -5,6 +5,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
 import { Issue } from '../../models/schema';
+import { FirebaseError } from 'firebase/app';
 
 /**
  * 課題一覧コンポーネント
@@ -754,8 +755,14 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       };
 
       if (this.editingIssue) {
-        // 編集（実装予定）
-        console.log('課題編集機能は実装予定です');
+        await this.issuesService.updateIssue(this.projectId, this.editingIssue.id!, {
+          name: issueData.name,
+          description: issueData.description ?? null,
+          startDate: issueData.startDate ?? null,
+          endDate: issueData.endDate ?? null,
+          goal: issueData.goal ?? null,
+          themeColor: issueData.themeColor ?? null,
+        });
       } else {
         await this.issuesService.createIssue(this.projectId, issueData);
       }
@@ -764,7 +771,15 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       await this.loadIssues();
     } catch (error) {
       console.error('課題の保存に失敗しました:', error);
-      alert('課題の保存に失敗しました');
+       // Firestoreのバージョン衝突（楽観的ロック違反）を検出して、再読み込みを案内
+       if (
+        error instanceof FirebaseError &&
+        (error.code === 'failed-precondition' || /version/i.test(error.message))
+      ) {
+        alert('データのバージョンが古いため課題を保存できませんでした。画面を再読み込みしてから再度お試しください。');
+      } else {
+        alert('課題の保存に失敗しました');
+      }
     } finally {
       this.saving = false;
     }

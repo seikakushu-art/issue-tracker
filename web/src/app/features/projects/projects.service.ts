@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
+  getDoc,
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { Project } from '../../models/schema';
@@ -151,6 +152,65 @@ export class ProjectsService {
   async archive(id: string, archived: boolean) {
     return updateDoc(doc(this.db, 'projects', id), { archived });
   }
+   /**
+   * 既存プロジェクトの情報を更新する
+   * @param id 更新対象のプロジェクトID
+   * @param updates 更新内容（空文字はnullとして扱う）
+   */
+   async updateProject(
+    id: string,
+    updates: Partial<{
+      name: string;
+      description: string | null;
+      startDate: Date | null;
+      endDate: Date | null;
+      goal: string | null;
+    }>,
+  ): Promise<void> {
+    // --- プロジェクト名変更時は重複チェックを実施 ---
+    if (updates.name !== undefined) {
+      await this.checkNameUniqueness(updates.name, id);
+    }
+
+    // --- Firestoreから最新のプロジェクトを取得して期間バリデーションに利用 ---
+    const projectSnap = await getDoc(doc(this.db, 'projects', id));
+    if (!projectSnap.exists()) {
+      throw new Error('対象のプロジェクトが見つかりません');
+    }
+    const current = projectSnap.data() as Project;
+
+    // --- FirestoreのTimestampが渡される場合に備えてDateへ正規化 ---
+    const normalizeDate = (value: unknown): Date | null => {
+      if (!value) {
+        return null;
+      }
+      if (value instanceof Date) {
+        return value;
+      }
+      if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+        return (value as { toDate: () => Date }).toDate();
+      }
+      const parsed = new Date(value as string);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    // --- 更新後の開始・終了日を算出（未指定の場合は既存値を利用） ---
+    const currentStart = normalizeDate(current.startDate ?? null);
+    const currentEnd = normalizeDate(current.endDate ?? null);
+    const startDate = updates.startDate !== undefined ? updates.startDate ?? null : currentStart;
+    const endDate = updates.endDate !== undefined ? updates.endDate ?? null : currentEnd;
+
+    // --- 期間の整合性チェック（開始日 <= 終了日） ---
+    if (startDate && endDate && startDate > endDate) {
+      throw new Error('開始日は終了日以前である必要があります');
+    }
+
+    // --- Firestoreへ更新を反映（undefinedは送らず、nullは許容） ---
+    const docRef = doc(this.db, 'projects', id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await updateDoc(docRef, updates as any);
+  }
+
 
   /**
    * プロジェクト名の重複をチェックする

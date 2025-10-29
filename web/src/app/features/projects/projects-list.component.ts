@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { ProjectsService } from './projects.service';
 import { Project } from '../../models/schema';
+import { IssuesService } from '../issues/issues.service';
+import { FirebaseError } from '@angular/fire/app';
 
 /**
  * プロジェクト一覧コンポーネント
@@ -34,6 +36,9 @@ import { Project } from '../../models/schema';
             <option value="endDate">終了日</option>
             <option value="progress">進捗</option>
             <option value="createdAt">作成日</option>
+            <option value="period">期間</option>
+            <option value="issueCount">課題数</option>
+            <option value="memberCount">メンバー数</option>
           </select>
           <select [(ngModel)]="sortOrder" (change)="sortProjects()">
             <option value="asc">昇順</option>
@@ -62,11 +67,13 @@ import { Project } from '../../models/schema';
           <div class="project-header">
             <h3>{{ project.name }}</h3>
             <div class="project-actions">
-              <button class="btn-icon" (click)="editProject(project, $event)" title="編集">
-                <i class="icon-edit"></i>
+            <button class="btn-action" (click)="editProject(project, $event)" title="編集">
+                <i class="icon-edit" aria-hidden="true"></i>
+                <span class="action-label">編集</span>
               </button>
-              <button class="btn-icon" (click)="archiveProject(project, $event)" title="アーカイブ">
-                <i class="icon-archive"></i>
+              <button class="btn-action" (click)="archiveProject(project, $event)" title="アーカイブ">
+                <i class="icon-archive" aria-hidden="true"></i>
+                <span class="action-label">{{ project.archived ? '復元' : 'アーカイブ' }}</span>
               </button>
             </div>
           </div>
@@ -296,7 +303,7 @@ import { Project } from '../../models/schema';
       gap: 8px;
     }
 
-    .btn-icon {
+    .btn-action {
       background: none;
       border: none;
       padding: 4px;
@@ -305,7 +312,7 @@ import { Project } from '../../models/schema';
       border-radius: 4px;
     }
 
-    .btn-icon:hover {
+    .btn-action:hover {
       background: #f0f0f0;
       color: #333;
     }
@@ -521,6 +528,7 @@ import { Project } from '../../models/schema';
 })
 export class ProjectsListComponent implements OnInit, OnDestroy {
   private projectsService = inject(ProjectsService);
+  private issuesService = inject(IssuesService);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
@@ -532,7 +540,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   showArchived = false;
 
   // 並び替え設定
-  sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' = 'name';
+  sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' | 'period' | 'issueCount' | 'memberCount' = 'name';
   sortOrder: 'asc' | 'desc' = 'asc';
 
   // フォームデータ
@@ -543,6 +551,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     endDate: '',
     goal: ''
   };
+
+   /** 課題数のキャッシュ（一覧表示・並び替え用） */
+   private issueCountMap: Record<string, number> = {};
+
 
   ngOnInit() {
     this.loadProjects();
@@ -559,6 +571,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   async loadProjects() {
     try {
       this.projects = await this.projectsService.listMyProjects();
+      await this.loadIssueCounts();
       this.filterProjects();
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
@@ -580,8 +593,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   sortProjects() {
     this.filteredProjects.sort((a, b) => {
-      let aValue: unknown;
-      let bValue: unknown;
+      let aValue: string | number | Date;
+      let bValue: string | number | Date;
 
       switch (this.sortBy) {
         case 'name':
@@ -589,27 +602,44 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
           bValue = b.name;
           break;
         case 'startDate':
-          aValue = a.startDate || new Date(0);
-          bValue = b.startDate || new Date(0);
+          aValue = this.normalizeToDate(a.startDate) ?? new Date(0);
+          bValue = this.normalizeToDate(b.startDate) ?? new Date(0);
           break;
         case 'endDate':
-          aValue = a.endDate || new Date(0);
-          bValue = b.endDate || new Date(0);
+          aValue = this.normalizeToDate(a.endDate) ?? new Date(0);
+          bValue = this.normalizeToDate(b.endDate) ?? new Date(0);
           break;
         case 'progress':
           aValue = a.progress || 0;
           bValue = b.progress || 0;
           break;
         case 'createdAt':
-          aValue = a.createdAt || new Date(0);
-          bValue = b.createdAt || new Date(0);
+          aValue = this.normalizeToDate(a.createdAt) ?? new Date(0);
+          bValue = this.normalizeToDate(b.createdAt) ?? new Date(0);
+          break;
+        case 'period':
+          aValue = this.getProjectDuration(a);
+          bValue = this.getProjectDuration(b);
+          break;
+        case 'issueCount':
+          aValue = this.getIssueCount(a.id!);
+          bValue = this.getIssueCount(b.id!);
+          break;
+        case 'memberCount':
+          aValue = a.memberIds.length;
+          bValue = b.memberIds.length;
           break;
         default:
-          return 0;
+          aValue = 0;
+          bValue = 0;
       }
 
-      if ((aValue as string | number | Date) < (bValue as string | number | Date)) return this.sortOrder === 'asc' ? -1 : 1;
-      if ((aValue as string | number | Date) > (bValue as string | number | Date)) return this.sortOrder === 'asc' ? 1 : -1;
+      if (aValue < bValue) {
+        return this.sortOrder === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return this.sortOrder === 'asc' ? 1 : -1;
+      }
       return 0;
     });
   }
@@ -657,13 +687,14 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   async archiveProject(project: Project, event: Event) {
     event.stopPropagation();
-    if (confirm(`プロジェクト「${project.name}」をアーカイブしますか？`)) {
+    const actionLabel = project.archived ? '復元' : 'アーカイブ';
+    if (confirm(`プロジェクト「${project.name}」を${actionLabel}しますか？`)) {
       try {
         await this.projectsService.archive(project.id!, !project.archived);
         await this.loadProjects();
     } catch (error) {
         console.error('アーカイブに失敗しました:', error);
-        alert('アーカイブに失敗しました');
+        alert(`${actionLabel}に失敗しました`);
       }
     }
   }
@@ -688,8 +719,13 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       };
 
       if (this.editingProject) {
-        // 編集（実装予定）
-        console.log('プロジェクト編集機能は実装予定です');
+        await this.projectsService.updateProject(this.editingProject.id!, {
+          name: projectData.name,
+          description: projectData.description ?? null,
+          startDate: projectData.startDate ?? null,
+          endDate: projectData.endDate ?? null,
+          goal: projectData.goal ?? null,
+        });
       } else {
         await this.projectsService.createProject(projectData);
       }
@@ -698,10 +734,32 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       await this.loadProjects();
     } catch (error) {
       console.error('プロジェクトの保存に失敗しました:', error);
-      alert('プロジェクトの保存に失敗しました');
+      alert(this.buildProjectSaveErrorMessage(error));
     } finally {
       this.saving = false;
     }
+  }
+  /**
+   * Firestoreエラーを人間にわかりやすいメッセージへ変換する
+   * バージョン衝突（FAILED_PRECONDITION/ABORTED）を検出して案内を表示
+   */
+  private buildProjectSaveErrorMessage(error: unknown): string {
+    // FirebaseErrorかどうかを判定し、バージョン違反コードを優先的に扱う
+    if (error instanceof FirebaseError) {
+      const conflictCodes = ['aborted', 'failed-precondition'];
+      if (conflictCodes.includes(error.code) || error.message.includes('FAILED_PRECONDITION')) {
+        return '最新の情報と競合したため保存できませんでした。画面を再読み込みしてからもう一度お試しください。';
+      }
+      if (error.message) {
+        return error.message;
+      }
+    }
+
+    // 通常のErrorであればメッセージを返却し、その他は汎用文を表示
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+    return '予期しないエラーが発生しました。時間をおいて再度お試しください。';
   }
 
   /**
@@ -716,23 +774,71 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   /**
    * 日付をinput用にフォーマット
    */
-  private formatDateForInput(date: Date): string {
-    return new Date(date).toISOString().split('T')[0];
+  private formatDateForInput(date: Date | null | undefined): string {
+    const normalized = this.normalizeToDate(date ?? null);
+    return normalized ? normalized.toISOString().split('T')[0] : '';
   }
 
   /**
-   * 課題数を取得（実装予定）
+   * 課題数を取得（非同期で取得したキャッシュを参照）
    */
   getIssueCount(projectId: string): number {
-    void projectId; // TODO: IssuesServiceから取得
-    return 0;
+    return this.issueCountMap[projectId] ?? 0;
   }
 
   /**
    * タスク数を取得（実装予定）
    */
   getTaskCount(projectId: string): number {
-    void projectId; // TODO: TasksServiceから取得
-    return 0;
+    return this.issueCountMap[projectId] ?? 0;
+  }
+
+  /** プロジェクト期間（日数）を算出する（開始・終了がそろっていない場合は0） */
+  private getProjectDuration(project: Project): number {
+    const startDate = this.normalizeToDate(project.startDate);
+    const endDate = this.normalizeToDate(project.endDate);
+    if (!startDate || !endDate) {
+      return 0;
+    }
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+    const diff = end - start;
+    return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
+  }
+
+  /** 任意の値をDate型へ正規化する（Timestamp互換にも対応） */
+  private normalizeToDate(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === 'object' && 'toDate' in (value as Record<string, unknown>)) {
+      const candidate = value as { toDate?: () => Date };
+      if (typeof candidate.toDate === 'function') {
+        return candidate.toDate();
+      }
+    }
+    const parsed = new Date(value as string);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  /** Firestoreから課題数を取得してキャッシュする */
+  private async loadIssueCounts(): Promise<void> {
+    const results = await Promise.all(this.projects.map(async (project) => {
+      if (!project.id) {
+        return { id: '', count: 0 };
+      }
+      const count = await this.issuesService.countIssues(project.id, this.showArchived);
+      return { id: project.id, count };
+    }));
+
+    this.issueCountMap = results.reduce<Record<string, number>>((acc, item) => {
+      if (item.id) {
+        acc[item.id] = item.count;
+      }
+      return acc;
+    }, {});
   }
 }
