@@ -10,13 +10,69 @@ import {
   doc,
   updateDoc,
 } from '@angular/fire/firestore';
-import { Auth } from '@angular/fire/auth';
+import { Auth, User, authState } from '@angular/fire/auth';
 import { Project } from '../../models/schema';
+import { firstValueFrom,TimeoutError } from 'rxjs';
+import { filter, take, timeout } from 'rxjs/operators';
 //プロジェクトを作成する
 @Injectable({ providedIn: 'root' })
 export class ProjectsService {
   private db = inject(Firestore);
   private auth = inject(Auth);
+  private authReady: Promise<void> | null = null;
+
+  private async ensureAuthReady() {
+    if (!this.authReady) {
+      this.authReady = this.auth.authStateReady();
+    }
+
+    try {
+      await this.authReady;
+    } catch (error) {
+      // reset so we can try again on the next call
+      this.authReady = null;
+      throw error;
+    }
+  }
+
+  private async waitForUser(): Promise<User | null> {
+    try {
+      await this.ensureAuthReady();
+    } catch (error) {
+      console.error('●●●Failed to await auth readiness:', error);
+    }
+
+    const current = this.auth.currentUser;
+    if (current) {
+      return current;
+    }
+
+    try {
+      return await firstValueFrom(
+        authState(this.auth).pipe(
+          filter((user): user is User => user !== null),
+          take(1),
+          timeout(10000),
+        ),
+      );
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        console.warn('●●●Timed out while waiting for Firebase auth state');
+      } else {
+        console.error('●●●Unexpected error while waiting for Firebase auth state:', error);
+      }
+      return null;
+    }
+  }
+
+  private async requireUser(): Promise<User> {
+    const user = await this.waitForUser();
+    if (!user) {
+      throw new Error('not signed in');
+    }
+    return user;
+  }
+
 
   async createProject(input: {
     name: string;
@@ -25,23 +81,27 @@ export class ProjectsService {
     endDate?: Date;
     goal?: string;
   }) {
-    console.log('●●●createProject called with:', input); 
-    const uid = this.auth.currentUser?.uid;
-    if (!uid) 
-      {console.error('●●●User not authenticated - createProject');
-        throw new Error('not signed in');
-      }
+    console.log('●●●createProject called with:', input);
+    const uid = (await this.requireUser()).uid;
     const payload: Record<string, unknown> = {
       name: input.name,
       memberIds: [uid],
       roles: { [uid]: 'admin' },
       archived: false,
-      createdAt: serverTimestamp(), // 最初から入れて OK
+      createdAt: serverTimestamp(),
     };
-    if (input.description !== undefined) payload['description'] = input.description;
-    if (input.goal !== undefined) payload['goal'] = input.goal;
-    if (input.startDate !== undefined) payload['startDate'] = input.startDate;
-    if (input.endDate !== undefined) payload['endDate'] = input.endDate;
+    if (input.description !== undefined && input.description !== null && input.description !== '') {
+      payload['description'] = input.description;
+    }
+    if (input.goal !== undefined && input.goal !== null && input.goal !== '') {
+      payload['goal'] = input.goal;
+    }
+    if (input.startDate !== undefined && input.startDate !== null) {
+      payload['startDate'] = input.startDate;
+    }
+    if (input.endDate !== undefined && input.endDate !== null) {
+      payload['endDate'] = input.endDate;
+    }
     console.log('●●●Creating document with payload:', payload);
     try {
     const ref = await addDoc(collection(this.db, 'projects'), payload);
@@ -54,8 +114,8 @@ export class ProjectsService {
   }
   async listMyProjects(): Promise<Project[]> {
     console.log('●●●listMyProjects called');
-    const uid = this.auth.currentUser?.uid;
-    console.log('●●●Current UID:', uid); 
+    const uid = (await this.waitForUser())?.uid;
+    console.log('●●●Current UID:', uid);
     if (!uid) {
       console.error('●●●User not authenticated - returning empty array');
       return [];
