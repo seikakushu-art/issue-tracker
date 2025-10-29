@@ -1,26 +1,26 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { Subject } from 'rxjs';
-import { ProjectsService } from './projects.service';
-import { Project } from '../../models/schema';
+import { Router, ActivatedRoute } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
+import { IssuesService } from '../issues/issues.service';
+import { Issue } from '../../models/schema';
 
 /**
- * プロジェクト一覧コンポーネント
- * プロジェクトの一覧表示、作成、編集、アーカイブ機能を提供
+ * 課題一覧コンポーネント
+ * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
  */
 @Component({
-  selector: 'app-projects-list',
+  selector: 'app-issues-list',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="projects-container">
+    <div class="issues-container">
       <!-- ヘッダー -->
       <div class="header">
-        <h1>プロジェクト一覧</h1>
+        <h2>課題一覧</h2>
         <button class="btn btn-primary" (click)="openCreateModal()">
-          <i class="icon-plus"></i> 新規プロジェクト
+          <i class="icon-plus"></i> 新規課題
         </button>
       </div>
 
@@ -28,88 +28,87 @@ import { Project } from '../../models/schema';
       <div class="filters">
         <div class="filter-group">
           <span>並び替え:</span>
-          <select [(ngModel)]="sortBy" (change)="sortProjects()">
+          <select [(ngModel)]="sortBy" (change)="sortIssues()">
             <option value="name">名称</option>
             <option value="startDate">開始日</option>
             <option value="endDate">終了日</option>
             <option value="progress">進捗</option>
             <option value="createdAt">作成日</option>
           </select>
-          <select [(ngModel)]="sortOrder" (change)="sortProjects()">
+          <select [(ngModel)]="sortOrder" (change)="sortIssues()">
             <option value="asc">昇順</option>
             <option value="desc">降順</option>
           </select>
         </div>
         <div class="filter-group">
           <label>
-            <input type="checkbox" [(ngModel)]="showArchived" (change)="loadProjects()">
+            <input type="checkbox" [(ngModel)]="showArchived" (change)="loadIssues()">
             アーカイブ済みも表示
           </label>
         </div>
       </div>
 
-      <!-- プロジェクト一覧 -->
-      <div class="projects-grid">
+      <!-- 課題一覧 -->
+      <div class="issues-grid">
         <div 
-          *ngFor="let project of filteredProjects" 
-          class="project-card"
-          [class.archived]="project.archived"
+          *ngFor="let issue of filteredIssues" 
+          class="issue-card"
+          [class.archived]="issue.archived"
+          (click)="selectIssue(issue)"
+          (keydown.enter)="selectIssue(issue)"
           role="button"
           tabindex="0"
-          (click)="selectProject(project)"
-          (keydown.enter)="selectProject(project)"
         >
-          <div class="project-header">
-            <h3>{{ project.name }}</h3>
-            <div class="project-actions">
-              <button class="btn-icon" (click)="editProject(project, $event)" title="編集">
+          <div class="issue-header">
+            <div class="issue-title">
+              <div 
+                class="theme-color-badge" 
+                [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
+              ></div>
+              <h3>{{ issue.name }}</h3>
+            </div>
+            <div class="issue-actions">
+              <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
                 <i class="icon-edit"></i>
               </button>
-              <button class="btn-icon" (click)="archiveProject(project, $event)" title="アーカイブ">
+              <button class="btn-icon" (click)="archiveIssue(issue, $event)" title="アーカイブ">
                 <i class="icon-archive"></i>
               </button>
             </div>
           </div>
           
-          <div class="project-content">
-            <p class="description" *ngIf="project.description">{{ project.description }}</p>
+          <div class="issue-content">
+            <p class="description" *ngIf="issue.description">{{ issue.description }}</p>
             
-            <div class="project-meta">
-              <div class="meta-item" *ngIf="project.startDate">
+            <div class="issue-meta">
+              <div class="meta-item" *ngIf="issue.startDate">
                 <i class="icon-calendar"></i>
-                {{ project.startDate | date:'yyyy/MM/dd' }}
+                {{ issue.startDate | date:'yyyy/MM/dd' }}
               </div>
-              <div class="meta-item" *ngIf="project.endDate">
+              <div class="meta-item" *ngIf="issue.endDate">
                 <i class="icon-calendar"></i>
-                {{ project.endDate | date:'yyyy/MM/dd' }}
-              </div>
-              <div class="meta-item">
-                <i class="icon-users"></i>
-                {{ project.memberIds.length }}人
+                {{ issue.endDate | date:'yyyy/MM/dd' }}
               </div>
             </div>
 
             <div class="progress-section">
               <div class="progress-label">
                 <span>進捗</span>
-                <span class="progress-value">{{ project.progress || 0 }}%</span>
+                <span class="progress-value">{{ issue.progress || 0 }}%</span>
               </div>
               <div class="progress-bar">
                 <div 
                   class="progress-fill" 
-                  [style.width.%]="project.progress || 0"
+                  [style.width.%]="issue.progress || 0"
+                  [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
                 ></div>
               </div>
             </div>
 
-            <div class="project-stats">
-              <div class="stat-item">
-                <span class="stat-label">課題数</span>
-                <span class="stat-value">{{ getIssueCount(project.id!) }}</span>
-              </div>
+            <div class="issue-stats">
               <div class="stat-item">
                 <span class="stat-label">タスク数</span>
-                <span class="stat-value">{{ getTaskCount(project.id!) }}</span>
+                <span class="stat-value">{{ getTaskCount(issue.id!) }}</span>
               </div>
             </div>
           </div>
@@ -117,36 +116,36 @@ import { Project } from '../../models/schema';
       </div>
 
       <!-- 空状態 -->
-      <div *ngIf="projects.length === 0" class="empty-state">
+      <div *ngIf="issues.length === 0" class="empty-state">
         <i class="icon-folder"></i>
-        <h3>プロジェクトがありません</h3>
-        <p>新しいプロジェクトを作成して始めましょう</p>
+        <h3>課題がありません</h3>
+        <p>新しい課題を作成して始めましょう</p>
         <button class="btn btn-primary" (click)="openCreateModal()">
-          プロジェクトを作成
+          課題を作成
         </button>
       </div>
     </div>
 
-    <!-- beauP t作成・編集モーダル -->
+    <!-- 課題作成・編集モーダル -->
     <div *ngIf="showModal" class="modal-overlay" (click)="closeModal()" role="button" tabindex="-1">
       <div class="modal" (click)="$event.stopPropagation()" role="button" tabindex="-1">
         <div class="modal-header">
-          <h2>{{ editingProject ? 'プロジェクト編集' : '新規プロジェクト' }}</h2>
-          <button class="btn-icon" (click)="closeModal()" (keydown.enter)="closeModal()">
+          <h2>{{ editingIssue ? '課題編集' : '新規課題' }}</h2>
+          <button class="btn-icon" (click)="closeModal()">
             <i class="icon-close"></i>
           </button>
         </div>
         
-        <form class="modal-body" (ngSubmit)="saveProject()">
+        <form class="modal-body" (ngSubmit)="saveIssue()">
           <div class="form-group">
-            <label for="name">プロジェクト名 *</label>
-        <input
+            <label for="name">課題名 *</label>
+            <input 
               id="name"
               type="text" 
-              [(ngModel)]="projectForm.name" 
-          name="name"
-          required
-              placeholder="プロジェクト名を入力"
+              [(ngModel)]="issueForm.name" 
+              name="name"
+              required
+              placeholder="課題名を入力"
             >
           </div>
           
@@ -154,9 +153,9 @@ import { Project } from '../../models/schema';
             <label for="description">説明</label>
             <textarea 
               id="description"
-              [(ngModel)]="projectForm.description" 
+              [(ngModel)]="issueForm.description" 
               name="description"
-              placeholder="プロジェクトの説明を入力"
+              placeholder="課題の説明を入力"
               rows="3"
             ></textarea>
           </div>
@@ -167,16 +166,16 @@ import { Project } from '../../models/schema';
               <input 
                 id="startDate"
                 type="date" 
-                [(ngModel)]="projectForm.startDate" 
+                [(ngModel)]="issueForm.startDate" 
                 name="startDate"
               >
             </div>
             <div class="form-group">
               <label for="endDate">終了日</label>
-        <input
+              <input 
                 id="endDate"
                 type="date" 
-                [(ngModel)]="projectForm.endDate" 
+                [(ngModel)]="issueForm.endDate" 
                 name="endDate"
               >
             </div>
@@ -186,30 +185,42 @@ import { Project } from '../../models/schema';
             <label for="goal">達成目標</label>
             <textarea 
               id="goal"
-              [(ngModel)]="projectForm.goal" 
-          name="goal"
-              placeholder="プロジェクトの達成目標を入力"
+              [(ngModel)]="issueForm.goal" 
+              name="goal"
+              placeholder="課題の達成目標を入力"
               rows="2"
-        ></textarea>
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="themeColor">テーマカラー</label>
+            <div class="color-picker">
+              <input 
+                id="themeColor"
+                type="color" 
+                [(ngModel)]="issueForm.themeColor" 
+                name="themeColor"
+                class="color-input"
+              >
+              <span class="color-label">カラーを選択</span>
+            </div>
           </div>
           
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="closeModal()">
               キャンセル
             </button>
-            <button type="submit" class="btn btn-primary" [disabled]="!projectForm.name || saving">
+            <button type="submit" class="btn btn-primary" [disabled]="!issueForm.name || saving">
               {{ saving ? '保存中...' : '保存' }}
-          </button>
-        </div>
-      </form>
+            </button>
           </div>
+        </form>
+      </div>
     </div>
   `,
   styles: [`
-    .projects-container {
+    .issues-container {
       padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
     }
 
     .header {
@@ -219,7 +230,7 @@ import { Project } from '../../models/schema';
       margin-bottom: 24px;
     }
 
-    .header h1 {
+    .header h2 {
       margin: 0;
       color: #333;
     }
@@ -250,50 +261,64 @@ import { Project } from '../../models/schema';
       border-radius: 4px;
     }
 
-    .projects-grid {
+    .issues-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 350px));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
       justify-content: center;
+      gap: 16px;
     }
 
-    .project-card {
+    .issue-card {
       background: white;
       border: 1px solid #e1e5e9;
       border-radius: 8px;
-      padding: 20px;
+      padding: 16px;
       cursor: pointer;
       transition: all 0.2s ease;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    .project-card:hover {
+    .issue-card:hover {
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       transform: translateY(-2px);
     }
 
-    .project-card.archived {
+    .issue-card.archived {
       opacity: 0.6;
       background: #f8f9fa;
     }
 
-    .project-header {
+    .issue-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
-    .project-header h3 {
+    .issue-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .theme-color-badge {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .issue-title h3 {
       margin: 0;
       color: #333;
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
     }
 
-    .project-actions {
+    .issue-actions {
       display: flex;
-      gap: 8px;
+      gap: 4px;
     }
 
     .btn-icon {
@@ -312,15 +337,16 @@ import { Project } from '../../models/schema';
 
     .description {
       color: #666;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       line-height: 1.5;
+      font-size: 14px;
     }
 
-    .project-meta {
+    .issue-meta {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .meta-item {
@@ -328,18 +354,18 @@ import { Project } from '../../models/schema';
       align-items: center;
       gap: 4px;
       color: #666;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .progress-section {
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .progress-label {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 14px;
+      margin-bottom: 6px;
+      font-size: 13px;
     }
 
     .progress-value {
@@ -348,19 +374,18 @@ import { Project } from '../../models/schema';
     }
 
     .progress-bar {
-      height: 8px;
+      height: 6px;
       background: #e9ecef;
-      border-radius: 4px;
+      border-radius: 3px;
       overflow: hidden;
     }
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #28a745, #20c997);
       transition: width 0.3s ease;
     }
 
-    .project-stats {
+    .issue-stats {
       display: flex;
       gap: 16px;
     }
@@ -372,12 +397,12 @@ import { Project } from '../../models/schema';
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: 11px;
       color: #666;
     }
 
     .stat-value {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
       color: #333;
     }
@@ -505,6 +530,26 @@ import { Project } from '../../models/schema';
       box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
     }
 
+    .color-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .color-input {
+      width: 40px !important;
+      height: 40px;
+      padding: 0 !important;
+      border: none !important;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .color-label {
+      font-size: 14px;
+      color: #666;
+    }
+
     .modal-footer {
       display: flex;
       justify-content: flex-end;
@@ -519,15 +564,18 @@ import { Project } from '../../models/schema';
     }
   `]
 })
-export class ProjectsListComponent implements OnInit, OnDestroy {
-  private projectsService = inject(ProjectsService);
+export class IssuesListComponent implements OnInit, OnDestroy {
+  private issuesService = inject(IssuesService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
 
-  projects: Project[] = [];
-  filteredProjects: Project[] = [];
+  projectId!: string;
+
+  issues: Issue[] = [];
+  filteredIssues: Issue[] = [];
   showModal = false;
-  editingProject: Project | null = null;
+  editingIssue: Issue | null = null;
   saving = false;
   showArchived = false;
 
@@ -536,16 +584,29 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   sortOrder: 'asc' | 'desc' = 'asc';
 
   // フォームデータ
-  projectForm = {
+  issueForm = {
     name: '',
     description: '',
     startDate: '',
     endDate: '',
-    goal: ''
+    goal: '',
+    themeColor: ''
   };
 
+  // ランダムカラー生成用
+  private colorPalette = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+  ];
+
   ngOnInit() {
-    this.loadProjects();
+    // ルートパラメータからprojectIdを取得
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.projectId = params['projectId'];
+      if (this.projectId) {
+        this.loadIssues();
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -554,32 +615,34 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * プロジェクト一覧を読み込む
+   * 課題一覧を読み込む
    */
-  async loadProjects() {
+  async loadIssues() {
+    if (!this.projectId) return;
+    
     try {
-      this.projects = await this.projectsService.listMyProjects();
-      this.filterProjects();
+      this.issues = await this.issuesService.listIssues(this.projectId);
+      this.filterIssues();
     } catch (error) {
-      console.error('プロジェクトの読み込みに失敗しました:', error);
+      console.error('課題の読み込みに失敗しました:', error);
     }
   }
 
   /**
-   * プロジェクトをフィルタリング
+   * 課題をフィルタリング
    */
-  filterProjects() {
-    this.filteredProjects = this.projects.filter(project => 
-      this.showArchived || !project.archived
+  filterIssues() {
+    this.filteredIssues = this.issues.filter(issue => 
+      this.showArchived || !issue.archived
     );
-    this.sortProjects();
+    this.sortIssues();
   }
 
   /**
-   * プロジェクトを並び替え
+   * 課題を並び替え
    */
-  sortProjects() {
-    this.filteredProjects.sort((a, b) => {
+  sortIssues() {
+    this.filteredIssues.sort((a, b) => {
       let aValue: unknown;
       let bValue: unknown;
 
@@ -615,53 +678,55 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * プロジェクトを選択（詳細表示）
+   * 課題を選択（詳細表示）
    */
-  selectProject(project: Project) {
-    this.router.navigate(['/projects', project.id]);
+  selectIssue(issue: Issue) {
+    this.router.navigate(['/projects', this.projectId, 'issues', issue.id]);
   }
 
   /**
-   * 新規プロジェクト作成モーダルを開く
+   * 新規課題作成モーダルを開く
    */
   openCreateModal() {
-    this.editingProject = null;
-    this.projectForm = {
+    this.editingIssue = null;
+    this.issueForm = {
       name: '',
       description: '',
       startDate: '',
       endDate: '',
-      goal: ''
+      goal: '',
+      themeColor: ''
     };
     this.showModal = true;
   }
 
   /**
-   * プロジェクト編集モーダルを開く
+   * 課題編集モーダルを開く
    */
-  editProject(project: Project, event: Event) {
+  editIssue(issue: Issue, event: Event) {
     event.stopPropagation();
-    this.editingProject = project;
-    this.projectForm = {
-      name: project.name,
-      description: project.description || '',
-      startDate: project.startDate ? this.formatDateForInput(project.startDate) : '',
-      endDate: project.endDate ? this.formatDateForInput(project.endDate) : '',
-      goal: project.goal || ''
+    this.editingIssue = issue;
+    this.issueForm = {
+      name: issue.name,
+      description: issue.description || '',
+      startDate: issue.startDate ? this.formatDateForInput(issue.startDate) : '',
+      endDate: issue.endDate ? this.formatDateForInput(issue.endDate) : '',
+      goal: issue.goal || '',
+      themeColor: issue.themeColor || ''
     };
     this.showModal = true;
   }
 
   /**
-   * プロジェクトをアーカイブ
+   * 課題をアーカイブ
    */
-  async archiveProject(project: Project, event: Event) {
+  async archiveIssue(issue: Issue, event: Event) {
     event.stopPropagation();
-    if (confirm(`プロジェクト「${project.name}」をアーカイブしますか？`)) {
+    if (confirm(`課題「${issue.name}」をアーカイブしますか？`)) {
       try {
-        await this.projectsService.archive(project.id!, !project.archived);
-        await this.loadProjects();
-    } catch (error) {
+        await this.issuesService.archiveIssue(this.projectId, issue.id!, !issue.archived);
+        await this.loadIssues();
+      } catch (error) {
         console.error('アーカイブに失敗しました:', error);
         alert('アーカイブに失敗しました');
       }
@@ -669,36 +734,37 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * プロジェクトを保存
+   * 課題を保存
    */
-  async saveProject() {
-    if (!this.projectForm.name.trim()) {
-      alert('プロジェクト名を入力してください');
+  async saveIssue() {
+    if (!this.issueForm.name.trim()) {
+      alert('課題名を入力してください');
       return;
     }
 
     this.saving = true;
     try {
-      const projectData = {
-        name: this.projectForm.name.trim(),
-        description: this.projectForm.description.trim() || undefined,
-        startDate: this.projectForm.startDate ? new Date(this.projectForm.startDate) : undefined,
-        endDate: this.projectForm.endDate ? new Date(this.projectForm.endDate) : undefined,
-        goal: this.projectForm.goal.trim() || undefined
+      const issueData = {
+        name: this.issueForm.name.trim(),
+        description: this.issueForm.description.trim() || undefined,
+        startDate: this.issueForm.startDate ? new Date(this.issueForm.startDate) : undefined,
+        endDate: this.issueForm.endDate ? new Date(this.issueForm.endDate) : undefined,
+        goal: this.issueForm.goal.trim() || undefined,
+        themeColor: this.issueForm.themeColor || undefined
       };
 
-      if (this.editingProject) {
+      if (this.editingIssue) {
         // 編集（実装予定）
-        console.log('プロジェクト編集機能は実装予定です');
+        console.log('課題編集機能は実装予定です');
       } else {
-        await this.projectsService.createProject(projectData);
+        await this.issuesService.createIssue(this.projectId, issueData);
       }
 
       this.closeModal();
-      await this.loadProjects();
+      await this.loadIssues();
     } catch (error) {
-      console.error('プロジェクトの保存に失敗しました:', error);
-      alert('プロジェクトの保存に失敗しました');
+      console.error('課題の保存に失敗しました:', error);
+      alert('課題の保存に失敗しました');
     } finally {
       this.saving = false;
     }
@@ -709,7 +775,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   closeModal() {
     this.showModal = false;
-    this.editingProject = null;
+    this.editingIssue = null;
     this.saving = false;
   }
 
@@ -721,18 +787,21 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * 課題数を取得（実装予定）
+   * ランダムカラーを取得
    */
-  getIssueCount(projectId: string): number {
-    void projectId; // TODO: IssuesServiceから取得
-    return 0;
+  getRandomColor(issueId: string): string {
+    const hash = issueId.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return this.colorPalette[Math.abs(hash) % this.colorPalette.length];
   }
 
   /**
    * タスク数を取得（実装予定）
    */
-  getTaskCount(projectId: string): number {
-    void projectId; // TODO: TasksServiceから取得
+  getTaskCount(issueId: string): number {
+    void issueId; // TODO: TasksServiceから取得
     return 0;
   }
 }

@@ -1,90 +1,304 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/auth.service';
-//ログイン画面
+import { Router } from '@angular/router';
+import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
+
+/**
+ * ログイン画面コンポーネント
+ * メールアドレスとパスワードでログイン
+ */
 @Component({
-  standalone: true,
   selector: 'app-login',
-  imports: [CommonModule, FormsModule, RouterLink],
+  standalone: true,
+  imports: [CommonModule, FormsModule],
   template: `
-    <div class="max-w-sm mx-auto p-4">
-      <h1 class="text-xl font-bold mb-4">ログイン</h1>
-      <form (ngSubmit)="onSubmit()" #f="ngForm" class="flex flex-col gap-3">
-        <input
-          name="email"
-          type="email"
-          [(ngModel)]="email"
-          placeholder="メール"
-          required
-          class="border p-2 rounded"
-        />
-        <input
-          name="password"
-          type="password"
-          [(ngModel)]="password"
-          placeholder="パスワード"
-          required
-          class="border p-2 rounded"
-        />
-        <label class="text-sm flex items-center gap-2">
-          <input type="checkbox" [(ngModel)]="remember" name="remember" />
-          ログイン状態を保持（30日）
-        </label>
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h1 class="auth-title">
+            <i class="icon-folder"></i>
+            Issue Tracker
+          </h1>
+          <p class="auth-subtitle">ログイン</p>
+        </div>
 
-        <button class="border rounded px-3 py-2" [disabled]="loading()">
-          ログイン
-        </button>
-        <button
-          type="button"
-          class="text-sm underline text-left"
-          (click)="onReset($event)"
-        >
-          パスワードをお忘れですか？
-        </button>
+        <form class="auth-form" (ngSubmit)="login()">
+          <div class="form-group">
+            <label for="email">メールアドレス</label>
+            <input 
+              id="email"
+              type="email" 
+              [(ngModel)]="loginForm.email" 
+              name="email"
+              required
+              placeholder="メールアドレスを入力"
+              [disabled]="loading"
+            >
+          </div>
+          
+          <div class="form-group">
+            <label for="password">パスワード</label>
+            <input 
+              id="password"
+              type="password" 
+              [(ngModel)]="loginForm.password" 
+              name="password"
+              required
+              placeholder="パスワードを入力"
+              [disabled]="loading"
+            >
+          </div>
 
-        <a class="text-sm underline" routerLink="/register">新規登録へ</a>
-        <p class="text-red-600 text-sm" *ngIf="error()">{{ error() }}</p>
-      </form>
+          <div class="form-actions">
+            <button 
+              type="submit" 
+              class="btn btn-primary btn-full"
+              [disabled]="!loginForm.email || !loginForm.password || loading"
+            >
+              {{ loading ? 'ログイン中...' : 'ログイン' }}
+            </button>
+          </div>
+
+          <div class="auth-footer">
+            <p>アカウントをお持ちでない方は</p>
+            <button 
+              type="button" 
+              class="btn btn-link" 
+              (click)="goToRegister()"
+              [disabled]="loading"
+            >
+              アカウント作成
+            </button>
+          </div>
+        </form>
+
+        <!-- エラーメッセージ -->
+        <div *ngIf="errorMessage" class="error-message">
+          <i class="icon-error"></i>
+          {{ errorMessage }}
+        </div>
+      </div>
     </div>
   `,
+  styles: [`
+    .auth-container {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+    }
+
+    .auth-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+      padding: 40px;
+    }
+
+    .auth-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .auth-title {
+      margin: 0 0 8px 0;
+      color: #333;
+      font-size: 24px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .auth-subtitle {
+      margin: 0;
+      color: #666;
+      font-size: 16px;
+    }
+
+    .auth-form {
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e1e5e9;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-group input:disabled {
+      background: #f8f9fa;
+      cursor: not-allowed;
+    }
+
+    .form-actions {
+      margin-bottom: 24px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 16px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #5a6fd8;
+      transform: translateY(-1px);
+    }
+
+    .btn-link {
+      background: none;
+      color: #667eea;
+      padding: 0;
+      font-size: 14px;
+      text-decoration: underline;
+    }
+
+    .btn-link:hover:not(:disabled) {
+      color: #5a6fd8;
+    }
+
+    .btn-full {
+      width: 100%;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-footer {
+      text-align: center;
+      padding-top: 20px;
+      border-top: 1px solid #e1e5e9;
+    }
+
+    .auth-footer p {
+      margin: 0 0 8px 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .error-message {
+      background: #fee;
+      border: 1px solid #fcc;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #c33;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* アイコンフォント用のスタイル */
+    .icon-folder::before { content: '📁'; }
+    .icon-error::before { content: '⚠️'; }
+  `]
 })
 export class LoginComponent {
+  private auth = inject(Auth);
   private router = inject(Router);
-  private auth = inject(AuthService);
 
-  email = '';
-  password = '';
-  remember = true;
-  loading = signal(false);
-  error = signal('');
+  loading = false;
+  errorMessage = '';
 
-  async onSubmit() {
-    this.loading.set(true);
-    this.error.set('');
+  loginForm = {
+    email: '',
+    password: ''
+  };
+
+  /**
+   * ログイン処理
+   */
+  async login() {
+    if (!this.loginForm.email || !this.loginForm.password) {
+      return;
+    }
+
+    this.loading = true;
+    this.errorMessage = '';
+
     try {
-      await this.auth.setRemember(this.remember);
-      await this.auth.login(this.email, this.password);
-      this.router.navigateByUrl('/projects');
-    } catch (e: unknown) {
-      this.error.set(e instanceof Error ? e.message : 'ログインに失敗しました');
+      await signInWithEmailAndPassword(
+        this.auth,
+        this.loginForm.email,
+        this.loginForm.password
+      );
+      
+      // ログイン成功時はプロジェクト一覧に遷移
+      this.router.navigate(['/']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error('ログインエラー:', error);
+      
+      // エラーメッセージを設定
+      switch (error.code) {
+        case 'auth/user-not-found':
+          this.errorMessage = 'このメールアドレスは登録されていません';
+          break;
+        case 'auth/wrong-password':
+          this.errorMessage = 'パスワードが正しくありません';
+          break;
+        case 'auth/invalid-email':
+          this.errorMessage = 'メールアドレスの形式が正しくありません';
+          break;
+        case 'auth/too-many-requests':
+          this.errorMessage = 'ログイン試行回数が多すぎます。しばらく待ってから再試行してください';
+          break;
+        default:
+          this.errorMessage = 'ログインに失敗しました。もう一度お試しください';
+      }
     } finally {
-      this.loading.set(false);
+      this.loading = false;
     }
   }
 
-  async onReset(ev?: Event) {
-    ev?.preventDefault(); // aタグ使用時のページ遷移防止
-    if (!this.email) {
-      this.error.set('メールを入力してください');
-      return;
-    }
-    try {
-      await this.auth.resetPassword(this.email);
-      alert('パスワードリセットメールを送信しました');
-    } catch (e: unknown) {
-      this.error.set(e instanceof Error ? e.message : '送信に失敗しました');
-    }
+  /**
+   * アカウント作成画面に遷移
+   */
+  goToRegister() {
+    this.router.navigate(['/register']);
   }
 }

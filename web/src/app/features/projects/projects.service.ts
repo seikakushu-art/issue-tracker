@@ -83,11 +83,21 @@ export class ProjectsService {
   }) {
     console.log('●●●createProject called with:', input);
     const uid = (await this.requireUser()).uid;
+    
+    // プロジェクト名重複チェック（アクティブ内で一意）
+    await this.checkNameUniqueness(input.name);
+    
+    // バリデーション: 開始日は終了日以前
+    if (input.startDate && input.endDate && input.startDate > input.endDate) {
+      throw new Error('開始日は終了日以前である必要があります');
+    }
+    
     const payload: Record<string, unknown> = {
       name: input.name,
       memberIds: [uid],
       roles: { [uid]: 'admin' },
       archived: false,
+      progress: 0,  // 初期進捗率は0%
       createdAt: serverTimestamp(),
     };
     if (input.description !== undefined && input.description !== null && input.description !== '') {
@@ -140,5 +150,23 @@ export class ProjectsService {
 
   async archive(id: string, archived: boolean) {
     return updateDoc(doc(this.db, 'projects', id), { archived });
+  }
+
+  /**
+   * プロジェクト名の重複をチェックする
+   * アクティブなプロジェクト内で同じ名前が存在する場合、エラーをスローする
+   * @param name プロジェクト名
+   * @param excludeProjectId 除外するプロジェクトID（更新時に使用）
+   */
+  private async checkNameUniqueness(name: string, excludeProjectId?: string): Promise<void> {
+    const projects = await this.listMyProjects();
+    const duplicate = projects.find(
+      project => project.name === name && 
+                 project.id !== excludeProjectId && 
+                 !project.archived
+    );
+    if (duplicate) {
+      throw new Error(`プロジェクト名 "${name}" は既に使用されています`);
+    }
   }
 }
