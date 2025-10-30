@@ -359,8 +359,15 @@ export class IssuesService {
    * @param issueId 課題ID
    */
   async deleteIssue(projectId: string, issueId: string): Promise<void> {
+    // まず配下のタスクをすべて削除し、孤立ドキュメントを防ぐ
+    const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`);
+    const tasksSnap = await getDocs(tasksRef);
+    for (const taskDoc of tasksSnap.docs) {
+      await deleteDoc(taskDoc.ref);
+    }
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
     await deleteDoc(docRef);
+    await this.progressService.updateProjectProgress(projectId); // プロジェクト進捗を再計算
   }
 
   /**

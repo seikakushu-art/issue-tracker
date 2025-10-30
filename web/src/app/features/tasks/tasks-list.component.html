@@ -123,6 +123,22 @@
       tabindex="0"
     >
       <div class="task-header">
+        <div class="task-actions">
+          <!-- 編集ボタンはラベルを表示して操作を明確化 -->
+          <button class="btn-icon btn-icon--labeled" (click)="editTask(task, $event)" title="編集">
+            <i class="icon-edit" aria-hidden="true"></i>
+            <span class="btn-label">編集</span>
+          </button>
+          <!-- アーカイブ状態のトグルもラベル表示 -->
+          <button class="btn-icon btn-icon--labeled" (click)="archiveTask(task, $event)" title="アーカイブ切替">
+            <i class="icon-archive" aria-hidden="true"></i>
+            <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
+          </button>
+          <button class="btn-icon btn-icon--labeled" (click)="deleteTask(task, $event)" title="削除">
+            <i class="icon-delete" aria-hidden="true"></i>
+            <span class="btn-label">削除</span>
+          </button>
+        </div>
         <div class="task-title">
         <div
             class="task-theme-marker"
@@ -132,21 +148,6 @@
           <span class="importance-chip" [ngClass]="getImportanceClass(task.importance)">
             {{ getImportanceLabel(task.importance) }}
           </span>
-        </div>
-        <div class="task-actions">
-           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
-           <button class="btn-icon btn-icon--labeled" (click)="editTask(task, $event)" title="編集">
-            <i class="icon-edit" aria-hidden="true"></i>
-            <span class="btn-label">編集</span>
-          </button>
-            <!-- アーカイブ状態のトグルもラベル表示 -->
-            <button class="btn-icon btn-icon--labeled" (click)="archiveTask(task, $event)" title="アーカイブ切替">
-              <i class="icon-archive" aria-hidden="true"></i>
-              <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
-            </button>
-          <button class="btn-icon" (click)="deleteTask(task, $event)" title="削除">
-            <i class="icon-delete" aria-hidden="true"></i>
-          </button>
         </div>
       </div>
 
@@ -420,13 +421,14 @@
         ></textarea>
       </div>
       
-      <div class="form-row">
+      <!-- 開始日と終了日を同じ行で扱い、十分な余白を確保して読みやすくする -->
+      <div class="form-row form-row--dates">
         <div class="form-group">
           <label for="startDate">開始日</label>
           <input 
             id="startDate"
-            type="date" 
-            [(ngModel)]="taskForm.startDate" 
+            type="date"
+            [(ngModel)]="taskForm.startDate"
             name="startDate"
           >
         </div>

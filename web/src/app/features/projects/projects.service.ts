@@ -10,6 +10,7 @@ import {
   doc,
   updateDoc,
   getDoc,
+  deleteDoc,
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { Project } from '../../models/schema';
@@ -191,6 +192,31 @@ export class ProjectsService {
       console.error('●●●Error in listMyProjects:', error);
       return [];
     }
+  }
+   /**
+   * プロジェクトを削除する
+   * - 配下の課題・タスクも合わせて物理削除する
+   */
+   async deleteProject(projectId: string): Promise<void> {
+    await this.requireUser(); // 認証確認（未ログイン時の削除を防止）
+
+    // プロジェクト配下の課題を取得
+    const issuesRef = collection(this.db, `projects/${projectId}/issues`);
+    const issuesSnap = await getDocs(issuesRef);
+
+    for (const issueDoc of issuesSnap.docs) {
+      // 課題配下のタスクを逐次削除
+      const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueDoc.id}/tasks`);
+      const tasksSnap = await getDocs(tasksRef);
+      for (const taskDoc of tasksSnap.docs) {
+        await deleteDoc(taskDoc.ref);
+      }
+
+      await deleteDoc(issueDoc.ref); // 課題本体を削除
+    }
+
+    // 最後にプロジェクトドキュメントを削除
+    await deleteDoc(doc(this.db, `projects/${projectId}`));
   }
   /**
    * 単一のプロジェクト情報を取得する

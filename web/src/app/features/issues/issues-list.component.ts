@@ -254,6 +254,30 @@ private async loadTags(): Promise<void> {
       }
     }
   }
+   /**
+   * 課題を削除（関連タスクもFirestoreのルールに従って削除される）
+   */
+   async deleteIssue(issue: Issue, event: Event) {
+    event.stopPropagation(); // カード遷移を阻止
+
+    if (!issue.id) {
+      return; // ID未確定の課題は削除不可
+    }
+
+    const confirmed = confirm(`課題「${issue.name}」を削除します。よろしいですか？`);
+    if (!confirmed) {
+      return; // ユーザーキャンセル
+    }
+
+    try {
+      await this.issuesService.deleteIssue(this.projectId, issue.id); // Firestoreドキュメント削除
+      await this.loadIssues(); // UI再読み込み
+    } catch (error) {
+      console.error('課題の削除に失敗しました:', error);
+      alert('課題の削除に失敗しました');
+    }
+  }
+
 
   /**
    * 課題を保存

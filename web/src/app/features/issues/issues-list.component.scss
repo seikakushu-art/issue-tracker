@@ -158,8 +158,8 @@
 
 .issue-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column; // 操作ボタンを上段に集約
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -168,6 +168,7 @@
   align-items: center;
   gap: 8px;
   flex: 1;
+  flex-wrap: wrap; // 長いタイトルでも折り返し表示
 }
 
 .theme-color-badge {
@@ -183,11 +184,15 @@
   color: #333;
   font-size: 16px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .issue-actions {
   display: flex;
   gap: 4px;
+  justify-content: flex-end;
+  align-self: flex-end; // 右上配置
+  flex-wrap: wrap;
 }
 
 .btn-icon {

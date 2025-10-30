@@ -191,6 +191,29 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       }
     }
   }
+ /**
+   * プロジェクトを削除（サブコレクションもまとめて削除）
+   */
+ async deleteProject(project: Project, event: Event) {
+  event.stopPropagation(); // カード遷移を防ぐ
+
+  if (!project.id) {
+    return; // IDが無ければ操作不可
+  }
+
+  const confirmed = confirm(`プロジェクト「${project.name}」を完全に削除します。よろしいですか？\n関連する課題とタスクも削除されます。`);
+  if (!confirmed) {
+    return; // ユーザーがキャンセルした場合
+  }
+
+  try {
+    await this.projectsService.deleteProject(project.id); // Firestore上のプロジェクトを削除
+    await this.loadProjects(); // 最新状態へ更新
+  } catch (error) {
+    console.error('プロジェクトの削除に失敗しました:', error);
+    alert('プロジェクトの削除に失敗しました');
+  }
+}
 
   /**
    * プロジェクトを保存

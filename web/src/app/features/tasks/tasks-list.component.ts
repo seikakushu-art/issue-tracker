@@ -358,6 +358,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     if (!task.id) return;
+    const actionLabel = task.archived ? '復元' : 'アーカイブ';
+    const confirmed = confirm(`タスク「${task.title}」を${actionLabel}しますか？`);
+    if (!confirmed) {
+      return; // キャンセル時は処理しない
+    }
 
     try {
       await this.tasksService.updateTask(this.projectId, this.issueId, task.id, {

@@ -75,13 +75,6 @@
         [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
       ></div>
       <div class="issue-header">
-        <div class="issue-title">
-          <div
-            class="theme-color-badge"
-            [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
-          ></div>
-          <h3>{{ issue.name }}</h3>
-        </div>
         <div class="issue-actions">
           <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
@@ -91,6 +84,17 @@
             <i class="icon-archive" aria-hidden="true"></i>
             <span class="action-label">{{ issue.archived ? '復元' : 'アーカイブ' }}</span>
           </button>
+          <button class="btn-icon" (click)="deleteIssue(issue, $event)" title="削除">
+            <i class="icon-delete" aria-hidden="true"></i>
+            <span class="action-label">削除</span>
+          </button>
+        </div>
+        <div class="issue-title">
+          <div
+            class="theme-color-badge"
+            [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
+          ></div>
+          <h3>{{ issue.name }}</h3>
         </div>
       </div>
       
