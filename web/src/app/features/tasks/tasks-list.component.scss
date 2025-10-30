@@ -13,15 +13,24 @@
   margin: 0;
   color: #333;
 }
+// 課題サマリーをテーマカラーで強調
 .issue-summary {
   margin: 16px 0 24px;
-  padding: 16px;
-  background: #f8f9fb;
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--issue-color-soft, rgba(0, 123, 255, 0.12)) 0%, #ffffff 70%);
+  border: 1px solid var(--issue-color-soft, #e1e5e9);
+  border-left: 6px solid var(--issue-color, #007bff);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px var(--issue-color-glow, rgba(0, 123, 255, 0.15));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  transition: box-shadow 0.2s ease;
+}
+
+// ホバー時にわずかに浮かせて視認性向上
+.issue-summary:hover {
+  box-shadow: 0 16px 32px var(--issue-color-glow, rgba(0, 123, 255, 0.25));
 }
 
 .summary-header {
@@ -39,18 +48,21 @@
   flex: 1;
 }
 
+// カラーマーカーを拡大して色を認識しやすくする
 .summary-color {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 0 4px var(--issue-color-soft, rgba(0, 123, 255, 0.15));
 }
 
 .summary-text h3 {
   margin: 0;
-  font-size: 18px;
-  color: #333;
+  font-size: 20px;
+  color: var(--issue-color, #333);
 }
+
 
 .summary-goal {
   margin: 4px 0 0;
@@ -86,14 +98,15 @@
 
 .summary-progress .progress-bar {
   flex: 1;
-  height: 8px;
+  height: 10px;
+  background: var(--issue-color-soft, rgba(0, 123, 255, 0.18));
 }
 
 .summary-progress .value {
-  min-width: 48px;
+  min-width: 56px;
   text-align: right;
-  font-weight: 600;
-  color: #333;
+  font-weight: 700;
+  color: var(--issue-color, #333);
 }
 
 .summary-tasks h4 {
@@ -255,11 +268,13 @@
   font-size: 16px;
   font-weight: 600;
 }
-
+// ボタンの横幅に余裕を持たせテキストを表示
 .task-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .task-flags {
@@ -282,7 +297,7 @@
 
 .task-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
 }
 
 .btn-action {
@@ -562,24 +577,27 @@
   height: 12px;
   border-radius: 50%;
 }
-
+// チェックリスト入力エリアをゆとりあるレイアウトに
 .checklist-editor {
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .checklist-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
 }
 
 .checklist-input {
-  flex: 1;
+  flex: 1 1 320px;
+  min-width: 0;
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px 14px;
   font-size: 14px;
 }
 
@@ -761,10 +779,27 @@
   align-items: center;
   gap: 4px;
   font-size: 13px;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .btn-icon:hover {
   background: #f0f0f0;
   color: #333;
 }
+// テキスト付きアイコンボタンをより見やすく
+.btn-icon--labeled {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-weight: 500;
+  gap: 6px;
+  color: #555;
+}
 
+.btn-icon--labeled:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #222;
+}
+
+.btn-label {
+  white-space: nowrap;
+}

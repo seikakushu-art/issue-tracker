@@ -1,1 +1,9 @@
 /* You can add global styles to this file, and also import other style files */
+/* 削除アイコンをバツ印で統一 */
+.icon-delete::before {
+    content: '✕';
+    display: inline-block;
+    font-weight: 700;
+    transform: translateY(-1px);
+  }
+  

@@ -8,7 +8,12 @@
   </div>
 
   <!-- 課題のサマリーパネル -->
-  <section *ngIf="issueDetails" class="issue-summary">
+  <!-- テーマカラー強調用のスタイル変数を注入 -->
+  <section
+    *ngIf="issueDetails"
+    class="issue-summary"
+    [ngStyle]="getIssueSummaryStyles()"
+  >
     <div class="summary-header">
       <div class="summary-title">
         <span
@@ -129,14 +134,18 @@
           </span>
         </div>
         <div class="task-actions">
-          <button class="btn-icon" (click)="editTask(task, $event)" title="編集">
-            <i class="icon-edit"></i>
+           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
+           <button class="btn-icon btn-icon--labeled" (click)="editTask(task, $event)" title="編集">
+            <i class="icon-edit" aria-hidden="true"></i>
+            <span class="btn-label">編集</span>
           </button>
-          <button class="btn-icon" (click)="archiveTask(task, $event)" title="アーカイブ切替">
-            <i class="icon-archive"></i>
-          </button>
+            <!-- アーカイブ状態のトグルもラベル表示 -->
+            <button class="btn-icon btn-icon--labeled" (click)="archiveTask(task, $event)" title="アーカイブ切替">
+              <i class="icon-archive" aria-hidden="true"></i>
+              <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
+            </button>
           <button class="btn-icon" (click)="deleteTask(task, $event)" title="削除">
-            <i class="icon-delete"></i>
+            <i class="icon-delete" aria-hidden="true"></i>
           </button>
         </div>
       </div>

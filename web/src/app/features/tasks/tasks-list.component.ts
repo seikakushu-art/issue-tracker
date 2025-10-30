@@ -473,6 +473,18 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.selectedTask = null;
     }
   }
+   /**
+   * 課題サマリーに適用するCSSカスタムプロパティを生成
+   * テンプレート側でテーマカラーを強調表示するために使用
+   */
+   getIssueSummaryStyles(): Record<string, string> {
+    const baseColor = this.getIssueThemeColor();
+    return {
+      '--issue-color': baseColor,
+      '--issue-color-soft': this.getIssueThemeTint(0.16),
+      '--issue-color-glow': this.getIssueThemeTint(0.22)
+    };
+  }
 
   /** 課題のテーマカラーを取得 */
   getIssueThemeColor(): string {
@@ -483,6 +495,55 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return this.getFallbackColor(this.issueDetails.id);
     }
     return this.colorPalette[0];
+  }
+  /**
+   * テーマカラーを透過色に変換
+   * CSS変数で柔らかな背景や影を作るための補助関数
+   */
+  private getIssueThemeTint(alpha: number): string {
+    const base = this.getIssueThemeColor();
+    const rgb = this.parseColor(base);
+    const normalizedAlpha = Math.min(Math.max(alpha, 0), 1);
+    if (rgb) {
+      return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${normalizedAlpha})`;
+    }
+    // 変換できなかった場合はブランドカラーにフォールバック
+    return `rgba(0, 123, 255, ${normalizedAlpha})`;
+  }
+
+  /**
+   * カラーコードをRGB値に変換
+   * #RGB / #RRGGBB / rgb(r,g,b) の表記に対応
+   */
+  private parseColor(color: string): { r: number; g: number; b: number } | null {
+    const trimmed = color.trim();
+
+    // rgb() 形式にも対応
+    const rgbMatch = trimmed.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/i);
+    if (rgbMatch) {
+      return {
+        r: Number(rgbMatch[1]),
+        g: Number(rgbMatch[2]),
+        b: Number(rgbMatch[3])
+      };
+    }
+
+    const hexMatch = trimmed.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!hexMatch) {
+      return null;
+    }
+
+    let hex = hexMatch[1];
+    if (hex.length === 3) {
+      hex = hex.split('').map(char => char + char).join('');
+    }
+
+    const value = parseInt(hex, 16);
+    return {
+      r: (value >> 16) & 0xff,
+      g: (value >> 8) & 0xff,
+      b: value & 0xff
+    };
   }
 
   /** フォールバックカラーを取得 */
