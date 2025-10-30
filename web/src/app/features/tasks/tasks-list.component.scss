@@ -552,15 +552,15 @@
 }
 
 .custom-tag-controls {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto; // カラー・名前・追加ボタンを1行に並べる
-  gap: 8px;
+  display: flex; // 入力欄とボタンを横並びにしつつ重なりを防ぐ
+  gap: 10px;
   margin-top: 8px;
-  align-items: center; // 高さを合わせて視認性を向上
+  align-items: center; // 高さを揃えて視認性を確保
+  flex-wrap: wrap; // 画面が狭い場合は自然に折り返す
 }
 
 .custom-tag-name {
-  width: 100%; // グリッド上で残りの領域をすべて占有
+  flex: 1 1 200px; // 入力欄は余ったスペースを広く使う
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid #ddd;
@@ -569,7 +569,7 @@
 }
 
 .custom-tag-color {
-  width: 44px;// 正方形で色を判別しやすくする
+  flex: 0 0 64px; // 色を判別しやすいように幅を拡大
   height: 44px;
   padding: 0;
   border: 1px solid #ddd;
@@ -577,13 +577,13 @@
   background: #fff;
 }
 
+.custom-tag-controls .btn {
+  flex: 0 0 auto; // ボタンを入力欄に重ねず一定幅を確保
+  white-space: nowrap; // 文言を折り返さず読みやすくする
+}
 @media (max-width: 520px) {
-  .custom-tag-controls {
-    grid-template-columns: auto minmax(0, 1fr); // 狭い画面ではボタンを改行
-  }
-
   .custom-tag-controls .btn {
-    grid-column: 1 / -1; // ボタンを2列分に広げて折り返し時も配置を整える
+    width: 100%; // モバイルではボタンを1行で表示
   }
 }
 .tag-option {
@@ -595,6 +595,7 @@
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-size: 14px; // タグの文字を通常テキストと同じサイズに揃える
 }
 
 .tag-option:hover {
@@ -623,23 +624,29 @@
 }
 
 .checklist-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto; // チェックボックス・入力欄・削除ボタンを行内で整理
+  display: flex; // チェックボックス・入力欄・削除ボタンを横並びで安定配置
   align-items: center; // 垂直位置を中央揃えにして左寄せされた印象を高める
-  gap: 10px;
+  gap: 8px; // チェックボックス周辺の余白を抑えて初期デザインの密度に寄せる
+  flex-wrap: nowrap; // 入力欄の上に削除ボタンが重ならないよう折り返しを防ぐ
 }
 
 .checklist-toggle {
   margin-top: 0; // 余計な余白をなくし、左端に揃えて配置
   justify-self: start;
+  flex: 0 0 18px; // チェックボックスの占有幅を限定して不要な空白をなくす
+  width: 18px; // ブラウザ既定値よりも小さめに調整してコンパクトさを演出
+  height: 18px; // 幅と高さを揃えて視覚的なバランスを維持
 }
 
 .checklist-input {
-  width: 100%; // 行内の残りスペースをフルに活用
+  flex: 1 1 auto; // 横幅を柔軟に広げて入力領域を確保
   min-width: 0;
   margin: 0;
   padding: 12px 14px;
   font-size: 14px;
+}
+.checklist-item .btn-icon {
+  flex: 0 0 auto; // 削除ボタンが入力欄に重ならないよう独立した幅を持たせる
 }
 
 .close-button {
