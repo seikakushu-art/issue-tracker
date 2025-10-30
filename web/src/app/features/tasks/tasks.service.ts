@@ -126,6 +126,7 @@ export class TasksService {
       issueId,
       title: input.title,
       status: input.status,
+      archived: false,
       assigneeIds: input.assigneeIds || [],
       tagIds: input.tagIds || [],
       checklist,
@@ -180,7 +181,17 @@ export class TasksService {
         collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`)
       );
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Task) }));
+      return snap.docs.map((d) => {
+        const data = d.data() as Task;
+        return {
+          id: d.id,
+          ...data,
+          assigneeIds: data.assigneeIds ?? [],
+          tagIds: data.tagIds ?? [],
+          checklist: data.checklist ?? [],
+          archived: data.archived ?? false,
+        };
+      });
     } catch (error) {
       console.error('Error in listTasks:', error);
       return [];
@@ -240,7 +251,15 @@ export class TasksService {
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Task) };
+      const data = docSnap.data() as Task;
+      return {
+        id: docSnap.id,
+        ...data,
+        assigneeIds: data.assigneeIds ?? [],
+        tagIds: data.tagIds ?? [],
+        checklist: data.checklist ?? [],
+        archived: data.archived ?? false,
+      };
     }
     return null;
   }
@@ -268,6 +287,7 @@ export class TasksService {
       tagIds: string[];
       checklist: ChecklistItem[];
       progress: number;
+      archived: boolean;
     }>
   ): Promise<void> {
     // タイトル変更の場合、重複チェック
@@ -306,6 +326,22 @@ export class TasksService {
     await updateDoc(docRef, updates as any);
     await this.refreshProgress(projectId, issueId);
   }
+  /**
+   * タスクのアーカイブ状態を切り替える
+   * @param projectId プロジェクトID
+   * @param issueId 課題ID
+   * @param taskId タスクID
+   * @param archived trueでアーカイブ、falseで復元
+   */
+  async archiveTask(
+    projectId: string,
+    issueId: string,
+    taskId: string,
+    archived: boolean
+  ): Promise<void> {
+    await this.updateTask(projectId, issueId, taskId, { archived });
+  }
+
 
   /**
    * タスクを削除する（物理削除）

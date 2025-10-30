@@ -111,6 +111,7 @@ export interface Task {
   goal?: string | null;
   importance?: Importance;  // 重要度（Critical/High/Medium/Low）
   status: TaskStatus;  // ステータス（未完了/進行中/完了/破棄/保留）
+  archived: boolean;  // アーカイブ状態（課題一覧の表示制御に使用）
   assigneeIds: string[];  // 担当者のユーザーID配列（複数可）
   tagIds: string[];  // タグID配列（最大10個）
   checklist: ChecklistItem[];  // チェックリスト項目

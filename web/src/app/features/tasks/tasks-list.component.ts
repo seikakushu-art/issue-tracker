@@ -1,12 +1,12 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { IssuesService } from '../issues/issues.service';
-import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
+import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem} from '../../models/schema';
 
 /**
  * タスク一覧コンポーネント
@@ -93,10 +93,10 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
           <span>重要度:</span>
           <select [(ngModel)]="importanceFilter" (change)="filterTasks()">
             <option value="">すべて</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            <option value="Critical">至急重要</option>
+            <option value="High">至急</option>
+            <option value="Medium">重要</option>
+            <option value="Low">普通</option>
           </select>
         </div>
         <div class="filter-group">
@@ -114,15 +114,23 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
             <option value="desc">降順</option>
           </select>
         </div>
+        <div class="filter-group">
+          <label>
+            <input type="checkbox" [(ngModel)]="showArchived" (change)="filterTasks()">
+            アーカイブ済みも表示
+          </label>
+        </div>
       </div>
 
       <!-- タスク一覧 -->
       <div class="tasks-grid">
-        <div 
-          *ngFor="let task of filteredTasks" 
+        <div
+          *ngFor="let task of filteredTasks"
           class="task-card"
           [class.completed]="task.status === 'completed'"
           [class.discarded]="task.status === 'discarded'"
+          [class.archived]="task.archived"
+          [style.borderTopColor]="getIssueThemeColor()"
           (click)="selectTask(task)"
           (keydown.enter)="selectTask(task)"
           role="button"
@@ -130,20 +138,30 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
         >
           <div class="task-header">
             <div class="task-title">
-              <div 
-                class="importance-badge" 
-                [class]="'importance-' + (task.importance || 'Low').toLowerCase()"
+            <div
+                class="task-theme-marker"
+                [style.background-color]="getIssueThemeColor()"
               ></div>
               <h3>{{ task.title }}</h3>
+              <span class="importance-chip" [ngClass]="getImportanceClass(task.importance)">
+                {{ getImportanceLabel(task.importance) }}
+              </span>
             </div>
             <div class="task-actions">
               <button class="btn-icon" (click)="editTask(task, $event)" title="編集">
                 <i class="icon-edit"></i>
               </button>
+              <button class="btn-icon" (click)="archiveTask(task, $event)" title="アーカイブ切替">
+                <i class="icon-archive"></i>
+              </button>
               <button class="btn-icon" (click)="deleteTask(task, $event)" title="削除">
                 <i class="icon-delete"></i>
               </button>
             </div>
+          </div>
+
+          <div class="task-flags" *ngIf="task.archived">
+            <span class="flag archived-flag">アーカイブ済み</span>
           </div>
           
           <div class="task-content">
@@ -168,12 +186,13 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
             <div class="progress-section">
               <div class="progress-label">
                 <span>進捗</span>
-                <span class="progress-value">{{ task.progress || 0 }}%</span>
+                <span class="progress-value">{{ getTaskProgress(task) | number:'1.0-0' }}%</span>
               </div>
               <div class="progress-bar">
-                <div 
-                  class="progress-fill" 
-                  [style.width.%]="task.progress || 0"
+              <div
+                  class="progress-fill"
+                  [style.width.%]="getTaskProgress(task)"
+                  [style.background-color]="getIssueThemeColor()"
                 ></div>
               </div>
             </div>
@@ -211,6 +230,164 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
           タスクを作成
         </button>
       </div>
+    </div>
+
+     <!-- タスク詳細パネル -->
+     <div *ngIf="selectedTask" class="task-detail-container">
+      <div
+        class="task-detail-backdrop"
+        (click)="closeDetailPanel()"
+        (keydown.enter)="closeDetailPanel()"
+        (keydown.space)="closeDetailPanel()"
+        role="button"
+        tabindex="0"
+        aria-label="詳細を閉じる"
+      ></div>
+      <aside
+        class="task-detail-panel"
+        [style.borderTopColor]="getIssueThemeColor()"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="detail-header">
+          <div class="detail-title">
+            <span class="importance-chip" [ngClass]="getImportanceClass(selectedTask.importance)">
+              {{ getImportanceLabel(selectedTask.importance) }}
+            </span>
+            <h2>{{ selectedTask.title }}</h2>
+          </div>
+          <div class="detail-actions">
+            <button class="btn btn-secondary btn-sm" (click)="editTask(selectedTask, $event)">
+              編集
+            </button>
+            <button class="btn btn-secondary btn-sm" (click)="archiveTask(selectedTask, $event)">
+              {{ selectedTask.archived ? '復元' : 'アーカイブ' }}
+            </button>
+            <button class="btn-icon" (click)="closeDetailPanel()" aria-label="閉じる">
+              <i class="icon-close"></i>
+            </button>
+          </div>
+        </div>
+
+        <p class="detail-description" *ngIf="selectedTask.description">{{ selectedTask.description }}</p>
+
+        <section class="detail-section">
+          <h3>基本情報</h3>
+          <dl class="detail-meta">
+            <div>
+              <dt>ステータス</dt>
+              <dd>
+                <span class="status-badge" [class]="'status-' + selectedTask.status">
+                  {{ getStatusLabel(selectedTask.status) }}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt>重要度</dt>
+              <dd>
+                <span class="importance-chip" [ngClass]="getImportanceClass(selectedTask.importance)">
+                  {{ getImportanceLabel(selectedTask.importance) }}
+                </span>
+              </dd>
+            </div>
+            <div *ngIf="selectedTask.startDate">
+              <dt>開始日</dt>
+              <dd>{{ selectedTask.startDate | date:'yyyy/MM/dd' }}</dd>
+            </div>
+            <div *ngIf="selectedTask.endDate">
+              <dt>終了日</dt>
+              <dd>{{ selectedTask.endDate | date:'yyyy/MM/dd' }}</dd>
+            </div>
+            <div *ngIf="selectedTask.goal">
+              <dt>達成目標</dt>
+              <dd>{{ selectedTask.goal }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="detail-section">
+          <h3>進捗</h3>
+          <div class="detail-progress">
+            <div class="progress-bar">
+              <div
+                class="progress-fill"
+                [style.width.%]="getTaskProgress(selectedTask)"
+                [style.background-color]="getIssueThemeColor()"
+              ></div>
+            </div>
+            <span class="progress-value">{{ getTaskProgress(selectedTask) | number:'1.0-0' }}%</span>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h3>チェックリスト</h3>
+          <div *ngIf="selectedTask.checklist.length > 0; else emptyChecklist">
+            <div class="detail-checklist-item" *ngFor="let item of selectedTask.checklist">
+              <label>
+                <input
+                  type="checkbox"
+                  [checked]="item.completed"
+                  (change)="toggleChecklistItem(selectedTask!, item.id, $any($event.target).checked)"
+                >
+                <span [class.completed]="item.completed">{{ item.text }}</span>
+              </label>
+              <button
+                type="button"
+                class="btn-icon"
+                (click)="removeChecklistItemFromDetail(item.id)"
+                title="削除"
+              >
+                <i class="icon-delete"></i>
+              </button>
+            </div>
+          </div>
+          <ng-template #emptyChecklist>
+            <p class="placeholder-text">チェックリストはまだありません。</p>
+          </ng-template>
+          <div class="detail-checklist-add">
+            <input
+              type="text"
+              [(ngModel)]="newChecklistText"
+              placeholder="新しい項目を入力"
+              (keydown.enter)="addChecklistItemFromDetail()"
+            >
+            <button type="button" class="btn btn-secondary btn-sm" (click)="addChecklistItemFromDetail()">
+              追加
+            </button>
+          </div>
+        </section>
+
+        <section class="detail-section" *ngIf="selectedTask.tagIds.length > 0">
+          <h3>タグ</h3>
+          <div class="detail-tags">
+            <span
+              *ngFor="let tagId of selectedTask.tagIds"
+              class="tag"
+              [style.background-color]="getTagColor(tagId)"
+            >
+              {{ getTagName(tagId) }}
+            </span>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <h3>担当者</h3>
+          <p *ngIf="selectedTask.assigneeIds.length === 0" class="placeholder-text">担当者はまだ割り当てられていません。</p>
+          <ul *ngIf="selectedTask.assigneeIds.length > 0" class="assignee-list">
+            <li *ngFor="let assigneeId of selectedTask.assigneeIds">{{ assigneeId }}</li>
+          </ul>
+        </section>
+
+        <section class="detail-section">
+          <h3>添付</h3>
+          <p class="placeholder-text">添付ファイルの管理機能は現在準備中です。</p>
+        </section>
+
+        <section class="detail-section">
+          <h3>コメント</h3>
+          <p class="placeholder-text">コメント機能（メンション対応）は今後の開発予定です。</p>
+        </section>
+      </aside>
     </div>
 
     <!-- タスク作成・編集モーダル -->
@@ -272,10 +449,10 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
             <div class="form-group">
               <label for="importance">重要度</label>
               <select id="importance" [(ngModel)]="taskForm.importance" name="importance">
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
+              <option value="Low">普通</option>
+                <option value="Medium">重要</option>
+                <option value="High">至急</option>
+                <option value="Critical">至急重要</option>
               </select>
             </div>
             <div class="form-group">
@@ -564,6 +741,7 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
       cursor: pointer;
       transition: all 0.2s ease;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border-top: 4px solid transparent;
     }
 
     .task-card:hover {
@@ -582,6 +760,11 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
       text-decoration: line-through;
     }
 
+    .task-card.archived {
+      opacity: 0.6;
+    }
+
+
     .task-header {
       display: flex;
       justify-content: space-between;
@@ -594,19 +777,29 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
       align-items: center;
       gap: 8px;
       flex: 1;
+      flex-wrap: wrap;
     }
 
-    .importance-badge {
-      width: 8px;
-      height: 8px;
+    .task-theme-marker {
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       flex-shrink: 0;
     }
 
-    .importance-critical { background: #dc3545; }
-    .importance-high { background: #fd7e14; }
-    .importance-medium { background: #ffc107; }
-    .importance-low { background: #28a745; }
+    .importance-chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.6;
+    }
+
+    .importance-critical { background: #c62828; }
+    .importance-high { background: #ef6c00; }
+    .importance-medium { background: #f9a825; color: #553600; }
+    .importance-low { background: #2e7d32; }
 
     .task-title h3 {
       margin: 0;
@@ -614,6 +807,30 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
       font-size: 16px;
       font-weight: 600;
     }
+
+    .task-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .task-flags {
+      margin-bottom: 8px;
+    }
+
+    .flag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .archived-flag {
+      background: #6c757d;
+    }
+
 
     .task-actions {
       display: flex;
@@ -694,7 +911,7 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #28a745, #20c997);
+      background: #20c997;
       transition: width 0.3s ease;
     }
 
@@ -914,6 +1131,8 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
     .checklist-input {
       flex: 1;
       margin: 0;
+      padding: 10px 12px;
+      font-size: 14px;
     }
 
     .modal-footer {
@@ -928,13 +1147,166 @@ import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
       opacity: 0.6;
       cursor: not-allowed;
     }
+
+    .task-detail-container {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: flex-end;
+      z-index: 900;
+    }
+
+    .task-detail-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+    }
+
+    .task-detail-panel {
+      position: relative;
+      width: min(420px, 100%);
+      background: #fff;
+      height: 100%;
+      overflow-y: auto;
+      padding: 24px;
+      box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+      border-top: 4px solid transparent;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .detail-title {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .detail-title h2 {
+      margin: 0;
+      font-size: 20px;
+      color: #222;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .detail-description {
+      margin: 12px 0;
+      color: #555;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .detail-section {
+      margin-top: 16px;
+    }
+
+    .detail-section h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .detail-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .detail-meta div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-meta dt {
+      font-size: 12px;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .detail-meta dd {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+      word-break: break-word;
+    }
+
+    .detail-progress {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .detail-checklist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+      gap: 8px;
+    }
+
+    .detail-checklist-item label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .detail-checklist-item span.completed {
+      text-decoration: line-through;
+      color: #888;
+    }
+
+    .detail-checklist-add {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .detail-checklist-add input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .detail-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .assignee-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .placeholder-text {
+      color: #777;
+      font-size: 13px;
+      margin: 0;
+    }
   `]
 })
 export class TasksListComponent implements OnInit, OnDestroy {
   private tasksService = inject(TasksService);
   private tagsService = inject(TagsService);
-  private issuesService = inject(IssuesService)
-  private router = inject(Router);
+  private issuesService = inject(IssuesService);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
 
@@ -950,6 +1322,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
   showModal = false;
   editingTask: Task | null = null;
   saving = false;
+  showArchived = false;
+  selectedTaskId: string | null = null;
+  selectedTask: Task | null = null;
+  newChecklistText = '';
 
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
@@ -970,6 +1346,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
     status: 'incomplete' as TaskStatus,
     tagIds: [] as string[],
     checklist: [] as { id: string; text: string; completed: boolean }[]
+  };
+
+  private importanceDisplay: Record<Importance, { label: string }> = {
+    Critical: { label: '至急重要' },
+    High: { label: '至急' },
+    Medium: { label: '重要' },
+    Low: { label: '普通' }
   };
   // 課題カラーのフォールバック用パレット
   private colorPalette = [
@@ -1004,35 +1387,43 @@ export class TasksListComponent implements OnInit, OnDestroy {
     if (!this.projectId || !this.issueId) return;
     
     try {
+      // Firestoreから対象課題のタスク一覧を取得
       this.tasks = await this.tasksService.listTasks(this.projectId, this.issueId);
+      // 取得直後にフィルターと並び替えを適用
       this.filterTasks();
+      // 選択済みタスクがあれば最新情報に差し替え
+      this.refreshSelectedTask();
+      // 課題サマリー（進捗・代表タスク）を更新
       this.updateIssueSummaryFromTasks();
     } catch (error) {
       console.error('タスクの読み込みに失敗しました:', error);
     }
   }
- /**
+  /**
    * 課題の基本情報を読み込む
    */
- async loadIssueDetails() {
-  if (!this.projectId || !this.issueId) return;
+  async loadIssueDetails() {
+    if (!this.projectId || !this.issueId) return;
 
-  try {
-    this.issueDetails = await this.issuesService.getIssue(this.projectId, this.issueId);
-    this.issueProgress = this.issueDetails?.progress ?? 0;
-    this.updateIssueSummaryFromTasks();
-  } catch (error) {
-    console.error('課題情報の読み込みに失敗しました:', error);
-    this.issueDetails = null;
-    this.issueProgress = 0;
-    this.taskPreview = [];
+    try {
+      // 親課題の基本情報を取得
+      this.issueDetails = await this.issuesService.getIssue(this.projectId, this.issueId);
+      this.issueProgress = this.issueDetails?.progress ?? 0;
+      // 課題進捗に基づきサマリーを反映
+      this.updateIssueSummaryFromTasks();
+    } catch (error) {
+      console.error('課題情報の読み込みに失敗しました:', error);
+      this.issueDetails = null;
+      this.issueProgress = 0;
+      this.taskPreview = [];
+    }
   }
-}
   /**
    * タグ一覧を読み込む
    */
   async loadTags() {
     try {
+      // タグは共有リソースのためサービスから一括取得
       this.availableTags = await this.tagsService.listTags();
     } catch (error) {
       console.error('タグの読み込みに失敗しました:', error);
@@ -1043,7 +1434,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * タスクをフィルタリング
    */
   filterTasks() {
+    // フィルター条件に合致するタスクのみ抽出
     this.filteredTasks = this.tasks.filter(task => {
+      if (!this.showArchived && task.archived) {
+        return false;
+      }
       if (this.statusFilter && task.status !== this.statusFilter) {
         return false;
       }
@@ -1059,7 +1454,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * タスクを並び替え
    */
   sortTasks() {
+    // 並び替え基準ごとに比較値を算出
     this.filteredTasks.sort((a, b) => {
+      if (a.archived !== b.archived) {
+        return a.archived ? 1 : -1;
+      }
       let aValue: unknown;
       let bValue: unknown;
 
@@ -1101,10 +1500,25 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * タスクを選択（詳細表示）
+   * タスクを選択して詳細パネルを開く
    */
   selectTask(task: Task) {
-    this.router.navigate(['/projects', this.projectId, 'issues', this.issueId, 'tasks', task.id]);
+    // カードクリック時に遷移せず詳細パネルを開くため、選択IDを保存
+    this.selectedTaskId = task.id ?? null;
+    // 選択タスクを保持して右側パネルに内容を表示
+    this.selectedTask = task;
+    // 新規チェックリスト入力欄は毎回リセットしておく
+    this.newChecklistText = '';
+  }
+
+  /**
+   * タスク詳細パネルを閉じる
+   */
+  closeDetailPanel() {
+    // 選択状態を全て解除し、パネルを閉じる
+    this.selectedTaskId = null;
+    this.selectedTask = null;
+    this.newChecklistText = '';
   }
 
   /**
@@ -1130,6 +1544,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * タスク編集モーダルを開く
    */
   editTask(task: Task, event: Event) {
+    // カード自体のクリック処理に波及しないよう停止
     event.stopPropagation();
     this.editingTask = task;
     this.taskForm = {
@@ -1141,7 +1556,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       importance: task.importance || 'Low',
       status: task.status,
       tagIds: [...task.tagIds],
-      checklist: task.checklist.map(item => ({ ...item }))
+      checklist: task.checklist.map(item => ({ ...item, id: item.id || this.generateId() }))
     };
     this.showModal = true;
   }
@@ -1150,6 +1565,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * タスクを削除
    */
   async deleteTask(task: Task, event: Event) {
+    // 詳細パネルを誤って開かないようイベントを止める
     event.stopPropagation();
     if (confirm(`タスク「${task.title}」を削除しますか？`)) {
       try {
@@ -1161,7 +1577,32 @@ export class TasksListComponent implements OnInit, OnDestroy {
       }
     }
   }
+ /**
+   * タスクをアーカイブ/復元する
+   */
+ async archiveTask(task: Task, event?: Event) {
+  // カードクリックとは独立してアーカイブ切替を行う
+  event?.stopPropagation();
+  if (!task.id) {
+    return;
+  }
 
+  const nextArchived = !task.archived;
+  const actionLabel = nextArchived ? 'アーカイブ' : '復元';
+  if (!confirm(`タスク「${task.title}」を${actionLabel}しますか？`)) {
+    return;
+  }
+
+  try {
+    this.selectedTaskId = task.id;
+    await this.tasksService.archiveTask(this.projectId, this.issueId, task.id, nextArchived);
+    // アーカイブ切替後の状態を再読み込みしてUIを同期
+    await this.loadTasks();
+  } catch (error) {
+    console.error('タスクのアーカイブ切替に失敗しました:', error);
+    alert('アーカイブ処理に失敗しました');
+  }
+}
   /**
    * タスクを保存
    */
@@ -1173,24 +1614,65 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     this.saving = true;
     try {
-      const taskData = {
-        title: this.taskForm.title.trim(),
-        description: this.taskForm.description.trim() || undefined,
-        startDate: this.taskForm.startDate ? new Date(this.taskForm.startDate) : undefined,
-        endDate: this.taskForm.endDate ? new Date(this.taskForm.endDate) : undefined,
-        goal: this.taskForm.goal.trim() || undefined,
-        importance: this.taskForm.importance,
-        status: this.taskForm.status,
-        assigneeIds: [], // TODO: 担当者選択機能
-        tagIds: this.taskForm.tagIds,
-        checklist: this.taskForm.checklist
-      };
+      const trimmedTitle = this.taskForm.title.trim();
+      const description = this.taskForm.description.trim();
+      const goal = this.taskForm.goal.trim();
+      const startDateValue = this.taskForm.startDate ? new Date(this.taskForm.startDate) : undefined;
+      const endDateValue = this.taskForm.endDate ? new Date(this.taskForm.endDate) : undefined;
+
+      if (!this.validateWithinIssuePeriod(startDateValue, endDateValue)) {
+        this.saving = false;
+        return;
+      }
+
+      // 入力されたチェックリストの空白除去・ID付与を行う
+      const sanitizedChecklist: ChecklistItem[] = this.taskForm.checklist
+        .map(item => ({
+          id: item.id || this.generateId(),
+          text: item.text.trim(),
+          completed: item.completed,
+        }))
+        .filter(item => item.text.length > 0);
+
+      if (this.editingTask && !this.editingTask.id) {
+        throw new Error('タスクIDが取得できませんでした');
+      }
 
       if (this.editingTask) {
-        // 編集（実装予定）
-        console.log('タスク編集機能は実装予定です');
+        const updates = {
+          title: trimmedTitle,
+          description: description || null,
+          startDate: startDateValue ?? null,
+          endDate: endDateValue ?? null,
+          goal: goal || null,
+          importance: this.taskForm.importance,
+          status: this.taskForm.status,
+          tagIds: [...this.taskForm.tagIds],
+          checklist: sanitizedChecklist,
+        };
+
+        await this.tasksService.updateTask(
+          this.projectId,
+          this.issueId,
+          this.editingTask.id!,
+          updates
+        );
+        this.selectedTaskId = this.editingTask.id!;
       } else {
-        await this.tasksService.createTask(this.projectId, this.issueId, taskData);
+        // 新規作成時はサービスに作成を依頼し、戻り値IDを選択中として保持
+        const createdId = await this.tasksService.createTask(this.projectId, this.issueId, {
+          title: trimmedTitle,
+          description: description || undefined,
+          startDate: startDateValue,
+          endDate: endDateValue,
+          goal: goal || undefined,
+          importance: this.taskForm.importance,
+          status: this.taskForm.status,
+          assigneeIds: [],
+          tagIds: [...this.taskForm.tagIds],
+          checklist: sanitizedChecklist,
+        });
+        this.selectedTaskId = createdId;
       }
 
       this.closeModal();
@@ -1207,6 +1689,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * タグをトグル
    */
   toggleTag(tagId: string) {
+    // 選択済みなら解除、未選択なら最大数を確認して追加
     const index = this.taskForm.tagIds.indexOf(tagId);
     if (index > -1) {
       this.taskForm.tagIds.splice(index, 1);
@@ -1224,6 +1707,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
    */
   addChecklistItem() {
     if (this.taskForm.checklist.length < 200) {
+      // 新規入力欄を末尾に追加
       this.taskForm.checklist.push({
         id: this.generateId(),
         text: '',
@@ -1238,6 +1722,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * チェックリスト項目を削除
    */
   removeChecklistItem(index: number) {
+    // 指定位置の項目を削除
     this.taskForm.checklist.splice(index, 1);
   }
 
@@ -1248,6 +1733,178 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.showModal = false;
     this.editingTask = null;
     this.saving = false;
+  }
+
+  /**
+   * 選択中タスクを最新情報に更新
+   */
+  private refreshSelectedTask(): void {
+    if (!this.selectedTaskId) {
+      this.selectedTask = null;
+      return;
+    }
+
+    // 最新の配列から同一IDを探し直す
+    const updated = this.tasks.find(task => task.id === this.selectedTaskId);
+    if (updated) {
+      this.selectedTask = updated;
+    } else {
+      // 存在しない場合は選択をクリア
+      this.selectedTaskId = null;
+      this.selectedTask = null;
+    }
+  }
+
+  /**
+   * 課題のテーマカラーを取得
+   */
+  getIssueThemeColor(): string {
+    if (this.issueDetails?.themeColor) {
+      return this.issueDetails.themeColor;
+    }
+    if (this.issueDetails?.id) {
+      return this.getFallbackColor(this.issueDetails.id);
+    }
+    return this.colorPalette[0];
+  }
+
+  /**
+   * 重要度のラベルを日本語で取得
+   */
+  getImportanceLabel(importance?: Importance): string {
+    const key = importance ?? 'Low';
+    return this.importanceDisplay[key].label;
+  }
+
+  /**
+   * 重要度バッジ用のクラス名を返す
+   */
+  getImportanceClass(importance?: Importance): string {
+    const key = (importance ?? 'Low').toLowerCase() as Lowercase<Importance>;
+    return `importance-${key}`;
+  }
+
+  /**
+   * 選択中タスクの進捗率を取得
+   */
+  getTaskProgress(task: Task): number {
+    if (typeof task.progress === 'number') {
+      return task.progress;
+    }
+    return this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
+  }
+
+  /**
+   * 詳細パネルからチェックリストの完了状態を切り替える
+   */
+  async toggleChecklistItem(task: Task, itemId: string, completed: boolean) {
+    // チェックボックスのオンオフ結果をローカル配列へ反映
+    const updatedChecklist = task.checklist.map(item =>
+      item.id === itemId ? { ...item, completed } : item
+    );
+    await this.persistChecklist(task, updatedChecklist);
+  }
+
+  /**
+   * 詳細パネルからチェックリスト項目を追加
+   */
+  async addChecklistItemFromDetail() {
+    const text = this.newChecklistText.trim();
+    if (!text || !this.selectedTask) {
+      return;
+    }
+
+    const updatedChecklist = [
+      ...this.selectedTask.checklist,
+      // 詳細パネルで追加した新項目はここでIDを付与
+      { id: this.generateId(), text, completed: false }
+    ];
+
+    await this.persistChecklist(this.selectedTask, updatedChecklist);
+    this.newChecklistText = '';
+  }
+
+  /**
+   * 詳細パネルからチェックリスト項目を削除
+   */
+  async removeChecklistItemFromDetail(itemId: string) {
+    if (!this.selectedTask) {
+      return;
+    }
+
+    // 指定ID以外を残すことで削除処理を実現
+    const updatedChecklist = this.selectedTask.checklist.filter(item => item.id !== itemId);
+    await this.persistChecklist(this.selectedTask, updatedChecklist);
+  }
+
+  /**
+   * チェックリスト更新をFirestoreに反映
+   */
+  private async persistChecklist(task: Task, checklist: ChecklistItem[]): Promise<void> {
+    if (!task.id) {
+      return;
+    }
+
+    try {
+      // チェックリストから自動的にステータスを推定
+      const nextStatus = this.resolveStatusFromChecklist(task, checklist);
+      await this.tasksService.updateTask(this.projectId, this.issueId, task.id, {
+        checklist,
+        status: nextStatus,
+      });
+      this.selectedTaskId = task.id;
+      // 再読込で進捗・ステータス・プレビューを同期
+      await this.loadTasks();
+    } catch (error) {
+      console.error('チェックリストの更新に失敗しました:', error);
+      alert('チェックリストの更新に失敗しました');
+    }
+  }
+
+  /**
+   * チェックリスト内容に応じたステータスを決定
+   */
+  private resolveStatusFromChecklist(task: Task, checklist: ChecklistItem[]): TaskStatus {
+    if (checklist.length === 0) {
+      return task.status;
+    }
+
+    if (task.status === 'on_hold' || task.status === 'discarded') {
+      return task.status;
+    }
+
+    const completedCount = checklist.filter(item => item.completed).length;
+    if (completedCount === 0) {
+      return 'incomplete';
+    }
+    if (completedCount === checklist.length) {
+      return 'completed';
+    }
+    return 'in_progress';
+  }
+
+  /**
+   * 課題の期間制約内かを検証
+   */
+  private validateWithinIssuePeriod(start?: Date, end?: Date): boolean {
+    if (!this.issueDetails) {
+      return true;
+    }
+
+    const issueStart = this.normalizeDate(this.issueDetails.startDate);
+    const issueEnd = this.normalizeDate(this.issueDetails.endDate);
+
+    if (start && issueStart && start < issueStart) {
+      alert('開始日は課題の開始日以降で設定してください');
+      return false;
+    }
+
+    if (end && issueEnd && end > issueEnd) {
+      alert('終了日は課題の終了日以前で設定してください');
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -1263,111 +1920,115 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private generateId(): string {
     return Math.random().toString(36).substr(2, 9);
   }
-/**
+  /**
    * 課題サマリー表示用に進捗・タスクプレビューを更新
    */
-private updateIssueSummaryFromTasks(): void {
-  if (!this.issueDetails) {
-    this.issueProgress = 0;
-    this.taskPreview = [];
-    return;
-  }
-
-  const activeTasks = this.tasks.filter(task => task.status !== 'discarded');
-
-  if (activeTasks.length === 0) {
-    this.issueProgress = this.issueDetails.progress ?? 0;
-    this.taskPreview = [];
-    return;
-  }
-
-  let totalProgressWeight = 0;
-  let totalWeight = 0;
-
-  for (const task of activeTasks) {
-    const weight = this.getImportanceWeight(task.importance);
-    const progress = typeof task.progress === 'number'
-      ? task.progress
-      : this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
-    totalProgressWeight += progress * weight;
-    totalWeight += weight;
-  }
-
-  const computedProgress = totalWeight === 0
-    ? 0
-    : Math.round((totalProgressWeight / totalWeight) * 10) / 10;
-  this.issueProgress = Math.min(100, Math.max(0, computedProgress));
-
-  const sortedTasks = [...activeTasks].sort((a, b) => {
-    const weightDiff = this.getImportanceWeight(b.importance) - this.getImportanceWeight(a.importance);
-    if (weightDiff !== 0) {
-      return weightDiff;
+  private updateIssueSummaryFromTasks(): void {
+    if (!this.issueDetails) {
+      this.issueProgress = 0;
+      this.taskPreview = [];
+      return;
     }
-    const endA = this.normalizeDate(a.endDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    const endB = this.normalizeDate(b.endDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    return endA - endB;
-  });
 
-  this.taskPreview = sortedTasks.slice(0, 3);
-}
+    const activeTasks = this.tasks.filter(task => task.status !== 'discarded');
 
-/**
- * 重要度を重み（1-4）に変換
- */
-private getImportanceWeight(importance?: Importance): number {
-  switch (importance) {
-    case 'Critical':
-      return 4;
-    case 'High':
-      return 3;
-    case 'Medium':
-      return 2;
-    default:
-      return 1;
+    if (activeTasks.length === 0) {
+      this.issueProgress = this.issueDetails.progress ?? 0;
+      this.taskPreview = [];
+      return;
+    }
+
+    let totalProgressWeight = 0;
+    let totalWeight = 0;
+
+    for (const task of activeTasks) {
+      // 重要度に応じた重み付けを計算
+      const weight = this.getImportanceWeight(task.importance);
+      // 既存progressがなければチェックリストから算出
+      const progress = typeof task.progress === 'number'
+        ? task.progress
+        : this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
+      totalProgressWeight += progress * weight;
+      totalWeight += weight;
+    }
+
+    const computedProgress = totalWeight === 0
+      ? 0
+      : Math.round((totalProgressWeight / totalWeight) * 10) / 10;
+    // 0-100の範囲に収めた値をサマリーに反映
+    this.issueProgress = Math.min(100, Math.max(0, computedProgress));
+
+    const sortedTasks = [...activeTasks].sort((a, b) => {
+      // 重要度の高いタスクを優先し、同順位は期日が早いものを上に
+      const weightDiff = this.getImportanceWeight(b.importance) - this.getImportanceWeight(a.importance);
+      if (weightDiff !== 0) {
+        return weightDiff;
+      }
+      const endA = this.normalizeDate(a.endDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      const endB = this.normalizeDate(b.endDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+      return endA - endB;
+    });
+
+    // 代表タスクとして最大3件を表示
+    this.taskPreview = sortedTasks.slice(0, 3);
   }
-}
 
-/**
- * Firestoreの日時表現をDate型に統一
- */
-private normalizeDate(value: unknown): Date | null {
-  if (!value) {
+  /**
+   * 重要度を重み（1-4）に変換
+   */
+  private getImportanceWeight(importance?: Importance): number {
+    switch (importance) {
+      case 'Critical':
+        return 4;
+      case 'High':
+        return 3;
+      case 'Medium':
+        return 2;
+      default:
+        return 1;
+    }
+  }
+
+  /**
+   * Firestoreの日時表現をDate型に統一
+   */
+  private normalizeDate(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'toDate' in value &&
+      typeof (value as { toDate: () => Date }).toDate === 'function'
+    ) {
+      const converted = (value as { toDate: () => Date }).toDate();
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    }
+
     return null;
   }
 
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
+  /**
+   * テーマカラー未設定時のフォールバックカラー
+   */
+  getFallbackColor(issueId: string): string {
+    const hash = issueId.split('').reduce((acc, char) => {
+      acc = ((acc << 5) - acc) + char.charCodeAt(0);
+      return acc & acc;
+    }, 0);
+    return this.colorPalette[Math.abs(hash) % this.colorPalette.length];
   }
-
-  if (typeof value === 'string') {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    'toDate' in value &&
-    typeof (value as { toDate: () => Date }).toDate === 'function'
-  ) {
-    const converted = (value as { toDate: () => Date }).toDate();
-    return Number.isNaN(converted.getTime()) ? null : converted;
-  }
-
-  return null;
-}
-
-/**
- * テーマカラー未設定時のフォールバックカラー
- */
-getFallbackColor(issueId: string): string {
-  const hash = issueId.split('').reduce((acc, char) => {
-    acc = ((acc << 5) - acc) + char.charCodeAt(0);
-    return acc & acc;
-  }, 0);
-  return this.colorPalette[Math.abs(hash) % this.colorPalette.length];
-}
-
   /**
    * ステータスラベルを取得
    */
