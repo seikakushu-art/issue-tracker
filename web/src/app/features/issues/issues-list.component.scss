@@ -286,6 +286,24 @@
   flex-wrap: wrap; // タイトルが長い場合でも折り返す
 }
 
+.representative-tags {
+  display: flex;
+  flex-wrap: wrap; // タグが多い場合でも折り返して表示
+  gap: 6px;
+}
+
+.representative-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #4c6ef5; // 色未指定時のフォールバック
+}
+
+
 .task-label {
   font-size: 12px;
   font-weight: 600;

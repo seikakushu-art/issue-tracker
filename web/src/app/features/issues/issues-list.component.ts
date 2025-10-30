@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
-import { Issue, Project,Importance } from '../../models/schema';
+import { Issue, Project,Importance,Tag } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { FirebaseError } from 'firebase/app';
-import { TasksService,TaskSummary } from '../tasks/tasks.service';
+import { TasksService, TaskSummary } from '../tasks/tasks.service';
+import { TagsService } from '../tags/tags.service';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -23,6 +24,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   private issuesService = inject(IssuesService);
   private projectsService = inject(ProjectsService);
   private tasksService = inject(TasksService);
+  private tagsService = inject(TagsService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
@@ -42,6 +44,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
    * UIのカード上で素早く表示できるよう、サービスからまとめて取得した内容を保持する
    */
   private taskSummaryMap: Record<string, TaskSummary> = {}; // タスク概要をキャッシュ
+  private tagMap: Record<string, Tag> = {}; // タグID→タグ情報の逆引きを保持
   private importanceLabels: Record<Importance, string> = { // 課題カード用の重要度表示
     Critical: '至急重要',
     High: '至急',
@@ -75,6 +78,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     void this.loadAvailableProjects();
+    void this.loadTags(); // タグ表示用に初回読込
     // ルートパラメータからprojectIdを取得
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.projectId = params['projectId'];
@@ -106,15 +110,16 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       this.issues = issues;
       this.filterIssues();
       await this.refreshTaskSummaries();
+      void this.loadTags(); // 直近で作成されたタグも反映
     } catch (error) {
       console.error('課題の読み込みに失敗しました:', error);
     }
   }
-/**
+ /**
    * 選択可能なプロジェクト一覧を取得する
    * 課題移動時のプルダウンで利用する
    */
-private async loadAvailableProjects(): Promise<void> {
+ private async loadAvailableProjects(): Promise<void> {
   try {
     const projects = await this.projectsService.listMyProjects();
     this.availableProjects = projects.filter((project): project is Project => Boolean(project.id));
@@ -123,6 +128,24 @@ private async loadAvailableProjects(): Promise<void> {
     this.availableProjects = [];
   }
 }
+
+/**
+ * タグ一覧を読み込み、IDから即座に参照できるようマップ化する
+ */
+private async loadTags(): Promise<void> {
+  try {
+    const tags = await this.tagsService.listTags();
+    this.tagMap = tags.reduce<Record<string, Tag>>((acc, tag) => {
+      if (tag.id) {
+        acc[tag.id] = tag; // 代表タスク表示で名称と色を即座に取り出す
+      }
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error('タグの取得に失敗しました:', error);
+    this.tagMap = {};
+  }
+  }
 
   /**
    * 課題をフィルタリング
@@ -220,13 +243,14 @@ private async loadAvailableProjects(): Promise<void> {
    */
   async archiveIssue(issue: Issue, event: Event) {
     event.stopPropagation();
-    if (confirm(`課題「${issue.name}」をアーカイブしますか？`)) {
+    const actionLabel = issue.archived ? '復元' : 'アーカイブ';
+    if (confirm(`課題「${issue.name}」を${actionLabel}しますか？`)) {
       try {
         await this.issuesService.archiveIssue(this.projectId, issue.id!, !issue.archived);
         await this.loadIssues();
       } catch (error) {
-        console.error('アーカイブに失敗しました:', error);
-        alert('アーカイブに失敗しました');
+        console.error(`${actionLabel}に失敗しました:`, error);
+        alert(`${actionLabel}に失敗しました`);
       }
     }
   }
@@ -367,7 +391,19 @@ private async loadAvailableProjects(): Promise<void> {
     }
     return summary.representativeTask;
   }
+/**
+   * 代表タスクに紐づくタグ情報を取得し、カードに表示できる形式で返却
+   */
+getRepresentativeTags(issueId: string): Tag[] {
+  const task = this.getRepresentativeTask(issueId);
+  if (!task) {
+    return [];
+  }
 
+  return task.tagIds
+    .map(tagId => this.tagMap[tagId])
+    .filter((tag): tag is Tag => Boolean(tag)); // 情報が揃っているタグのみ表示
+}
   /** 重要度の日本語ラベルを取得 */
   getImportanceLabel(importance?: Importance | null): string {
     const key = importance ?? 'Low';

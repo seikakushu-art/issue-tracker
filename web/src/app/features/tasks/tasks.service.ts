@@ -23,7 +23,11 @@ import { ProgressService } from '../projects/progress.service';
  */
 export interface TaskSummary {
   count: number; // タスク総数
-  representativeTask: { title: string; importance?: Importance | null } | null; // 一番手前に見せるタスク
+  representativeTask: {
+    title: string;
+    importance?: Importance | null;
+    tagIds: string[]; // 代表タスクに紐づくタグを併せて提示する
+  } | null; // 一番手前に見せるタスク
 }
 
 /**
@@ -238,6 +242,7 @@ export class TasksService {
         ? {
             title: firstTask.title,
             importance: firstTask.importance ?? null,
+            tagIds: firstTask.tagIds ?? [], // タグ未設定時は空配列で扱う
           }
         : null;
 

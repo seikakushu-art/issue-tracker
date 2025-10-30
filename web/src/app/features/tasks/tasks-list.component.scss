@@ -552,15 +552,15 @@
 }
 
 .custom-tag-controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto; // カラー・名前・追加ボタンを1行に並べる
   gap: 8px;
   margin-top: 8px;
-  align-items: center; // ボタンと入力欄の高さをそろえる
+  align-items: center; // 高さを合わせて視認性を向上
 }
 
 .custom-tag-name {
-  flex: 1 1 180px;
+  width: 100%; // グリッド上で残りの領域をすべて占有
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid #ddd;
@@ -569,12 +569,22 @@
 }
 
 .custom-tag-color {
-  width: 44px;
+  width: 44px;// 正方形で色を判別しやすくする
   height: 44px;
   padding: 0;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: #fff;
+}
+
+@media (max-width: 520px) {
+  .custom-tag-controls {
+    grid-template-columns: auto minmax(0, 1fr); // 狭い画面ではボタンを改行
+  }
+
+  .custom-tag-controls .btn {
+    grid-column: 1 / -1; // ボタンを2列分に広げて折り返し時も配置を整える
+  }
 }
 .tag-option {
   display: flex;
@@ -613,23 +623,35 @@
 }
 
 .checklist-item {
-  display: flex;
-  align-items: flex-start; // チェックボックスを上端に寄せる
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto; // チェックボックス・入力欄・削除ボタンを行内で整理
+  align-items: center; // 垂直位置を中央揃えにして左寄せされた印象を高める
   gap: 10px;
 }
 
 .checklist-toggle {
-  margin-top: 6px; // チェックボックスを左上へ密着させる
+  margin-top: 0; // 余計な余白をなくし、左端に揃えて配置
+  justify-self: start;
 }
 
 .checklist-input {
-  flex: 1 1 auto; // 残りの幅をすべてテキスト入力に割り当てる
+  width: 100%; // 行内の残りスペースをフルに活用
   min-width: 0;
   margin: 0;
   padding: 12px 14px;
   font-size: 14px;
 }
 
+.close-button {
+  font-size: 24px; // ×記号を視認しやすい大きさに設定
+  line-height: 1;
+  color: #555;
+}
+
+.close-button:hover,
+.close-button:focus {
+  color: #000; // ホバー時に濃くして操作可能性を伝える
+}
 .modal-footer {
   display: flex;
   justify-content: flex-end;

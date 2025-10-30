@@ -144,6 +144,18 @@
               {{ getImportanceLabel(importance) }}
             </span>
           </div>
+          <!-- タグは代表タスクの情報から取得し、課題カードでも視認できるようにする -->
+          <ng-container *ngIf="getRepresentativeTags(issue.id!) as representativeTags">
+            <div class="representative-tags" *ngIf="representativeTags.length > 0">
+              <span
+                *ngFor="let tag of representativeTags"
+                class="representative-tag"
+                [style.background-color]="tag.color || '#4c6ef5'"
+              >
+                {{ tag.name }}
+              </span>
+            </div>
+          </ng-container>
         </div>
       </div>
     </div>

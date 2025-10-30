@@ -385,8 +385,14 @@
   <div class="modal" (click)="$event.stopPropagation()" role="button" tabindex="-1">
     <div class="modal-header">
       <h2>{{ editingTask ? 'タスク編集' : '新規タスク' }}</h2>
-      <button class="btn-icon" (click)="closeModal()">
-        <i class="icon-close"></i>
+       <!-- 明示的な×ボタンを設置して閉じる操作を分かりやすくする -->
+       <button
+       class="btn-icon close-button"
+       (click)="closeModal()"
+       type="button"
+       aria-label="閉じる"
+     >
+       ×
       </button>
     </div>
     
@@ -489,6 +495,14 @@
           </div>
         </div>
         <div class="custom-tag-controls">
+           <!-- カラー入力を左側に固定し、視線移動を最小化する -->
+           <input
+           type="color"
+           [(ngModel)]="newTagColor"
+           name="newTagColor"
+           class="custom-tag-color"
+           aria-label="タグカラー"
+         >
           <!-- タグ名の入力欄。trim後に空なら作成できない -->
           <input
             type="text"
@@ -497,14 +511,7 @@
             class="custom-tag-name"
             placeholder="新しいタグ名を入力"
           >
-          <!-- タグカラーを選択可能にして視認性を保つ -->
-          <input
-            type="color"
-            [(ngModel)]="newTagColor"
-            name="newTagColor"
-            class="custom-tag-color"
-            aria-label="タグカラー"
-          >
+         
           <button
             type="button"
             class="btn btn-secondary btn-sm"
