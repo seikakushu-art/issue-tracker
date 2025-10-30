@@ -279,6 +279,13 @@
   border-left: 4px solid transparent;
 }
 
+.representative-task-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap; // タイトルが長い場合でも折り返す
+}
+
 .task-label {
   font-size: 12px;
   font-weight: 600;
@@ -293,6 +300,22 @@
   line-height: 1.4;
   word-break: break-word;
 }
+
+.importance-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.importance-critical { background: #c62828; }
+.importance-high { background: #ef6c00; }
+.importance-medium { background: #f9a825; color: #553600; }
+.importance-low { background: #2e7d32; }
+
 
 .stat-item {
   display: flex;
@@ -392,6 +415,24 @@
 .modal-header h2 {
   margin: 0;
   color: #333;
+}
+
+.close-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease; // ホバー時に視覚的フィードバック
+}
+
+.close-button:hover {
+  background: #f0f2f5;
+  color: #222;
 }
 
 .modal-body {

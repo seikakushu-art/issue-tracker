@@ -12,12 +12,19 @@ import {
   getDoc,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Task, TaskStatus, ChecklistItem } from '../../models/schema';
+import { Task, TaskStatus, ChecklistItem, Importance } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
 
+/**
+ * 課題カードに表示する代表タスク情報
+ */
+export interface TaskSummary {
+  count: number; // タスク総数
+  representativeTask: { title: string; importance?: Importance | null } | null; // 一番手前に見せるタスク
+}
 
 /**
  * タスク管理サービス
@@ -215,27 +222,32 @@ export class TasksService {
 
   /**
    * 課題配下のタスク概要を取得する
-   * 一覧カードに表示する件数と代表タスクタイトルを一度のアクセスでまとめて返す
+   * 一覧カードに表示する件数と代表タスク情報を一度のアクセスでまとめて返す
    */
   async getTaskSummary(
     projectId: string,
     issueId: string,
-  ): Promise<{ count: number; representativeTitle: string | null }> {
+  ): Promise<TaskSummary> {
     try {
       const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
       const snap = await getDocs(q);
 
-      // 代表タスクは一番最初に取得できたタスクのタイトルを利用
+      // 代表タスクは一番最初に取得できたタスクの情報を利用
       const firstTask = snap.docs[0]?.data() as Task | undefined;
-      const representativeTitle = firstTask?.title ?? null;
+      const representativeTask = firstTask
+        ? {
+            title: firstTask.title,
+            importance: firstTask.importance ?? null,
+          }
+        : null;
 
       return {
         count: snap.docs.length,
-        representativeTitle,
+        representativeTask,
       };
     } catch (error) {
       console.error('Error fetching task summary:', error);
-      return { count: 0, representativeTitle: null };
+      return { count: 0, representativeTask: null };
     }
   }
 

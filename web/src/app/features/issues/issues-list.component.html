@@ -130,11 +130,20 @@
         </div>
         <div
           class="representative-task"
-          *ngIf="getRepresentativeTaskTitle(issue.id!) as representativeTitle"
+          *ngIf="getRepresentativeTask(issue.id!) as representativeTask"
           [style.border-left-color]="issue.themeColor || getRandomColor(issue.id!)"
         >
           <span class="task-label">代表タスク</span>
-          <span class="task-title">{{ representativeTitle }}</span>
+          <div class="representative-task-main">
+            <span class="task-title">{{ representativeTask.title }}</span>
+            <span
+              *ngIf="representativeTask?.importance as importance"
+              class="importance-chip"
+              [ngClass]="getImportanceClass(importance)"
+            >
+              {{ getImportanceLabel(importance) }}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -156,8 +165,12 @@
   <div class="modal" (click)="$event.stopPropagation()" role="button" tabindex="-1">
     <div class="modal-header">
       <h2>{{ editingIssue ? '課題編集' : '新規課題' }}</h2>
-      <button class="btn-icon" (click)="closeModal()">
-        <i class="icon-close"></i>
+      <button
+      class="btn-icon close-button"
+      (click)="closeModal()"
+      aria-label="閉じる"
+    >
+      ×
       </button>
     </div>
     

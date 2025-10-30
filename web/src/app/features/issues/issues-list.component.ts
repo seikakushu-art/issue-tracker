@@ -4,10 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
-import { Issue, Project } from '../../models/schema';
+import { Issue, Project,Importance } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { FirebaseError } from 'firebase/app';
-import { TasksService } from '../tasks/tasks.service';
+import { TasksService,TaskSummary } from '../tasks/tasks.service';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -38,10 +38,16 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   saving = false;
   showArchived = false;
   /**
-   * 課題IDごとのタスク概要（件数と代表タスク名）をキャッシュ
+   * 課題IDごとのタスク概要（件数と代表タスク情報）をキャッシュ
    * UIのカード上で素早く表示できるよう、サービスからまとめて取得した内容を保持する
    */
-  private taskSummaryMap: Record<string, { count: number; representativeTitle: string | null }> = {};
+  private taskSummaryMap: Record<string, TaskSummary> = {}; // タスク概要をキャッシュ
+  private importanceLabels: Record<Importance, string> = { // 課題カード用の重要度表示
+    Critical: '至急重要',
+    High: '至急',
+    Medium: '重要',
+    Low: '普通',
+  };
 
   // 所属プロジェクトの選択肢を保持
   availableProjects: Project[] = [];
@@ -335,7 +341,7 @@ private async loadAvailableProjects(): Promise<void> {
           })
       );
 
-      const map = pairs.reduce<Record<string, { count: number; representativeTitle: string | null }>>((acc, item) => {
+      const map = pairs.reduce<Record<string, TaskSummary>>((acc, item) => {
         acc[item.issueId] = item.summary;
         return acc;
       }, {});
@@ -353,12 +359,24 @@ private async loadAvailableProjects(): Promise<void> {
     return this.taskSummaryMap[issueId]?.count ?? 0;
   }
 
-  /** 課題カードに表示する代表タスクタイトルを取得（存在しない場合はnull） */
-  getRepresentativeTaskTitle(issueId: string): string | null {
+  /** 課題カードに表示する代表タスク情報を取得（存在しない場合はnull） */
+  getRepresentativeTask(issueId: string): TaskSummary['representativeTask'] {
     const summary = this.taskSummaryMap[issueId];
     if (!summary || summary.count === 0) {
       return null;
     }
-    return summary.representativeTitle;
+    return summary.representativeTask;
+  }
+
+  /** 重要度の日本語ラベルを取得 */
+  getImportanceLabel(importance?: Importance | null): string {
+    const key = importance ?? 'Low';
+    return this.importanceLabels[key];
+  }
+
+  /** 重要度ごとのバッジクラス名を返却 */
+  getImportanceClass(importance?: Importance | null): string {
+    const key = (importance ?? 'Low').toLowerCase() as Lowercase<Importance>;
+    return `importance-${key}`;
   }
 }

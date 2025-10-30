@@ -551,6 +551,31 @@
   gap: 8px;
 }
 
+.custom-tag-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center; // ボタンと入力欄の高さをそろえる
+}
+
+.custom-tag-name {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.custom-tag-color {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+}
 .tag-option {
   display: flex;
   align-items: center;
@@ -589,12 +614,16 @@
 
 .checklist-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start; // チェックボックスを上端に寄せる
   gap: 10px;
 }
 
+.checklist-toggle {
+  margin-top: 6px; // チェックボックスを左上へ密着させる
+}
+
 .checklist-input {
-  flex: 1 1 320px;
+  flex: 1 1 auto; // 残りの幅をすべてテキスト入力に割り当てる
   min-width: 0;
   margin: 0;
   padding: 12px 14px;

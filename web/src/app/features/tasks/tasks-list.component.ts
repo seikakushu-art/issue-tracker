@@ -38,6 +38,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
   showModal = false;
   editingTask: Task | null = null;
   saving = false;
+  newTagName = ''; // カスタムタグ名の入力値
+  newTagColor = '#4c6ef5'; // カスタムタグ用の既定カラー
+  creatingTag = false; // タグ作成処理の二重実行防止
   showArchived = false;
   selectedTaskId: string | null = null;
   selectedTask: Task | null = null;
@@ -417,6 +420,38 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
+   /** カスタムタグを即時作成し、一覧とフォームへ反映する */
+   async createCustomTag() {
+    const name = this.newTagName.trim(); // 前後の空白を除去
+    if (!name) {
+      alert('タグ名を入力してください');
+      return;
+    }
+
+    if (this.creatingTag) {
+      return; // 二重クリックによる多重送信を防止
+    }
+
+    this.creatingTag = true;
+    try {
+      const color = this.newTagColor?.trim() || undefined; // 空文字列は未指定扱い
+      const tagId = await this.tagsService.createTag({ name, color }); // Firestoreへタグを保存
+      const newTag: Tag = { id: tagId, name, color }; // 表示用にタグ情報を構築
+      this.availableTags = [...this.availableTags, newTag]; // Change Detectionを確実に発火
+
+      if (!this.taskForm.tagIds.includes(tagId) && this.taskForm.tagIds.length < 10) {
+        this.taskForm.tagIds.push(tagId); // 作成したタグを自動的に選択
+      }
+
+      this.newTagName = ''; // 入力欄をクリア
+      this.newTagColor = '#4c6ef5'; // 次回作成時の初期色に戻す
+    } catch (error) {
+      console.error('カスタムタグの作成に失敗しました:', error);
+      alert('タグの作成に失敗しました。時間を置いて再度お試しください。');
+    } finally {
+      this.creatingTag = false; // ローディング状態を解除
+    }
+  }
   /** 課題進捗更新 */
   private async updateIssueProgress() {
     if (!this.issueDetails?.id) return;

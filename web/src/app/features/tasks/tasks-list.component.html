@@ -471,8 +471,9 @@
       <div class="form-group">
         <span>タグ</span>
         <div class="tag-selector">
-          <div 
-            *ngFor="let tag of availableTags" 
+           <!-- 既存タグをグリッド状に表示し、クリックで選択する -->
+           <div
+           *ngFor="let tag of availableTags"
             class="tag-option"
             [class.selected]="taskForm.tagIds.includes(tag.id!)"
             (click)="toggleTag(tag.id!)"
@@ -480,13 +481,42 @@
             role="button"
             tabindex="0"
           >
-            <span 
-              class="tag-color" 
+            <span
+              class="tag-color"
               [style.background-color]="tag.color || '#ccc'"
             ></span>
             {{ tag.name }}
           </div>
         </div>
+        <div class="custom-tag-controls">
+          <!-- タグ名の入力欄。trim後に空なら作成できない -->
+          <input
+            type="text"
+            [(ngModel)]="newTagName"
+            name="newTagName"
+            class="custom-tag-name"
+            placeholder="新しいタグ名を入力"
+          >
+          <!-- タグカラーを選択可能にして視認性を保つ -->
+          <input
+            type="color"
+            [(ngModel)]="newTagColor"
+            name="newTagColor"
+            class="custom-tag-color"
+            aria-label="タグカラー"
+          >
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            (click)="createCustomTag()"
+            [disabled]="creatingTag"
+          >
+            {{ creatingTag ? '作成中...' : 'タグを追加' }}
+          </button>
+        </div>
+        <small class="hint">
+          カスタムタグは保存され、ほかのタスクでも選択できます。
+        </small>
       </div>
 
       <div class="form-group">
@@ -498,6 +528,7 @@
           >
             <input 
               type="checkbox" 
+              class="checklist-toggle"
               [(ngModel)]="item.completed"
               [name]="'checklist-' + i"
             >
