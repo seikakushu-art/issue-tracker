@@ -5,7 +5,8 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
-import { Task, TaskStatus, Importance, Tag } from '../../models/schema';
+import { IssuesService } from '../issues/issues.service';
+import { Task, TaskStatus, Importance, Tag, Issue } from '../../models/schema';
 
 /**
  * タスク一覧コンポーネント
@@ -24,6 +25,56 @@ import { Task, TaskStatus, Importance, Tag } from '../../models/schema';
           <i class="icon-plus"></i> 新規タスク
         </button>
       </div>
+
+      <!-- 課題のサマリーパネル -->
+      <section *ngIf="issueDetails" class="issue-summary">
+        <div class="summary-header">
+          <div class="summary-title">
+            <span
+              class="summary-color"
+              [style.background-color]="issueDetails.themeColor || getFallbackColor(issueDetails.id!)"
+            ></span>
+            <div class="summary-text">
+              <h3>{{ issueDetails.name }}</h3>
+              <p class="summary-goal" *ngIf="issueDetails.goal">{{ issueDetails.goal }}</p>
+            </div>
+          </div>
+          <div class="summary-deadline">
+            <span *ngIf="issueDetails.startDate">開始: {{ issueDetails.startDate | date:'yyyy/MM/dd' }}</span>
+            <span *ngIf="issueDetails.endDate">期限: {{ issueDetails.endDate | date:'yyyy/MM/dd' }}</span>
+          </div>
+        </div>
+
+        <p class="summary-description" *ngIf="issueDetails.description">{{ issueDetails.description }}</p>
+
+        <div class="summary-progress">
+          <span class="label">進捗</span>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              [style.width.%]="issueProgress"
+              [style.background-color]="issueDetails.themeColor || getFallbackColor(issueDetails.id!)"
+            ></div>
+          </div>
+          <span class="value">{{ issueProgress | number:'1.0-1' }}%</span>
+        </div>
+
+        <div class="summary-tasks" *ngIf="taskPreview.length > 0; else noTaskPreview">
+          <h4>代表タスク</h4>
+          <ul>
+            <li *ngFor="let previewTask of taskPreview">
+              <span class="task-title">{{ previewTask.title }}</span>
+              <span class="task-progress">{{ (previewTask.progress || 0) | number:'1.0-0' }}%</span>
+              <span class="task-status" [class]="'status-' + previewTask.status">
+                {{ getStatusLabel(previewTask.status) }}
+              </span>
+            </li>
+          </ul>
+        </div>
+        <ng-template #noTaskPreview>
+          <p class="summary-empty">まだタスクが登録されていません。</p>
+        </ng-template>
+      </section>
 
       <!-- フィルター・並び替え -->
       <div class="filters">
@@ -337,6 +388,139 @@ import { Task, TaskStatus, Importance, Tag } from '../../models/schema';
       margin: 0;
       color: #333;
     }
+    .issue-summary {
+      margin: 16px 0 24px;
+      padding: 16px;
+      background: #f8f9fb;
+      border: 1px solid #e1e5e9;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .summary-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .summary-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .summary-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .summary-text h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #333;
+    }
+
+    .summary-goal {
+      margin: 4px 0 0;
+      color: #666;
+      font-size: 13px;
+    }
+
+    .summary-deadline {
+      display: flex;
+      gap: 12px;
+      color: #555;
+      font-size: 13px;
+      flex-wrap: wrap;
+    }
+
+    .summary-description {
+      margin: 0;
+      color: #555;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .summary-progress {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .summary-progress .label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .summary-progress .progress-bar {
+      flex: 1;
+      height: 8px;
+    }
+
+    .summary-progress .value {
+      min-width: 48px;
+      text-align: right;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .summary-tasks h4 {
+      margin: 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .summary-tasks ul {
+      list-style: none;
+      margin: 8px 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .summary-tasks li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .summary-tasks .task-title {
+      flex: 1;
+      font-weight: 500;
+      color: #333;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .summary-tasks .task-progress {
+      width: 48px;
+      text-align: right;
+      color: #007bff;
+    }
+
+    .summary-tasks .task-status {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+    }
+
+    .summary-empty {
+      margin: 0;
+      color: #777;
+      font-size: 13px;
+    }
+
 
     .filters {
       display: flex;
@@ -436,7 +620,7 @@ import { Task, TaskStatus, Importance, Tag } from '../../models/schema';
       gap: 4px;
     }
 
-    .btn-icon {
+    .btn-action {
       background: none;
       border: none;
       padding: 4px;
@@ -445,7 +629,7 @@ import { Task, TaskStatus, Importance, Tag } from '../../models/schema';
       border-radius: 4px;
     }
 
-    .btn-icon:hover {
+    .btn-action:hover {
       background: #f0f0f0;
       color: #333;
     }
@@ -749,6 +933,7 @@ import { Task, TaskStatus, Importance, Tag } from '../../models/schema';
 export class TasksListComponent implements OnInit, OnDestroy {
   private tasksService = inject(TasksService);
   private tagsService = inject(TagsService);
+  private issuesService = inject(IssuesService)
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
@@ -756,6 +941,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
   projectId!: string;
   issueId!: string;
 
+  issueDetails: Issue | null = null;
+  issueProgress = 0;
+  taskPreview: Task[] = [];
   tasks: Task[] = [];
   filteredTasks: Task[] = [];
   availableTags: Tag[] = [];
@@ -783,6 +971,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
     tagIds: [] as string[],
     checklist: [] as { id: string; text: string; completed: boolean }[]
   };
+  // 課題カラーのフォールバック用パレット
+  private colorPalette = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
+  ];
+
+  
 
   ngOnInit() {
     // ルートパラメータからprojectIdとissueIdを取得
@@ -792,6 +987,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       if (this.projectId && this.issueId) {
         this.loadTasks();
         this.loadTags();
+        this.loadIssueDetails();
       }
     });
   }
@@ -810,11 +1006,28 @@ export class TasksListComponent implements OnInit, OnDestroy {
     try {
       this.tasks = await this.tasksService.listTasks(this.projectId, this.issueId);
       this.filterTasks();
+      this.updateIssueSummaryFromTasks();
     } catch (error) {
       console.error('タスクの読み込みに失敗しました:', error);
     }
   }
+ /**
+   * 課題の基本情報を読み込む
+   */
+ async loadIssueDetails() {
+  if (!this.projectId || !this.issueId) return;
 
+  try {
+    this.issueDetails = await this.issuesService.getIssue(this.projectId, this.issueId);
+    this.issueProgress = this.issueDetails?.progress ?? 0;
+    this.updateIssueSummaryFromTasks();
+  } catch (error) {
+    console.error('課題情報の読み込みに失敗しました:', error);
+    this.issueDetails = null;
+    this.issueProgress = 0;
+    this.taskPreview = [];
+  }
+}
   /**
    * タグ一覧を読み込む
    */
@@ -1050,6 +1263,110 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private generateId(): string {
     return Math.random().toString(36).substr(2, 9);
   }
+/**
+   * 課題サマリー表示用に進捗・タスクプレビューを更新
+   */
+private updateIssueSummaryFromTasks(): void {
+  if (!this.issueDetails) {
+    this.issueProgress = 0;
+    this.taskPreview = [];
+    return;
+  }
+
+  const activeTasks = this.tasks.filter(task => task.status !== 'discarded');
+
+  if (activeTasks.length === 0) {
+    this.issueProgress = this.issueDetails.progress ?? 0;
+    this.taskPreview = [];
+    return;
+  }
+
+  let totalProgressWeight = 0;
+  let totalWeight = 0;
+
+  for (const task of activeTasks) {
+    const weight = this.getImportanceWeight(task.importance);
+    const progress = typeof task.progress === 'number'
+      ? task.progress
+      : this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
+    totalProgressWeight += progress * weight;
+    totalWeight += weight;
+  }
+
+  const computedProgress = totalWeight === 0
+    ? 0
+    : Math.round((totalProgressWeight / totalWeight) * 10) / 10;
+  this.issueProgress = Math.min(100, Math.max(0, computedProgress));
+
+  const sortedTasks = [...activeTasks].sort((a, b) => {
+    const weightDiff = this.getImportanceWeight(b.importance) - this.getImportanceWeight(a.importance);
+    if (weightDiff !== 0) {
+      return weightDiff;
+    }
+    const endA = this.normalizeDate(a.endDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const endB = this.normalizeDate(b.endDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    return endA - endB;
+  });
+
+  this.taskPreview = sortedTasks.slice(0, 3);
+}
+
+/**
+ * 重要度を重み（1-4）に変換
+ */
+private getImportanceWeight(importance?: Importance): number {
+  switch (importance) {
+    case 'Critical':
+      return 4;
+    case 'High':
+      return 3;
+    case 'Medium':
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * Firestoreの日時表現をDate型に統一
+ */
+private normalizeDate(value: unknown): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toDate' in value &&
+    typeof (value as { toDate: () => Date }).toDate === 'function'
+  ) {
+    const converted = (value as { toDate: () => Date }).toDate();
+    return Number.isNaN(converted.getTime()) ? null : converted;
+  }
+
+  return null;
+}
+
+/**
+ * テーマカラー未設定時のフォールバックカラー
+ */
+getFallbackColor(issueId: string): string {
+  const hash = issueId.split('').reduce((acc, char) => {
+    acc = ((acc << 5) - acc) + char.charCodeAt(0);
+    return acc & acc;
+  }, 0);
+  return this.colorPalette[Math.abs(hash) % this.colorPalette.length];
+}
 
   /**
    * ステータスラベルを取得

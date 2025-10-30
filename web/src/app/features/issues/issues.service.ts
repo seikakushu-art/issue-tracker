@@ -11,12 +11,14 @@ import {
   updateDoc,
   deleteDoc,
   getDoc,
+  setDoc,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Issue } from '../../models/schema';
+import { Issue, Project, Task } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
+import { ProgressService } from '../projects/progress.service';
 
 /**
  * 課題（Issue）管理サービス
@@ -27,6 +29,87 @@ export class IssuesService {
   private db = inject(Firestore);
   private auth = inject(Auth);
   private authReady: Promise<void> | null = null;
+  private progressService = inject(ProgressService);
+
+  /**
+   * Firestoreから取得した日時フィールドをDate型へ正規化するユーティリティ
+   * @param value Firestore Timestamp / string / Date など
+   */
+  private normalizeDate(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'toDate' in value &&
+      typeof (value as { toDate: () => Date }).toDate === 'function'
+    ) {
+      const converted = (value as { toDate: () => Date }).toDate();
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    }
+
+    return null;
+  }
+
+  /**
+   * Firestoreから取得した課題ドキュメントをUIで扱いやすい形に整形する
+   * @param id ドキュメントID
+   * @param data Firestoreから取得した生データ
+   */
+  private hydrateIssue(id: string, data: Issue): Issue {
+    const dataRecord = data as unknown as Record<string, unknown>;
+    return {
+      ...data,
+      id,
+      startDate: this.normalizeDate(dataRecord['startDate']) ?? null,
+      endDate: this.normalizeDate(dataRecord['endDate']) ?? null,
+      createdAt: this.normalizeDate(dataRecord['createdAt']) ?? null,
+      progress: dataRecord['progress'] as number ?? 0,
+      archived: (dataRecord['archived'] as boolean) ?? false,
+    };
+  }
+
+  /**
+   * プロジェクト期間内に課題期間が収まっているか検証する
+   * @param projectId プロジェクトID
+   * @param startDate 課題開始日
+   * @param endDate 課題終了日
+   */
+  private async validateWithinProjectPeriod(
+    projectId: string,
+    startDate?: Date | null,
+    endDate?: Date | null,
+  ): Promise<void> {
+    const projectSnap = await getDoc(doc(this.db, 'projects', projectId));
+    if (!projectSnap.exists()) {
+      // プロジェクトが存在しない場合は制約できないので終了
+      return;
+    }
+
+    const project = projectSnap.data() as Project;
+    const projectRecord = project as unknown as Record<string, unknown>;
+    const projectStart = this.normalizeDate(projectRecord['startDate']);
+    const projectEnd = this.normalizeDate(projectRecord['endDate']);
+
+    if (projectStart && startDate && startDate < projectStart) {
+      throw new Error('課題の開始日はプロジェクト期間内に設定してください');
+    }
+
+    if (projectEnd && endDate && endDate > projectEnd) {
+      throw new Error('課題の終了日はプロジェクト期間内に設定してください');
+    }
+  }
 
   private async ensureAuthReady() {
     if (!this.authReady) {
@@ -97,6 +180,13 @@ export class IssuesService {
     // 名称重複チェック
     await this.checkNameUniqueness(projectId, input.name);
 
+     // プロジェクト期間内チェック
+     await this.validateWithinProjectPeriod(
+      projectId,
+      input.startDate ?? null,
+      input.endDate ?? null,
+    );
+
     const payload: Record<string, unknown> = {
       projectId,
       name: input.name,
@@ -142,19 +232,21 @@ export class IssuesService {
    * @param projectId プロジェクトID
    * @returns 課題の配列
    */
-  async listIssues(projectId: string): Promise<Issue[]> {
+  async listIssues(projectId: string, includeArchived = false): Promise<Issue[]> {
     const uid = (await this.waitForUser())?.uid;
     if (!uid) {
       return [];
     }
 
     try {
-      const q = query(
-        collection(this.db, `projects/${projectId}/issues`),
-        where('archived', '==', false)
+      const snap = await getDocs(
+        query(
+          collection(this.db, `projects/${projectId}/issues`),
+        ),
       );
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Issue) }));
+      return snap.docs
+        .map((d) => this.hydrateIssue(d.id, d.data() as Issue))
+        .filter(issue => includeArchived || !issue.archived);
     } catch (error) {
       console.error('Error in listIssues:', error);
       return [];
@@ -195,7 +287,7 @@ export class IssuesService {
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Issue) };
+      return this.hydrateIssue(docSnap.id, docSnap.data() as Issue);
     }
     return null;
   }
@@ -229,6 +321,11 @@ export class IssuesService {
       if (updates.startDate && updates.endDate && updates.startDate > updates.endDate) {
         throw new Error('開始日は終了日以前である必要があります');
       }
+      await this.validateWithinProjectPeriod(
+        projectId,
+        this.normalizeDate(updates.startDate) ?? null,
+        this.normalizeDate(updates.endDate) ?? null,
+      );
     }
 
     // 日付の大小をチェック（既存の開始日・終了日との比較）
@@ -274,11 +371,101 @@ export class IssuesService {
    * @param excludeIssueId 除外する課題ID（更新時に使用）
    */
   private async checkNameUniqueness(projectId: string, name: string, excludeIssueId?: string): Promise<void> {
-    const issues = await this.listIssues(projectId);
+    const issues = await this.listIssues(projectId, true);
     const duplicate = issues.find(issue => issue.name === name && issue.id !== excludeIssueId);
     if (duplicate) {
       throw new Error(`課題名 "${name}" は既にこのプロジェクト内で使用されています`);
     }
   }
+    /**
+   * 課題を別プロジェクトへ移動する
+   * @param currentProjectId 現在のプロジェクトID
+   * @param issueId 課題ID
+   * @param targetProjectId 移動先プロジェクトID
+   */
+    async moveIssue(
+      currentProjectId: string,
+      issueId: string,
+      targetProjectId: string,
+      overrides?: Partial<{
+        name: string;
+        description: string | null;
+        startDate: Date | null;
+        endDate: Date | null;
+        goal: string | null;
+        themeColor: string | null;
+        archived: boolean;
+        progress: number | null;
+      }>,
+    ): Promise<void> {
+      if (currentProjectId === targetProjectId) {
+        return;
+      }
+  
+      const sourceIssueRef = doc(this.db, `projects/${currentProjectId}/issues/${issueId}`);
+      const issueSnap = await getDoc(sourceIssueRef);
+      if (!issueSnap.exists()) {
+        throw new Error('移動対象の課題が見つかりません');
+      }
+  
+      const rawIssue = issueSnap.data() as Issue;
+      const rawIssueRecord = rawIssue as unknown as Record<string, unknown>;
+  
+      const normalizedStart = this.normalizeDate(rawIssueRecord['startDate']);
+      const normalizedEnd = this.normalizeDate(rawIssueRecord['endDate']);
+  
+      const overrideStart = overrides && Object.prototype.hasOwnProperty.call(overrides, 'startDate')
+        ? this.normalizeDate(overrides.startDate ?? null)
+        : normalizedStart;
+      const overrideEnd = overrides && Object.prototype.hasOwnProperty.call(overrides, 'endDate')
+        ? this.normalizeDate(overrides.endDate ?? null)
+        : normalizedEnd;
+  
+      await this.validateWithinProjectPeriod(targetProjectId, overrideStart, overrideEnd);
+  
+      const targetName = overrides?.name ?? rawIssue.name;
+      await this.checkNameUniqueness(targetProjectId, targetName, issueId);
+  
+      const tasksSnap = await getDocs(collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks`));
+      const tasks = tasksSnap.docs.map(docSnap => ({ id: docSnap.id, ...(docSnap.data() as Task) }));
+  
+      const targetIssueRef = doc(this.db, `projects/${targetProjectId}/issues/${issueId}`);
+      const payload = {
+        ...rawIssue,
+        projectId: targetProjectId,
+      } as Record<string, unknown>;
+  
+      if (overrides) {
+        for (const [key, value] of Object.entries(overrides)) {
+          if (value !== undefined) {
+            payload[key] = value;
+          }
+        }
+      }
+  
+      await setDoc(targetIssueRef, payload);
+  
+      for (const task of tasks) {
+        const { id: taskId, ...taskData } = task;
+        const taskPayload = {
+          ...taskData,
+          projectId: targetProjectId,
+          issueId,
+        } as Record<string, unknown>;
+  
+        await setDoc(
+          doc(this.db, `projects/${targetProjectId}/issues/${issueId}/tasks/${taskId}`),
+          taskPayload,
+        );
+  
+        await deleteDoc(doc(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks/${taskId}`));
+      }
+  
+      await deleteDoc(sourceIssueRef);
+  
+      await this.progressService.updateProjectProgress(currentProjectId);
+      await this.progressService.updateProjectProgress(targetProjectId);
+      await this.progressService.updateIssueProgress(targetProjectId, issueId);
+    }
 }
 

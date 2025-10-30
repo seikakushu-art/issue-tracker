@@ -4,9 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
-import { Issue } from '../../models/schema';
+import { Issue, Project } from '../../models/schema';
+import { ProjectsService } from '../projects/projects.service';
 import { FirebaseError } from 'firebase/app';
-
+import { TasksService } from '../tasks/tasks.service';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -26,6 +27,34 @@ import { FirebaseError } from 'firebase/app';
       </div>
 
       <!-- フィルター・並び替え -->
+      <section *ngIf="projectDetails" class="project-summary">
+        <div class="summary-header">
+          <div class="summary-title">
+            <h3>{{ projectDetails.name }}</h3>
+            <p class="summary-goal" *ngIf="projectDetails.goal">{{ projectDetails.goal }}</p>
+          </div>
+          <div class="summary-dates">
+            <span *ngIf="projectDetails.startDate">開始: {{ projectDetails.startDate | date:'yyyy/MM/dd' }}</span>
+            <span *ngIf="projectDetails.endDate">終了: {{ projectDetails.endDate | date:'yyyy/MM/dd' }}</span>
+          </div>
+        </div>
+
+        <p class="summary-description" *ngIf="projectDetails.description">{{ projectDetails.description }}</p>
+
+        <div class="summary-progress">
+          <span class="label">進捗</span>
+          <div class="progress-bar">
+            <div class="progress-fill" [style.width.%]="projectDetails.progress || 0"></div>
+          </div>
+          <span class="value">{{ projectDetails.progress || 0 }}%</span>
+        </div>
+
+        <div class="summary-meta">
+          <span>メンバー: {{ projectDetails.memberIds.length }}人</span>
+          <span>課題数: {{ filteredIssues.length }}</span>
+        </div>
+      </section>
+
       <div class="filters">
         <div class="filter-group">
           <span>並び替え:</span>
@@ -51,8 +80,8 @@ import { FirebaseError } from 'firebase/app';
 
       <!-- 課題一覧 -->
       <div class="issues-grid">
-        <div 
-          *ngFor="let issue of filteredIssues" 
+        <div
+          *ngFor="let issue of filteredIssues"
           class="issue-card"
           [class.archived]="issue.archived"
           (click)="selectIssue(issue)"
@@ -60,20 +89,26 @@ import { FirebaseError } from 'firebase/app';
           role="button"
           tabindex="0"
         >
+        <div
+            class="theme-strip"
+            [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
+          ></div>
           <div class="issue-header">
             <div class="issue-title">
-              <div 
-                class="theme-color-badge" 
+              <div
+                class="theme-color-badge"
                 [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
               ></div>
               <h3>{{ issue.name }}</h3>
             </div>
             <div class="issue-actions">
               <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
-                <i class="icon-edit"></i>
+                <i class="icon-edit" aria-hidden="true"></i>
+                <span class="action-label">編集</span>
               </button>
               <button class="btn-icon" (click)="archiveIssue(issue, $event)" title="アーカイブ">
-                <i class="icon-archive"></i>
+              <i class="icon-archive" aria-hidden="true"></i>
+              <span class="action-label">{{ issue.archived ? '復元' : 'アーカイブ' }}</span>
               </button>
             </div>
           </div>
@@ -112,6 +147,14 @@ import { FirebaseError } from 'firebase/app';
                 <span class="stat-value">{{ getTaskCount(issue.id!) }}</span>
               </div>
             </div>
+            <div
+              class="representative-task"
+              *ngIf="getRepresentativeTaskTitle(issue.id!) as representativeTitle"
+              [style.border-left-color]="issue.themeColor || getRandomColor(issue.id!)"
+            >
+              <span class="task-label">代表タスク</span>
+              <span class="task-title">{{ representativeTitle }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -140,19 +183,34 @@ import { FirebaseError } from 'firebase/app';
         <form class="modal-body" (ngSubmit)="saveIssue()">
           <div class="form-group">
             <label for="name">課題名 *</label>
-            <input 
+            <input
               id="name"
-              type="text" 
-              [(ngModel)]="issueForm.name" 
+              type="text"
+              [(ngModel)]="issueForm.name"
               name="name"
               required
               placeholder="課題名を入力"
             >
           </div>
-          
+          <div class="form-group">
+            <label for="projectId">所属プロジェクト</label>
+            <select
+              id="projectId"
+              [(ngModel)]="issueForm.projectId"
+              name="projectId"
+              [disabled]="!editingIssue"
+            >
+              <option *ngFor="let project of availableProjects" [value]="project.id">
+                {{ project.name }}
+              </option>
+            </select>
+            <small class="hint" *ngIf="editingIssue">選択したプロジェクトへ課題と配下タスクをまとめて移動します。</small>
+            <small class="hint" *ngIf="!editingIssue">新規課題は現在表示中のプロジェクトに登録されます。</small>
+          </div>
+
           <div class="form-group">
             <label for="description">説明</label>
-            <textarea 
+            <textarea
               id="description"
               [(ngModel)]="issueForm.description" 
               name="description"
@@ -236,6 +294,87 @@ import { FirebaseError } from 'firebase/app';
       color: #333;
     }
 
+    .project-summary {
+      margin-bottom: 24px;
+      padding: 20px;
+      background: #f5f7fb;
+      border-radius: 12px;
+      border: 1px solid #e1e5e9;
+    }
+
+    .summary-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .summary-title h3 {
+      margin: 0;
+      font-size: 20px;
+      color: #333;
+    }
+
+    .summary-goal {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .summary-dates {
+      display: flex;
+      gap: 12px;
+      color: #555;
+      font-size: 13px;
+    }
+
+    .summary-description {
+      margin: 0 0 16px;
+      color: #555;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .summary-progress {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .summary-progress .label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .summary-progress .progress-bar {
+      flex: 1;
+      height: 8px;
+      background: #e9ecef;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .summary-progress .progress-fill {
+      height: 100%;
+      background: #4c6ef5;
+      transition: width 0.3s ease;
+    }
+
+    .summary-progress .value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .summary-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: #555;
+    }
+
+
     .filters {
       display: flex;
       gap: 24px;
@@ -277,11 +416,19 @@ import { FirebaseError } from 'firebase/app';
       cursor: pointer;
       transition: all 0.2s ease;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      position: relative;
+      overflow: hidden;
     }
 
     .issue-card:hover {
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       transform: translateY(-2px);
+    }
+
+    .theme-strip {
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 6px;
     }
 
     .issue-card.archived {
@@ -304,10 +451,11 @@ import { FirebaseError } from 'firebase/app';
     }
 
     .theme-color-badge {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
       flex-shrink: 0;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
     }
 
     .issue-title h3 {
@@ -325,16 +473,25 @@ import { FirebaseError } from 'firebase/app';
     .btn-icon {
       background: none;
       border: none;
-      padding: 4px;
+      padding: 4px 8px;
       cursor: pointer;
       color: #666;
       border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
     }
 
     .btn-icon:hover {
       background: #f0f0f0;
       color: #333;
     }
+
+    .issue-actions .action-label {
+      line-height: 1;
+    }
+
 
     .description {
       color: #666;
@@ -376,7 +533,7 @@ import { FirebaseError } from 'firebase/app';
 
     .progress-bar {
       height: 6px;
-      background: #e9ecef;
+      background: #eef2f7;
       border-radius: 3px;
       overflow: hidden;
     }
@@ -389,6 +546,32 @@ import { FirebaseError } from 'firebase/app';
     .issue-stats {
       display: flex;
       gap: 16px;
+    }
+    /* 代表タスク表示 */
+    .representative-task {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #f7f9fc;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-left: 4px solid transparent;
+    }
+
+    .task-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #4c6ef5;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .task-title {
+      font-size: 14px;
+      color: #2f3542;
+      line-height: 1.4;
+      word-break: break-word;
     }
 
     .stat-item {
@@ -516,7 +699,8 @@ import { FirebaseError } from 'firebase/app';
     }
 
     .form-group input,
-    .form-group textarea {
+    .form-group textarea,
+    .form-group select {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid #ddd;
@@ -525,7 +709,8 @@ import { FirebaseError } from 'firebase/app';
     }
 
     .form-group input:focus,
-    .form-group textarea:focus {
+    .form-group textarea:focus,
+    .form-group select:focus {
       outline: none;
       border-color: #007bff;
       box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
@@ -538,8 +723,8 @@ import { FirebaseError } from 'firebase/app';
     }
 
     .color-input {
-      width: 40px !important;
-      height: 40px;
+      width: 28px !important;
+      height: 28px;
       padding: 0 !important;
       border: none !important;
       border-radius: 4px;
@@ -549,6 +734,13 @@ import { FirebaseError } from 'firebase/app';
     .color-label {
       font-size: 14px;
       color: #666;
+    }
+
+    .hint {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: #888;
     }
 
     .modal-footer {
@@ -567,18 +759,30 @@ import { FirebaseError } from 'firebase/app';
 })
 export class IssuesListComponent implements OnInit, OnDestroy {
   private issuesService = inject(IssuesService);
+  private projectsService = inject(ProjectsService);
+  private tasksService = inject(TasksService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
 
   projectId!: string;
 
+  /** プロジェクトの詳細情報（新規作成直後でも内容が消えないよう保持） */
+  projectDetails: Project | null = null;
   issues: Issue[] = [];
   filteredIssues: Issue[] = [];
   showModal = false;
   editingIssue: Issue | null = null;
   saving = false;
   showArchived = false;
+  /**
+   * 課題IDごとのタスク概要（件数と代表タスク名）をキャッシュ
+   * UIのカード上で素早く表示できるよう、サービスからまとめて取得した内容を保持する
+   */
+  private taskSummaryMap: Record<string, { count: number; representativeTitle: string | null }> = {};
+
+  // 所属プロジェクトの選択肢を保持
+  availableProjects: Project[] = [];
 
   // 並び替え設定
   sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' = 'name';
@@ -586,6 +790,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 
   // フォームデータ
   issueForm = {
+    projectId: '',
     name: '',
     description: '',
     startDate: '',
@@ -601,10 +806,12 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit() {
+    void this.loadAvailableProjects();
     // ルートパラメータからprojectIdを取得
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.projectId = params['projectId'];
       if (this.projectId) {
+        this.issueForm.projectId = this.projectId;
         this.loadIssues();
       }
     });
@@ -622,12 +829,32 @@ export class IssuesListComponent implements OnInit, OnDestroy {
     if (!this.projectId) return;
     
     try {
-      this.issues = await this.issuesService.listIssues(this.projectId);
+      const [issues, project] = await Promise.all([
+        this.issuesService.listIssues(this.projectId, this.showArchived),
+        this.projectsService.getProject(this.projectId),
+      ]);
+
+      this.projectDetails = project;
+      this.issues = issues;
       this.filterIssues();
+      await this.refreshTaskSummaries();
     } catch (error) {
       console.error('課題の読み込みに失敗しました:', error);
     }
   }
+/**
+   * 選択可能なプロジェクト一覧を取得する
+   * 課題移動時のプルダウンで利用する
+   */
+private async loadAvailableProjects(): Promise<void> {
+  try {
+    const projects = await this.projectsService.listMyProjects();
+    this.availableProjects = projects.filter((project): project is Project => Boolean(project.id));
+  } catch (error) {
+    console.error('プロジェクト一覧の取得に失敗しました:', error);
+    this.availableProjects = [];
+  }
+}
 
   /**
    * 課題をフィルタリング
@@ -691,6 +918,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   openCreateModal() {
     this.editingIssue = null;
     this.issueForm = {
+      projectId: this.projectId,
       name: '',
       description: '',
       startDate: '',
@@ -708,6 +936,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     this.editingIssue = issue;
     this.issueForm = {
+      projectId: issue.projectId,
       name: issue.name,
       description: issue.description || '',
       startDate: issue.startDate ? this.formatDateForInput(issue.startDate) : '',
@@ -745,6 +974,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 
     this.saving = true;
     try {
+      const targetProjectId = this.editingIssue ? (this.issueForm.projectId || this.projectId) : this.projectId;
       const issueData = {
         name: this.issueForm.name.trim(),
         description: this.issueForm.description.trim() || undefined,
@@ -755,16 +985,25 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       };
 
       if (this.editingIssue) {
-        await this.issuesService.updateIssue(this.projectId, this.editingIssue.id!, {
+        const updatePayload = {
           name: issueData.name,
           description: issueData.description ?? null,
           startDate: issueData.startDate ?? null,
           endDate: issueData.endDate ?? null,
           goal: issueData.goal ?? null,
           themeColor: issueData.themeColor ?? null,
-        });
+        };
+        if (targetProjectId !== this.projectId) {
+          await this.issuesService.moveIssue(this.projectId, this.editingIssue.id!, targetProjectId, updatePayload);
+          alert('課題を選択したプロジェクトへ移動しました。');
+        } else {
+          await this.issuesService.updateIssue(this.projectId, this.editingIssue.id!, updatePayload);
+        }
       } else {
-        await this.issuesService.createIssue(this.projectId, issueData);
+        await this.issuesService.createIssue(targetProjectId, issueData);
+        if (targetProjectId !== this.projectId) {
+          alert('別のプロジェクトに課題を作成しました。対象のプロジェクトに移動して内容を確認してください。');
+        }
       }
 
       this.closeModal();
@@ -772,13 +1011,15 @@ export class IssuesListComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('課題の保存に失敗しました:', error);
        // Firestoreのバージョン衝突（楽観的ロック違反）を検出して、再読み込みを案内
-       if (
+       const actionLabel = this.editingIssue ? '保存' : '作成';
+      if (
         error instanceof FirebaseError &&
         (error.code === 'failed-precondition' || /version/i.test(error.message))
       ) {
-        alert('データのバージョンが古いため課題を保存できませんでした。画面を再読み込みしてから再度お試しください。');
-      } else {
-        alert('課題の保存に失敗しました');
+        alert(`データのバージョンが古いため課題を${actionLabel}できませんでした。画面を再読み込みしてから再度お試しください。`);
+      } else if(error instanceof Error && error.message) {
+        alert(error.message);
+        alert(`課題の${actionLabel}に失敗しました`);
       }
     } finally {
       this.saving = false;
@@ -813,10 +1054,49 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * タスク数を取得（実装予定）
+   * Firestoreからタスク数を集計し、課題カードへ反映する
+   * Destroy後に反映しないようSubjectの状態を参照
    */
+  private async refreshTaskSummaries(): Promise<void> {
+    if (!this.projectId) {
+      this.taskSummaryMap = {};
+      return;
+    }
+
+    try {
+      const pairs = await Promise.all(
+        this.issues
+          .filter((issue): issue is Issue & { id: string } => Boolean(issue.id))
+          .map(async (issue) => {
+            const summary = await this.tasksService.getTaskSummary(this.projectId, issue.id!);
+            return { issueId: issue.id!, summary };
+          })
+      );
+
+      const map = pairs.reduce<Record<string, { count: number; representativeTitle: string | null }>>((acc, item) => {
+        acc[item.issueId] = item.summary;
+        return acc;
+      }, {});
+
+      if (!this.destroy$.closed) {
+        this.taskSummaryMap = map;
+      }
+    } catch (error) {
+      console.error('タスク概要の取得に失敗しました:', error);
+    }
+  }
+
+  /** 指定課題のタスク数を返却（キャッシュがない場合は0） */
   getTaskCount(issueId: string): number {
-    void issueId; // TODO: TasksServiceから取得
-    return 0;
+    return this.taskSummaryMap[issueId]?.count ?? 0;
+  }
+
+  /** 課題カードに表示する代表タスクタイトルを取得（存在しない場合はnull） */
+  getRepresentativeTaskTitle(issueId: string): string | null {
+    const summary = this.taskSummaryMap[issueId];
+    if (!summary || summary.count === 0) {
+      return null;
+    }
+    return summary.representativeTitle;
   }
 }

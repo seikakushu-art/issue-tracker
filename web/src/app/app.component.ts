@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { RouterOutlet, Router, ActivatedRoute,NavigationEnd} from '@angular/router';
+import { Subject, takeUntil,filter, startWith} from 'rxjs';
 import { ProjectsService } from './features/projects/projects.service';
 import { IssuesService } from './features/issues/issues.service';
 import { TasksService } from './features/tasks/tasks.service';
@@ -163,13 +163,17 @@ export class AppComponent implements OnInit, OnDestroy {
   currentTask: Task | null = null;
 
   ngOnInit() {
-    // ルート変更を監視してパンくずリストを更新
     this.router.events
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        filter(event => event instanceof NavigationEnd), // ナビゲーション完了時だけ
+        startWith(null),                                  // 初回ロード時にも実行
+        takeUntil(this.destroy$)
+      )
       .subscribe(() => {
         this.updateBreadcrumbs();
       });
   }
+  
 
   ngOnDestroy() {
     this.destroy$.next();

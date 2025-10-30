@@ -16,6 +16,8 @@ import { Task, TaskStatus, ChecklistItem } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
+import { ProgressService } from '../projects/progress.service';
+
 
 /**
  * タスク管理サービス
@@ -26,6 +28,7 @@ export class TasksService {
   private db = inject(Firestore);
   private auth = inject(Auth);
   private authReady: Promise<void> | null = null;
+  private progressService = inject(ProgressService);
 
   private async ensureAuthReady() {
     if (!this.authReady) {
@@ -161,6 +164,7 @@ export class TasksService {
       collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`),
       payload
     );
+    await this.refreshProgress(projectId, issueId);
     return ref.id;
   }
 
@@ -180,6 +184,47 @@ export class TasksService {
     } catch (error) {
       console.error('Error in listTasks:', error);
       return [];
+    }
+  }
+
+  /**
+   * 課題配下のタスク数を取得する
+   * 一覧画面の統計表示用に件数のみを高速に集計する
+   */
+  async countTasks(projectId: string, issueId: string): Promise<number> {
+    try {
+      const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
+      const snap = await getDocs(q);
+      return snap.docs.length;
+    } catch (error) {
+      console.error('Error counting tasks:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * 課題配下のタスク概要を取得する
+   * 一覧カードに表示する件数と代表タスクタイトルを一度のアクセスでまとめて返す
+   */
+  async getTaskSummary(
+    projectId: string,
+    issueId: string,
+  ): Promise<{ count: number; representativeTitle: string | null }> {
+    try {
+      const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
+      const snap = await getDocs(q);
+
+      // 代表タスクは一番最初に取得できたタスクのタイトルを利用
+      const firstTask = snap.docs[0]?.data() as Task | undefined;
+      const representativeTitle = firstTask?.title ?? null;
+
+      return {
+        count: snap.docs.length,
+        representativeTitle,
+      };
+    } catch (error) {
+      console.error('Error fetching task summary:', error);
+      return { count: 0, representativeTitle: null };
     }
   }
 
@@ -259,6 +304,7 @@ export class TasksService {
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await updateDoc(docRef, updates as any);
+    await this.refreshProgress(projectId, issueId);
   }
 
   /**
@@ -270,6 +316,7 @@ export class TasksService {
   async deleteTask(projectId: string, issueId: string, taskId: string): Promise<void> {
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
     await deleteDoc(docRef);
+    await this.refreshProgress(projectId, issueId);
   }
 
   /**
@@ -379,6 +426,18 @@ export class TasksService {
       progress,
       status: newStatus,
     });
+  }
+  /**
+   * 課題・プロジェクトの進捗率を再計算する
+   * タスクのCRUD後に必ず呼び出してデータの整合性を保つ
+   */
+  private async refreshProgress(projectId: string, issueId: string): Promise<void> {
+    try {
+      await this.progressService.updateIssueProgress(projectId, issueId);
+      await this.progressService.updateProjectProgress(projectId);
+    } catch (error) {
+      console.error('進捗率の再計算に失敗しました:', error);
+    }
   }
 }
 

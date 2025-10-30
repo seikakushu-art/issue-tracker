@@ -13,7 +13,7 @@ import {
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { Project } from '../../models/schema';
-import { firstValueFrom,TimeoutError } from 'rxjs';
+import { firstValueFrom,TimeoutError} from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 //プロジェクトを作成する
 @Injectable({ providedIn: 'root' })
@@ -21,6 +21,50 @@ export class ProjectsService {
   private db = inject(Firestore);
   private auth = inject(Auth);
   private authReady: Promise<void> | null = null;
+
+  /**
+   * Firestoreから受け取った日付相当の値をDate型へ統一するユーティリティ
+   * Timestamp/Date/stringのいずれが来ても安全にDateへ変換し、解釈できない値はnullを返す
+   */
+  private normalizeDate(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'toDate' in value &&
+      typeof (value as { toDate: () => Date }).toDate === 'function'
+    ) {
+      const converted = (value as { toDate: () => Date }).toDate();
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    }
+
+    const parsed = new Date(value as string);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  /**
+   * Firestoreから取得した生のプロジェクトデータを画面で扱いやすい形に整形する
+   * - ドキュメントIDをidへ格納
+   * - Timestampなどの日時をDate型へ変換
+   * - undefinedをnullへ揃える
+   */
+  private hydrateProject(id: string, data: Project): Project {
+    const dataRecord = data as unknown as Record<string, unknown>;
+    return {
+      ...data,
+      id,
+      startDate: this.normalizeDate(dataRecord['startDate']),
+      endDate: this.normalizeDate(dataRecord['endDate']),
+      createdAt: this.normalizeDate(dataRecord['createdAt']),
+      progress: (dataRecord['progress'] as number) ?? 0,
+      archived: (dataRecord['archived'] as boolean) ?? false,
+    };
+  }
 
   private async ensureAuthReady() {
     if (!this.authReady) {
@@ -140,7 +184,7 @@ export class ProjectsService {
     console.log('●●●Executing Firestore query...');
     const snap = await getDocs(q);
     console.log('●●●Firestore query completed, documents:', snap.docs.length);
-    const projects = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Project) }));
+    const projects = snap.docs.map((d) =>this.hydrateProject(d.id, d.data() as Project));
     console.log('●●●Mapped projects:', projects);
     return projects;
     } catch (error) {
@@ -148,6 +192,23 @@ export class ProjectsService {
       return [];
     }
   }
+  /**
+   * 単一のプロジェクト情報を取得する
+   * プロジェクト詳細パネルで利用するため、存在しない場合はnullを返す
+   */
+  async getProject(id: string): Promise<Project | null> {
+    try {
+      const snapshot = await getDoc(doc(this.db, 'projects', id));
+      if (!snapshot.exists()) {
+        return null;
+      }
+      return this.hydrateProject(snapshot.id, snapshot.data() as Project);
+    } catch (error) {
+      console.error('●●●Error fetching project detail:', error);
+      return null;
+    }
+  }
+
 
   async archive(id: string, archived: boolean) {
     return updateDoc(doc(this.db, 'projects', id), { archived });
