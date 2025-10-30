@@ -1,7 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
 
 /**
@@ -77,6 +77,12 @@ import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
         <div *ngIf="errorMessage" class="error-message">
           <i class="icon-error"></i>
           {{ errorMessage }}
+        </div>
+
+        <!-- 成功メッセージ -->
+        <div *ngIf="successMessage" class="success-message">
+          <i class="icon-success"></i>
+          {{ successMessage }}
         </div>
       </div>
     </div>
@@ -232,22 +238,45 @@ import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
       gap: 8px;
     }
 
+    .success-message {
+      background: #efe;
+      border: 1px solid #cfc;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #3c3;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     /* アイコンフォント用のスタイル */
     .icon-folder::before { content: '📁'; }
     .icon-error::before { content: '⚠️'; }
+    .icon-success::before { content: '✅'; }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private auth = inject(Auth);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   loading = false;
   errorMessage = '';
+  successMessage = '';
 
   loginForm = {
     email: '',
     password: ''
   };
+
+  ngOnInit() {
+    // アカウント作成後のメッセージを表示
+    const registered = this.route.snapshot.queryParams['registered'];
+    if (registered === 'true') {
+      this.successMessage = 'アカウントが作成されました。確認メールを確認してからログインしてください。';
+    }
+  }
 
   /**
    * ログイン処理
@@ -259,13 +288,23 @@ export class LoginComponent {
 
     this.loading = true;
     this.errorMessage = '';
+    this.successMessage = '';
 
     try {
-      await signInWithEmailAndPassword(
+      const userCredential = await signInWithEmailAndPassword(
         this.auth,
         this.loginForm.email,
         this.loginForm.password
       );
+      
+      // メール認証が完了しているかチェック
+      if (!userCredential.user.emailVerified) {
+        // ログアウトして、認証が完了していないことを通知
+        await this.auth.signOut();
+        this.errorMessage = 'メールアドレスの確認が完了していません。確認メールのリンクをクリックしてメールアドレスを確認してください。';
+        this.loading = false;
+        return;
+      }
       
       // ログイン成功時はプロジェクト一覧に遷移
       this.router.navigate(['/']);
@@ -279,13 +318,17 @@ export class LoginComponent {
           this.errorMessage = 'このメールアドレスは登録されていません';
           break;
         case 'auth/wrong-password':
-          this.errorMessage = 'パスワードが正しくありません';
+        case 'auth/invalid-credential':
+          this.errorMessage = 'メールアドレスまたはパスワードが正しくありません';
           break;
         case 'auth/invalid-email':
           this.errorMessage = 'メールアドレスの形式が正しくありません';
           break;
         case 'auth/too-many-requests':
           this.errorMessage = 'ログイン試行回数が多すぎます。しばらく待ってから再試行してください';
+          break;
+        case 'auth/user-disabled':
+          this.errorMessage = 'このアカウントは無効化されています';
           break;
         default:
           this.errorMessage = 'ログインに失敗しました。もう一度お試しください';

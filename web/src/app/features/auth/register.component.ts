@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Auth, createUserWithEmailAndPassword, updateProfile } from '@angular/fire/auth';
+import { AuthService } from '../../core/auth.service';
 
 /**
  * アカウント作成画面コンポーネント
@@ -283,7 +283,7 @@ import { Auth, createUserWithEmailAndPassword, updateProfile } from '@angular/fi
   `]
 })
 export class RegisterComponent {
-  private auth = inject(Auth);
+  private authService = inject(AuthService);
   private router = inject(Router);
 
   loading = false;
@@ -327,53 +327,67 @@ export class RegisterComponent {
       // パスワード確認
       if (this.registerForm.password !== this.registerForm.confirmPassword) {
         this.errorMessage = 'パスワードが一致しません';
+        this.loading = false;
         return;
       }
 
       if (this.registerForm.password.length < 6) {
         this.errorMessage = 'パスワードは6文字以上で入力してください';
+        this.loading = false;
         return;
       }
 
-      // アカウント作成
-      const userCredential = await createUserWithEmailAndPassword(
-        this.auth,
+      // メールアドレスの形式チェック
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(this.registerForm.email)) {
+        this.errorMessage = 'メールアドレスの形式が正しくありません';
+        this.loading = false;
+        return;
+      }
+
+      // AuthServiceを使用してアカウント作成（メール認証送信含む）
+      await this.authService.register(
         this.registerForm.email,
-        this.registerForm.password
+        this.registerForm.password,
+        this.registerForm.displayName
       );
 
-      // 表示名を設定
-      await updateProfile(userCredential.user, {
-        displayName: this.registerForm.displayName
-      });
-
-      this.successMessage = 'アカウントが作成されました！ログインしています...';
+      this.successMessage = '確認メールを送信しました。メールのリンクを開いてからログインしてください。';
       
-      // 少し待ってからプロジェクト一覧に遷移
+      // ログイン画面に遷移（メール認証が完了するまでログインできない）
       setTimeout(() => {
-        this.router.navigate(['/']);
-      }, 1500);
+        this.router.navigate(['/login'], { 
+          queryParams: { registered: 'true' } 
+        });
+      }, 2000);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('アカウント作成エラー:', error);
       
       // エラーメッセージを設定
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          this.errorMessage = 'このメールアドレスは既に使用されています';
-          break;
-        case 'auth/invalid-email':
-          this.errorMessage = 'メールアドレスの形式が正しくありません';
-          break;
-        case 'auth/weak-password':
-          this.errorMessage = 'パスワードが弱すぎます。より強力なパスワードを設定してください';
-          break;
-        case 'auth/operation-not-allowed':
-          this.errorMessage = 'アカウント作成が無効になっています';
-          break;
-        default:
-          this.errorMessage = 'アカウント作成に失敗しました。もう一度お試しください';
+      if (error instanceof Error && 'code' in error) {
+        const firebaseError = error as { code: string; message?: string };
+        switch (firebaseError.code) {
+          case 'auth/email-already-in-use':
+            this.errorMessage = 'このメールアドレスは既に使用されています';
+            break;
+          case 'auth/invalid-email':
+            this.errorMessage = 'メールアドレスの形式が正しくありません';
+            break;
+          case 'auth/weak-password':
+            this.errorMessage = 'パスワードが弱すぎます。より強力なパスワードを設定してください';
+            break;
+          case 'auth/operation-not-allowed':
+            this.errorMessage = 'アカウント作成が無効になっています';
+            break;
+          case 'auth/invalid-password':
+            this.errorMessage = 'パスワードは6文字以上で入力してください';
+            break;
+          default:
+            this.errorMessage = firebaseError.message || 'アカウント作成に失敗しました。もう一度お試しください';
+        }
+      } else {
+        this.errorMessage = 'アカウント作成に失敗しました。もう一度お試しください';
       }
     } finally {
       this.loading = false;
