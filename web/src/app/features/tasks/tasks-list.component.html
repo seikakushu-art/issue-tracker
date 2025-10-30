@@ -1,0 +1,532 @@
+<div class="tasks-container">
+  <!-- ヘッダー -->
+  <div class="header">
+    <h2>タスク一覧</h2>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      <i class="icon-plus"></i> 新規タスク
+    </button>
+  </div>
+
+  <!-- 課題のサマリーパネル -->
+  <section *ngIf="issueDetails" class="issue-summary">
+    <div class="summary-header">
+      <div class="summary-title">
+        <span
+          class="summary-color"
+          [style.background-color]="issueDetails.themeColor || getFallbackColor(issueDetails.id!)"
+        ></span>
+        <div class="summary-text">
+          <h3>{{ issueDetails.name }}</h3>
+          <p class="summary-goal" *ngIf="issueDetails.goal">{{ issueDetails.goal }}</p>
+        </div>
+      </div>
+      <div class="summary-deadline">
+        <span *ngIf="issueDetails.startDate">開始: {{ issueDetails.startDate | date:'yyyy/MM/dd' }}</span>
+        <span *ngIf="issueDetails.endDate">期限: {{ issueDetails.endDate | date:'yyyy/MM/dd' }}</span>
+      </div>
+    </div>
+
+    <p class="summary-description" *ngIf="issueDetails.description">{{ issueDetails.description }}</p>
+
+    <div class="summary-progress">
+      <span class="label">進捗</span>
+      <div class="progress-bar">
+        <div
+          class="progress-fill"
+          [style.width.%]="issueProgress"
+          [style.background-color]="issueDetails.themeColor || getFallbackColor(issueDetails.id!)"
+        ></div>
+      </div>
+      <span class="value">{{ issueProgress | number:'1.0-1' }}%</span>
+    </div>
+
+    <div class="summary-tasks" *ngIf="taskPreview.length > 0; else noTaskPreview">
+      <h4>代表タスク</h4>
+      <ul>
+        <li *ngFor="let previewTask of taskPreview">
+          <span class="task-title">{{ previewTask.title }}</span>
+          <span class="task-progress">{{ (previewTask.progress || 0) | number:'1.0-0' }}%</span>
+          <span class="task-status" [class]="'status-' + previewTask.status">
+            {{ getStatusLabel(previewTask.status) }}
+          </span>
+        </li>
+      </ul>
+    </div>
+    <ng-template #noTaskPreview>
+      <p class="summary-empty">まだタスクが登録されていません。</p>
+    </ng-template>
+  </section>
+
+  <!-- フィルター・並び替え -->
+  <div class="filters">
+    <div class="filter-group">
+      <span>ステータス:</span>
+      <select [(ngModel)]="statusFilter" (change)="filterTasks()">
+        <option value="">すべて</option>
+        <option value="incomplete">未完了</option>
+        <option value="in_progress">進行中</option>
+        <option value="completed">完了</option>
+        <option value="on_hold">保留</option>
+        <option value="discarded">破棄</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span>重要度:</span>
+      <select [(ngModel)]="importanceFilter" (change)="filterTasks()">
+        <option value="">すべて</option>
+        <option value="Critical">至急重要</option>
+        <option value="High">至急</option>
+        <option value="Medium">重要</option>
+        <option value="Low">普通</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span>並び替え:</span>
+      <select [(ngModel)]="sortBy" (change)="sortTasks()">
+        <option value="title">タイトル</option>
+        <option value="startDate">開始日</option>
+        <option value="endDate">終了日</option>
+        <option value="progress">進捗</option>
+        <option value="importance">重要度</option>
+        <option value="createdAt">作成日</option>
+      </select>
+      <select [(ngModel)]="sortOrder" (change)="sortTasks()">
+        <option value="asc">昇順</option>
+        <option value="desc">降順</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>
+        <input type="checkbox" [(ngModel)]="showArchived" (change)="filterTasks()">
+        アーカイブ済みも表示
+      </label>
+    </div>
+  </div>
+
+  <!-- タスク一覧 -->
+  <div class="tasks-grid">
+    <div
+      *ngFor="let task of filteredTasks"
+      class="task-card"
+      [class.completed]="task.status === 'completed'"
+      [class.discarded]="task.status === 'discarded'"
+      [class.archived]="task.archived"
+      [style.borderTopColor]="getIssueThemeColor()"
+      (click)="selectTask(task)"
+      (keydown.enter)="selectTask(task)"
+      role="button"
+      tabindex="0"
+    >
+      <div class="task-header">
+        <div class="task-title">
+        <div
+            class="task-theme-marker"
+            [style.background-color]="getIssueThemeColor()"
+          ></div>
+          <h3>{{ task.title }}</h3>
+          <span class="importance-chip" [ngClass]="getImportanceClass(task.importance)">
+            {{ getImportanceLabel(task.importance) }}
+          </span>
+        </div>
+        <div class="task-actions">
+          <button class="btn-icon" (click)="editTask(task, $event)" title="編集">
+            <i class="icon-edit"></i>
+          </button>
+          <button class="btn-icon" (click)="archiveTask(task, $event)" title="アーカイブ切替">
+            <i class="icon-archive"></i>
+          </button>
+          <button class="btn-icon" (click)="deleteTask(task, $event)" title="削除">
+            <i class="icon-delete"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="task-flags" *ngIf="task.archived">
+        <span class="flag archived-flag">アーカイブ済み</span>
+      </div>
+      
+      <div class="task-content">
+        <p class="description" *ngIf="task.description">{{ task.description }}</p>
+        
+        <div class="task-meta">
+          <div class="meta-item" *ngIf="task.startDate">
+            <i class="icon-calendar"></i>
+            {{ task.startDate | date:'yyyy/MM/dd' }}
+          </div>
+          <div class="meta-item" *ngIf="task.endDate">
+            <i class="icon-calendar"></i>
+            {{ task.endDate | date:'yyyy/MM/dd' }}
+          </div>
+          <div class="meta-item">
+            <span class="status-badge" [class]="'status-' + task.status">
+              {{ getStatusLabel(task.status) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>進捗</span>
+            <span class="progress-value">{{ getTaskProgress(task) | number:'1.0-0' }}%</span>
+          </div>
+          <div class="progress-bar">
+          <div
+              class="progress-fill"
+              [style.width.%]="getTaskProgress(task)"
+              [style.background-color]="getIssueThemeColor()"
+            ></div>
+          </div>
+        </div>
+
+        <div class="task-tags" *ngIf="task.tagIds.length > 0">
+          <span 
+            *ngFor="let tagId of task.tagIds" 
+            class="tag"
+            [style.background-color]="getTagColor(tagId)"
+          >
+            {{ getTagName(tagId) }}
+          </span>
+        </div>
+
+        <div class="task-stats">
+          <div class="stat-item">
+            <span class="stat-label">チェックリスト</span>
+            <span class="stat-value">{{ task.checklist.length }}項目</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">完了</span>
+            <span class="stat-value">{{ getCompletedChecklistCount(task) }}項目</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 空状態 -->
+  <div *ngIf="tasks.length === 0" class="empty-state">
+    <i class="icon-folder"></i>
+    <h3>タスクがありません</h3>
+    <p>新しいタスクを作成して始めましょう</p>
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      タスクを作成
+    </button>
+  </div>
+</div>
+
+ <!-- タスク詳細パネル -->
+ <div *ngIf="selectedTask" class="task-detail-container">
+  <div
+    class="task-detail-backdrop"
+    (click)="closeDetailPanel()"
+    (keydown.enter)="closeDetailPanel()"
+    (keydown.space)="closeDetailPanel()"
+    role="button"
+    tabindex="0"
+    aria-label="詳細を閉じる"
+  ></div>
+  <aside
+    class="task-detail-panel"
+    [style.borderTopColor]="getIssueThemeColor()"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="detail-header">
+      <div class="detail-title">
+        <span class="importance-chip" [ngClass]="getImportanceClass(selectedTask.importance)">
+          {{ getImportanceLabel(selectedTask.importance) }}
+        </span>
+        <h2>{{ selectedTask.title }}</h2>
+      </div>
+      <div class="detail-actions">
+        <button class="btn btn-secondary btn-sm" (click)="editTask(selectedTask, $event)">
+          編集
+        </button>
+        <button class="btn btn-secondary btn-sm" (click)="archiveTask(selectedTask, $event)">
+          {{ selectedTask.archived ? '復元' : 'アーカイブ' }}
+        </button>
+        <button class="btn-icon" (click)="closeDetailPanel()" aria-label="閉じる">
+          <i class="icon-close"></i>
+        </button>
+      </div>
+    </div>
+
+    <p class="detail-description" *ngIf="selectedTask.description">{{ selectedTask.description }}</p>
+
+    <section class="detail-section">
+      <h3>基本情報</h3>
+      <dl class="detail-meta">
+        <div>
+          <dt>ステータス</dt>
+          <dd>
+            <span class="status-badge" [class]="'status-' + selectedTask.status">
+              {{ getStatusLabel(selectedTask.status) }}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>重要度</dt>
+          <dd>
+            <span class="importance-chip" [ngClass]="getImportanceClass(selectedTask.importance)">
+              {{ getImportanceLabel(selectedTask.importance) }}
+            </span>
+          </dd>
+        </div>
+        <div *ngIf="selectedTask.startDate">
+          <dt>開始日</dt>
+          <dd>{{ selectedTask.startDate | date:'yyyy/MM/dd' }}</dd>
+        </div>
+        <div *ngIf="selectedTask.endDate">
+          <dt>終了日</dt>
+          <dd>{{ selectedTask.endDate | date:'yyyy/MM/dd' }}</dd>
+        </div>
+        <div *ngIf="selectedTask.goal">
+          <dt>達成目標</dt>
+          <dd>{{ selectedTask.goal }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="detail-section">
+      <h3>進捗</h3>
+      <div class="detail-progress">
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            [style.width.%]="getTaskProgress(selectedTask)"
+            [style.background-color]="getIssueThemeColor()"
+          ></div>
+        </div>
+        <span class="progress-value">{{ getTaskProgress(selectedTask) | number:'1.0-0' }}%</span>
+      </div>
+    </section>
+
+    <section class="detail-section">
+      <h3>チェックリスト</h3>
+      <div *ngIf="selectedTask.checklist.length > 0; else emptyChecklist">
+        <div class="detail-checklist-item" *ngFor="let item of selectedTask.checklist">
+          <label>
+            <input
+              type="checkbox"
+              [checked]="item.completed"
+              (change)="toggleChecklistItem(selectedTask!, item.id, $any($event.target).checked)"
+            >
+            <span [class.completed]="item.completed">{{ item.text }}</span>
+          </label>
+          <button
+            type="button"
+            class="btn-icon"
+            (click)="removeChecklistItemFromDetail(item.id)"
+            title="削除"
+          >
+            <i class="icon-delete"></i>
+          </button>
+        </div>
+      </div>
+      <ng-template #emptyChecklist>
+        <p class="placeholder-text">チェックリストはまだありません。</p>
+      </ng-template>
+      <div class="detail-checklist-add">
+        <input
+          type="text"
+          [(ngModel)]="newChecklistText"
+          placeholder="新しい項目を入力"
+          (keydown.enter)="addChecklistItemFromDetail()"
+        >
+        <button type="button" class="btn btn-secondary btn-sm" (click)="addChecklistItemFromDetail()">
+          追加
+        </button>
+      </div>
+    </section>
+
+    <section class="detail-section" *ngIf="selectedTask.tagIds.length > 0">
+      <h3>タグ</h3>
+      <div class="detail-tags">
+        <span
+          *ngFor="let tagId of selectedTask.tagIds"
+          class="tag"
+          [style.background-color]="getTagColor(tagId)"
+        >
+          {{ getTagName(tagId) }}
+        </span>
+      </div>
+    </section>
+
+    <section class="detail-section">
+      <h3>担当者</h3>
+      <p *ngIf="selectedTask.assigneeIds.length === 0" class="placeholder-text">担当者はまだ割り当てられていません。</p>
+      <ul *ngIf="selectedTask.assigneeIds.length > 0" class="assignee-list">
+        <li *ngFor="let assigneeId of selectedTask.assigneeIds">{{ assigneeId }}</li>
+      </ul>
+    </section>
+
+    <section class="detail-section">
+      <h3>添付</h3>
+      <p class="placeholder-text">添付ファイルの管理機能は現在準備中です。</p>
+    </section>
+
+    <section class="detail-section">
+      <h3>コメント</h3>
+      <p class="placeholder-text">コメント機能（メンション対応）は今後の開発予定です。</p>
+    </section>
+  </aside>
+</div>
+
+<!-- タスク作成・編集モーダル -->
+<div *ngIf="showModal" class="modal-overlay" (click)="closeModal()" role="button" tabindex="-1">
+  <div class="modal" (click)="$event.stopPropagation()" role="button" tabindex="-1">
+    <div class="modal-header">
+      <h2>{{ editingTask ? 'タスク編集' : '新規タスク' }}</h2>
+      <button class="btn-icon" (click)="closeModal()">
+        <i class="icon-close"></i>
+      </button>
+    </div>
+    
+    <form class="modal-body" (ngSubmit)="saveTask()">
+      <div class="form-group">
+        <label for="title">タイトル *</label>
+        <input 
+          id="title"
+          type="text" 
+          [(ngModel)]="taskForm.title" 
+          name="title"
+          required
+          placeholder="タスクのタイトルを入力"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="description">説明</label>
+        <textarea 
+          id="description"
+          [(ngModel)]="taskForm.description" 
+          name="description"
+          placeholder="タスクの説明を入力"
+          rows="3"
+        ></textarea>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="startDate">開始日</label>
+          <input 
+            id="startDate"
+            type="date" 
+            [(ngModel)]="taskForm.startDate" 
+            name="startDate"
+          >
+        </div>
+        <div class="form-group">
+          <label for="endDate">終了日</label>
+          <input 
+            id="endDate"
+            type="date"
+            [(ngModel)]="taskForm.endDate"
+            name="endDate"
+          >
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="importance">重要度</label>
+          <select id="importance" [(ngModel)]="taskForm.importance" name="importance">
+          <option value="Low">普通</option>
+            <option value="Medium">重要</option>
+            <option value="High">至急</option>
+            <option value="Critical">至急重要</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="status">ステータス</label>
+          <select id="status" [(ngModel)]="taskForm.status" name="status">
+            <option value="incomplete">未完了</option>
+            <option value="in_progress">進行中</option>
+            <option value="completed">完了</option>
+            <option value="on_hold">保留</option>
+            <option value="discarded">破棄</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="goal">達成目標</label>
+        <textarea 
+          id="goal"
+          [(ngModel)]="taskForm.goal" 
+          name="goal"
+          placeholder="タスクの達成目標を入力"
+          rows="2"
+        ></textarea>
+      </div>
+
+      <div class="form-group">
+        <span>タグ</span>
+        <div class="tag-selector">
+          <div 
+            *ngFor="let tag of availableTags" 
+            class="tag-option"
+            [class.selected]="taskForm.tagIds.includes(tag.id!)"
+            (click)="toggleTag(tag.id!)"
+            (keydown.enter)="toggleTag(tag.id!)"
+            role="button"
+            tabindex="0"
+          >
+            <span 
+              class="tag-color" 
+              [style.background-color]="tag.color || '#ccc'"
+            ></span>
+            {{ tag.name }}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <span>チェックリスト</span>
+        <div class="checklist-editor">
+          <div 
+            *ngFor="let item of taskForm.checklist; let i = index" 
+            class="checklist-item"
+          >
+            <input 
+              type="checkbox" 
+              [(ngModel)]="item.completed"
+              [name]="'checklist-' + i"
+            >
+            <input 
+              type="text" 
+              [(ngModel)]="item.text"
+              [name]="'checklist-text-' + i"
+              placeholder="チェック項目を入力"
+              class="checklist-input"
+            >
+            <button 
+              type="button" 
+              class="btn-icon" 
+              (click)="removeChecklistItem(i)"
+              title="削除"
+            >
+              <i class="icon-delete"></i>
+            </button>
+          </div>
+          <button 
+            type="button" 
+            class="btn btn-secondary btn-sm" 
+            (click)="addChecklistItem()"
+          >
+            <i class="icon-plus"></i> 項目を追加
+          </button>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeModal()">
+          キャンセル
+        </button>
+        <button type="submit" class="btn btn-primary" [disabled]="!taskForm.title || saving">
+          {{ saving ? '保存中...' : '保存' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
