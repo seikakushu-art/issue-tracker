@@ -384,7 +384,11 @@ private async loadTags(): Promise<void> {
         this.issues
           .filter((issue): issue is Issue & { id: string } => Boolean(issue.id))
           .map(async (issue) => {
-            const summary = await this.tasksService.getTaskSummary(this.projectId, issue.id!);
+            const summary = await this.tasksService.getTaskSummary(
+              this.projectId,
+              issue.id!,
+              issue.representativeTaskId ?? null
+            );
             return { issueId: issue.id!, summary };
           })
       );

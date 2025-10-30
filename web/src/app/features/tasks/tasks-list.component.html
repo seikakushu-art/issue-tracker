@@ -108,6 +108,15 @@
     </div>
   </div>
 
+   <!-- 代表タスク操作のフィードバックメッセージ -->
+   <div *ngIf="representativeTaskMessage" class="feedback feedback--success">
+    <i class="icon-success"></i>
+    {{ representativeTaskMessage }}
+  </div>
+  <div *ngIf="representativeTaskError" class="feedback feedback--error">
+    <i class="icon-error"></i>
+    {{ representativeTaskError }}
+  </div>
   <!-- タスク一覧 -->
   <div class="tasks-grid">
     <div
@@ -116,6 +125,7 @@
       [class.completed]="task.status === 'completed'"
       [class.discarded]="task.status === 'discarded'"
       [class.archived]="task.archived"
+      [class.representative-task]="isRepresentativeTask(task)"
       [style.borderTopColor]="getIssueThemeColor()"
       (click)="selectTask(task)"
       (keydown.enter)="selectTask(task)"
@@ -138,12 +148,33 @@
             <i class="icon-delete" aria-hidden="true"></i>
             <span class="btn-label">削除</span>
           </button>
+          <button
+          class="btn-icon btn-icon--labeled"
+          *ngIf="!isRepresentativeTask(task)"
+          (click)="markAsRepresentative(task, $event)"
+          [disabled]="representativeTaskUpdatingId === task.id"
+          title="代表タスクに設定"
+        >
+          <i class="icon-star" aria-hidden="true"></i>
+          <span class="btn-label">代表に設定</span>
+        </button>
+        <button
+          class="btn-icon btn-icon--labeled"
+          *ngIf="isRepresentativeTask(task)"
+          (click)="clearRepresentativeTask(task, $event)"
+          [disabled]="representativeTaskUpdatingId === task.id"
+          title="代表タスクを解除"
+        >
+          <i class="icon-remove-star" aria-hidden="true"></i>
+          <span class="btn-label">代表解除</span>
+        </button>
         </div>
         <div class="task-title">
         <div
             class="task-theme-marker"
             [style.background-color]="getIssueThemeColor()"
           ></div>
+          <span *ngIf="isRepresentativeTask(task)" class="representative-badge">代表</span>
           <h3>{{ task.title }}</h3>
           <span class="importance-chip" [ngClass]="getImportanceClass(task.importance)">
             {{ getImportanceLabel(task.importance) }}

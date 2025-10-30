@@ -24,6 +24,7 @@ import { ProgressService } from '../projects/progress.service';
 export interface TaskSummary {
   count: number; // タスク総数
   representativeTask: {
+    taskId: string;
     title: string;
     importance?: Importance | null;
     tagIds: string[]; // 代表タスクに紐づくタグを併せて提示する
@@ -231,30 +232,37 @@ export class TasksService {
   async getTaskSummary(
     projectId: string,
     issueId: string,
+    representativeTaskId: string | null = null,
   ): Promise<TaskSummary> {
     try {
       const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
       const snap = await getDocs(q);
 
-      // 代表タスクは一番最初に取得できたタスクの情報を利用
-      const firstTask = snap.docs[0]?.data() as Task | undefined;
-      const representativeTask = firstTask
-        ? {
-            title: firstTask.title,
-            importance: firstTask.importance ?? null,
-            tagIds: firstTask.tagIds ?? [], // タグ未設定時は空配列で扱う
-          }
-        : null;
+     // 指定された代表タスクIDと一致するものを優先して選択
+     const matchedDoc = representativeTaskId
+     ? snap.docs.find(docSnap => docSnap.id === representativeTaskId)
+     : undefined;
 
-      return {
-        count: snap.docs.length,
-        representativeTask,
-      };
-    } catch (error) {
-      console.error('Error fetching task summary:', error);
-      return { count: 0, representativeTask: null };
-    }
+   const candidateDoc = matchedDoc ?? snap.docs[0];
+   const candidateData = candidateDoc?.data() as Task | undefined;
+
+   const representativeTask = candidateDoc && candidateData
+     ? {
+         taskId: candidateDoc.id,
+         title: candidateData.title,
+         importance: candidateData.importance ?? null,
+         tagIds: candidateData.tagIds ?? [], // タグ未設定時は空配列で扱う
+    } : null;
+    return {
+      count: snap.docs.length,
+      representativeTask,
+    };
+  } catch (error) {
+    console.error('Error fetching task summary:', error);
+    return { count: 0, representativeTask: null };
   }
+}
+
 
   /**
    * 特定のタスクを取得する

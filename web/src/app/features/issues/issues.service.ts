@@ -77,6 +77,7 @@ export class IssuesService {
       createdAt: this.normalizeDate(dataRecord['createdAt']) ?? null,
       progress: dataRecord['progress'] as number ?? 0,
       archived: (dataRecord['archived'] as boolean) ?? false,
+      representativeTaskId: (dataRecord['representativeTaskId'] as string | null | undefined) ?? null,
     };
   }
 
@@ -192,6 +193,7 @@ export class IssuesService {
       name: input.name,
       archived: false,
       createdAt: serverTimestamp(),
+      representativeTaskId: null,
     };
 
     if (input.description !== undefined && input.description !== null && input.description !== '') {
@@ -309,6 +311,7 @@ export class IssuesService {
       goal: string | null;
       themeColor: string | null;
       archived: boolean;
+      representativeTaskId: string | null;
     }>
   ): Promise<void> {
     // 名称変更の場合、重複チェック
@@ -342,6 +345,16 @@ export class IssuesService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await updateDoc(docRef, updates as any);
   }
+/**
+   * 代表タスクを設定／解除する
+   * @param projectId プロジェクトID
+   * @param issueId 課題ID
+   * @param taskId タスクID（null指定で解除）
+   */
+async setRepresentativeTask(projectId: string, issueId: string, taskId: string | null): Promise<void> {
+  const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
+  await updateDoc(docRef, { representativeTaskId: taskId });
+}
 
   /**
    * 課題をアーカイブする
