@@ -216,7 +216,11 @@ export class ProjectInviteService {
       const roles = { ...(projectData.roles ?? {}) } as Record<string, Role>;
 
       memberIds.add(uid);
-      roles[uid] = invite.role;
+      const currentRole = roles[uid];
+      const isInviteCreator = invite.createdBy === uid;
+      const nextRole: Role = isInviteCreator && currentRole ? currentRole : invite.role;
+
+      roles[uid] = nextRole;
 
       tx.update(projectRef, {
         memberIds: Array.from(memberIds),
@@ -229,7 +233,7 @@ export class ProjectInviteService {
         usedAt: serverTimestamp(),
       });
 
-      return { projectId: invite.projectId, role: invite.role };
+      return { projectId: invite.projectId, role: roles[uid] };
     });
   }
 }
