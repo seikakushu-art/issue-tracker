@@ -75,21 +75,94 @@
         </ul>
       </section>
   
-      <!-- ウィジェット④: 期限が近いタスク -->
-      <section class="widget widget--deadlines" aria-labelledby="deadline-title">
+     <!-- ウィジェット④: 要対応タスク -->
+     <section class="widget widget--deadlines" aria-labelledby="actionable-title">
         <div class="widget__header">
-          <h2 id="deadline-title">期限間近のタスク</h2>
-          <button type="button" class="button button--ghost">日付を変更</button>
-        </div>
-        <ul class="widget__content">
-          <li class="deadline-item" *ngFor="let deadline of upcomingDeadlines">
-            <div>
-              <h3>{{ deadline.task }}</h3>
-              <p>{{ deadline.project }}</p>
+            <h2 id="actionable-title">要対応タスク</h2>
+            <button
+              type="button"
+              class="button button--ghost"
+              (click)="refreshActionableTasks()"
+              [disabled]="actionableLoading()"
+            >
+              再読み込み
+            </button>
+          </div>
+          <div class="widget__content widget__content--actionable">
+            <div class="widget__loading" *ngIf="actionableLoading()">
+              <span class="spinner" aria-hidden="true"></span>
+              <span>読み込み中...</span>
             </div>
-            <span class="deadline-item__due">{{ deadline.due }}</span>
-          </li>
-        </ul>
+            <p class="widget__error" *ngIf="!actionableLoading() && actionableError()">
+              {{ actionableError() }}
+            </p>
+            <p
+              class="widget__empty"
+              *ngIf="!actionableLoading() && !actionableError() && actionableTasks().length === 0"
+            >
+              現在対応が必要なタスクはありません。
+            </p>
+            <ul
+              class="actionable-list"
+              *ngIf="!actionableLoading() && actionableTasks().length > 0"
+            >
+              <li class="actionable-card" *ngFor="let card of actionableTasks(); trackBy: trackTask">
+                <div class="actionable-card__header">
+                  <span
+                    class="actionable-card__badge"
+                    [style.background-color]="card.badge.color"
+                  >
+                    {{ card.badge.label }}
+                  </span>
+                  <span class="actionable-card__project">{{ card.projectName }}</span>
+                </div>
+                <div class="actionable-card__body">
+                  <h3>{{ card.title }}</h3>
+                  <div class="actionable-card__meta">
+                    <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
+                      {{ getImportanceLabel(card.importance) }}
+                    </span>
+                    <span class="status-badge" [ngClass]="'status-' + card.status">
+                      {{ card.statusLabel }}
+                    </span>
+                    <span class="due-label" *ngIf="card.dueDate">
+                      期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
+                    </span>
+                  </div>
+                  <ul class="actionable-card__reasons">
+                    <li *ngFor="let label of getHighlightLabels(card)">{{ label }}</li>
+                  </ul>
+                  <div class="actionable-card__mentions" *ngIf="card.mentionCount > 0">
+                    <h4>メンション {{ card.mentionCount }}件</h4>
+                    <ul>
+                      <li *ngFor="let mention of card.mentions">
+                        <span class="mention-date">{{ mention.createdAt | date: 'MM/dd HH:mm' }}</span>
+                        <span class="mention-text">{{ mention.text }}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="actionable-card__actions">
+                  <button
+                    type="button"
+                    class="button button--ghost"
+                    (click)="markOnHold(card)"
+                    [disabled]="isUpdating(card)"
+                  >
+                    保留
+                  </button>
+                  <button
+                    type="button"
+                    class="button button--primary"
+                    (click)="markCompleted(card)"
+                    [disabled]="isUpdating(card)"
+                  >
+                    完了
+                  </button>
+                </div>
+              </li>
+            </ul>
+        </div>
       </section>
   
       <!-- ウィジェット⑤: リソースリンク -->
