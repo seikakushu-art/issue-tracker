@@ -13,7 +13,7 @@ import {
   deleteDoc,
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
-import { Project } from '../../models/schema';
+import { Project, Role } from '../../models/schema';
 import { firstValueFrom,TimeoutError} from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 //プロジェクトを作成する
@@ -56,9 +56,13 @@ export class ProjectsService {
    */
   private hydrateProject(id: string, data: Project): Project {
     const dataRecord = data as unknown as Record<string, unknown>;
+    const memberIds = (dataRecord['memberIds'] as string[] | undefined) ?? [];
+    const roles = (dataRecord['roles'] as Record<string, Role> | undefined) ?? {};
     return {
       ...data,
       id,
+      memberIds,
+      roles,
       startDate: this.normalizeDate(dataRecord['startDate']),
       endDate: this.normalizeDate(dataRecord['endDate']),
       createdAt: this.normalizeDate(dataRecord['createdAt']),
@@ -66,6 +70,31 @@ export class ProjectsService {
       archived: (dataRecord['archived'] as boolean) ?? false,
     };
   }
+
+  private resolveRoleForUser(project: Project, uid: string): Role | null {
+    const roles = project.roles ?? {};
+    return roles[uid] ?? null;
+  }
+
+  public async getSignedInUid(): Promise<string> {
+    const user = await this.requireUser();
+    return user.uid;
+  }
+
+  public async ensureProjectRole(projectId: string, allowedRoles: Role[]): Promise<{ project: Project; role: Role; uid: string }> {
+    const uid = await this.getSignedInUid();
+    const projectSnap = await getDoc(doc(this.db, 'projects', projectId));
+    if (!projectSnap.exists()) {
+      throw new Error('対象のプロジェクトが見つかりません');
+    }
+    const project = this.hydrateProject(projectSnap.id, projectSnap.data() as Project);
+    const role = this.resolveRoleForUser(project, uid);
+    if (!role || !allowedRoles.includes(role)) {
+      throw new Error('この操作を行う権限がありません');
+    }
+    return { project, role, uid };
+  }
+
 
   private async ensureAuthReady() {
     if (!this.authReady) {
@@ -168,7 +197,7 @@ export class ProjectsService {
       throw error;
     }
   }
-  async listMyProjects(): Promise<Project[]> {
+  public async listMyProjects(): Promise<Project[]> {
     console.log('●●●listMyProjects called');
     const uid = (await this.waitForUser())?.uid;
     console.log('●●●Current UID:', uid);
@@ -185,7 +214,10 @@ export class ProjectsService {
     console.log('●●●Executing Firestore query...');
     const snap = await getDocs(q);
     console.log('●●●Firestore query completed, documents:', snap.docs.length);
-    const projects = snap.docs.map((d) =>this.hydrateProject(d.id, d.data() as Project));
+    const projects = snap.docs.map((d) => this.hydrateProject(d.id, d.data() as Project));
+    projects.forEach((project) => {
+      project.currentRole = this.resolveRoleForUser(project, uid) ?? undefined;
+    });
     console.log('●●●Mapped projects:', projects);
     return projects;
     } catch (error) {
@@ -198,7 +230,7 @@ export class ProjectsService {
    * - 配下の課題・タスクも合わせて物理削除する
    */
    async deleteProject(projectId: string): Promise<void> {
-    await this.requireUser(); // 認証確認（未ログイン時の削除を防止）
+    await this.ensureProjectRole(projectId, ['admin']);
 
     // プロジェクト配下の課題を取得
     const issuesRef = collection(this.db, `projects/${projectId}/issues`);
@@ -222,7 +254,7 @@ export class ProjectsService {
    * 単一のプロジェクト情報を取得する
    * プロジェクト詳細パネルで利用するため、存在しない場合はnullを返す
    */
-  async getProject(id: string): Promise<Project | null> {
+  public async getProject(id: string): Promise<Project | null> {
     try {
       const snapshot = await getDoc(doc(this.db, 'projects', id));
       if (!snapshot.exists()) {
@@ -237,6 +269,7 @@ export class ProjectsService {
 
 
   async archive(id: string, archived: boolean) {
+    await this.ensureProjectRole(id, ['admin']);
     return updateDoc(doc(this.db, 'projects', id), { archived });
   }
    /**
@@ -255,16 +288,11 @@ export class ProjectsService {
     }>,
   ): Promise<void> {
     // --- プロジェクト名変更時は重複チェックを実施 ---
+    const { project: current } = await this.ensureProjectRole(id, ['admin']);
+
     if (updates.name !== undefined) {
       await this.checkNameUniqueness(updates.name, id);
     }
-
-    // --- Firestoreから最新のプロジェクトを取得して期間バリデーションに利用 ---
-    const projectSnap = await getDoc(doc(this.db, 'projects', id));
-    if (!projectSnap.exists()) {
-      throw new Error('対象のプロジェクトが見つかりません');
-    }
-    const current = projectSnap.data() as Project;
 
     // --- FirestoreのTimestampが渡される場合に備えてDateへ正規化 ---
     const normalizeDate = (value: unknown): Date | null => {

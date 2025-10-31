@@ -17,6 +17,7 @@ import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
+import { ProjectsService } from '../projects/projects.service';
 
 /**
  * 課題カードに表示する代表タスク情報
@@ -41,6 +42,7 @@ export class TasksService {
   private auth = inject(Auth);
   private authReady: Promise<void> | null = null;
   private progressService = inject(ProgressService);
+  private projectsService = inject(ProjectsService);
 
   private async ensureAuthReady() {
     if (!this.authReady) {
@@ -115,7 +117,7 @@ export class TasksService {
       checklist?: ChecklistItem[];
     }
   ): Promise<string> {
-    const uid = (await this.requireUser()).uid;
+    const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     
     // 名称重複チェック
     await this.checkTitleUniqueness(projectId, issueId, input.title);
@@ -315,6 +317,8 @@ export class TasksService {
       archived: boolean;
     }>
   ): Promise<void> {
+    const { role, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
     // タイトル変更の場合、重複チェック
     if (updates.title !== undefined) {
       await this.checkTitleUniqueness(projectId, issueId, updates.title, taskId);
@@ -333,6 +337,12 @@ export class TasksService {
     // バリデーション: 開始日は終了日以前
     const task = await this.getTask(projectId, issueId, taskId);
     if (task) {
+      if (role === 'member') {
+        const canEdit = task.createdBy === uid || (task.assigneeIds ?? []).includes(uid);
+        if (!canEdit) {
+          throw new Error('このタスクを編集する権限がありません');
+        }
+      }
       const startDate = updates.startDate !== undefined ? updates.startDate : task.startDate;
       const endDate = updates.endDate !== undefined ? updates.endDate : task.endDate;
       if (startDate && endDate && startDate > endDate) {
@@ -375,7 +385,16 @@ export class TasksService {
    * @param taskId タスクID
    */
   async deleteTask(projectId: string, issueId: string, taskId: string): Promise<void> {
+    const { role, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
+    const taskSnap = await getDoc(docRef);
+    if (!taskSnap.exists()) {
+      throw new Error('タスクが見つかりません');
+    }
+    const task = taskSnap.data() as Task;
+    if (role === 'member' && task.createdBy !== uid) {
+      throw new Error('このタスクを削除する権限がありません');
+    }
     await deleteDoc(docRef);
     await this.refreshProgress(projectId, issueId);
   }

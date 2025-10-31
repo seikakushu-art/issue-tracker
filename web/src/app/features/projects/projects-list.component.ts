@@ -4,9 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { ProjectsService } from './projects.service';
-import { Project } from '../../models/schema';
+import { InviteStatus, Project, ProjectInvite, Role } from '../../models/schema';
 import { IssuesService } from '../issues/issues.service';
 import { FirebaseError } from '@angular/fire/app';
+import { ProjectInviteService } from './project-invite.service';
 
 /**
  * プロジェクト一覧コンポーネント
@@ -22,6 +23,7 @@ import { FirebaseError } from '@angular/fire/app';
 export class ProjectsListComponent implements OnInit, OnDestroy {
   private projectsService = inject(ProjectsService);
   private issuesService = inject(IssuesService);
+  private inviteService = inject(ProjectInviteService);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
@@ -31,6 +33,20 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   editingProject: Project | null = null;
   saving = false;
   showArchived = false;
+  currentUid: string | null = null;
+
+  // 招待リンク関連
+  showInviteModal = false;
+  inviteProject: Project | null = null;
+  inviteForm = {
+    role: 'member' as Role,
+    expiresInHours: 24,
+  };
+  inviteLinks: ProjectInvite[] = [];
+  inviteLoading = false;
+  inviteMessage = '';
+  inviteError = '';
+  generatedUrl = '';
 
   // 並び替え設定
   sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' | 'period' | 'issueCount' | 'memberCount' = 'name';
@@ -63,12 +79,31 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   async loadProjects() {
     try {
+      this.currentUid = await this.projectsService.getSignedInUid();
       this.projects = await this.projectsService.listMyProjects();
       await this.loadIssueCounts();
       this.filterProjects();
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
     }
+  }
+
+  getRole(project: Project): Role | null {
+    if (project.currentRole) {
+      return project.currentRole;
+    }
+    if (!this.currentUid) {
+      return null;
+    }
+    return project.roles?.[this.currentUid] ?? null;
+  }
+
+  isAdmin(project: Project): boolean {
+    return this.getRole(project) === 'admin';
+  }
+
+  canManage(project: Project): boolean {
+    return this.isAdmin(project);
   }
 
   /**
@@ -164,6 +199,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   editProject(project: Project, event: Event) {
     event.stopPropagation();
+    if (!this.isAdmin(project)) {
+      alert('この操作を行う権限がありません');
+      return;
+    }
     this.editingProject = project;
     this.projectForm = {
       name: project.name,
@@ -180,6 +219,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   async archiveProject(project: Project, event: Event) {
     event.stopPropagation();
+    if (!this.isAdmin(project)) {
+      alert('この操作を行う権限がありません');
+      return;
+    }
     const actionLabel = project.archived ? '復元' : 'アーカイブ';
     if (confirm(`プロジェクト「${project.name}」を${actionLabel}しますか？`)) {
       try {
@@ -191,29 +234,152 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       }
     }
   }
- /**
+  /**
    * プロジェクトを削除（サブコレクションもまとめて削除）
    */
- async deleteProject(project: Project, event: Event) {
-  event.stopPropagation(); // カード遷移を防ぐ
+  async deleteProject(project: Project, event: Event) {
+    event.stopPropagation(); // カード遷移を防ぐ
 
-  if (!project.id) {
-    return; // IDが無ければ操作不可
+    if (!this.isAdmin(project)) {
+      alert('この操作を行う権限がありません');
+      return;
+    }
+
+    if (!project.id) {
+      return; // IDが無ければ操作不可
+    }
+
+    const confirmed = confirm(`プロジェクト「${project.name}」を完全に削除します。よろしいですか？\n関連する課題とタスクも削除されます。`);
+    if (!confirmed) {
+      return; // ユーザーがキャンセルした場合
+    }
+
+    try {
+      await this.projectsService.deleteProject(project.id); // Firestore上のプロジェクトを削除
+      await this.loadProjects(); // 最新状態へ更新
+    } catch (error) {
+      console.error('プロジェクトの削除に失敗しました:', error);
+      alert('プロジェクトの削除に失敗しました');
+    }
   }
 
-  const confirmed = confirm(`プロジェクト「${project.name}」を完全に削除します。よろしいですか？\n関連する課題とタスクも削除されます。`);
-  if (!confirmed) {
-    return; // ユーザーがキャンセルした場合
+  async loadInvites(projectId: string) {
+    this.inviteLoading = true;
+    this.inviteError = '';
+    try {
+      this.inviteLinks = await this.inviteService.listInvites(projectId);
+    } catch (error) {
+      console.error('招待リンクの取得に失敗しました:', error);
+      this.inviteError = error instanceof Error ? error.message : '招待リンクの取得に失敗しました';
+    } finally {
+      this.inviteLoading = false;
+    }
   }
 
-  try {
-    await this.projectsService.deleteProject(project.id); // Firestore上のプロジェクトを削除
-    await this.loadProjects(); // 最新状態へ更新
-  } catch (error) {
-    console.error('プロジェクトの削除に失敗しました:', error);
-    alert('プロジェクトの削除に失敗しました');
+  async openInviteModal(project: Project, event: Event) {
+    event.stopPropagation();
+    if (!project.id) return;
+    if (!this.isAdmin(project)) {
+      alert('招待リンクの管理権限がありません');
+      return;
+    }
+    this.inviteProject = project;
+    this.inviteForm = { role: 'member', expiresInHours: 24 };
+    this.generatedUrl = '';
+    this.inviteMessage = '';
+    this.showInviteModal = true;
+    await this.loadInvites(project.id);
   }
-}
+
+  async createInvite() {
+    if (!this.inviteProject?.id) return;
+    this.inviteLoading = true;
+    this.inviteMessage = '';
+    this.inviteError = '';
+    try {
+      const { invite, url } = await this.inviteService.createInvite(this.inviteProject.id, this.inviteForm);
+      this.generatedUrl = url;
+      this.inviteLinks = [invite, ...this.inviteLinks];
+      this.inviteMessage = '招待リンクを発行しました。';
+    } catch (error) {
+      console.error('招待リンクの発行に失敗しました:', error);
+      this.inviteError = error instanceof Error ? error.message : '招待リンクの発行に失敗しました';
+    } finally {
+      this.inviteLoading = false;
+    }
+  }
+
+  async revokeInvite(invite: ProjectInvite) {
+    if (invite.status !== 'active') {
+      return;
+    }
+    if (!confirm('この招待リンクを無効にしますか？')) {
+      return;
+    }
+    try {
+      await this.inviteService.revokeInvite(invite.token);
+      if (this.inviteProject?.id) {
+        await this.loadInvites(this.inviteProject.id);
+      }
+    } catch (error) {
+      console.error('招待リンクの取り消しに失敗しました:', error);
+      alert(error instanceof Error ? error.message : '招待リンクの取り消しに失敗しました');
+    }
+  }
+
+  copyInvite(url: string) {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        this.inviteMessage = 'クリップボードにコピーしました。';
+      }).catch((error) => {
+        console.error('コピーに失敗しました:', error);
+        this.inviteError = 'コピーに失敗しました';
+      });
+    } else {
+      this.inviteError = 'クリップボードにコピーできませんでした';
+    }
+  }
+
+  closeInviteModal() {
+    this.showInviteModal = false;
+    this.inviteProject = null;
+    this.inviteLinks = [];
+    this.generatedUrl = '';
+    this.inviteMessage = '';
+    this.inviteError = '';
+  }
+
+  translateRole(role: Role): string {
+    switch (role) {
+      case 'admin':
+        return '管理者';
+      case 'member':
+        return 'メンバー';
+      case 'guest':
+        return 'ゲスト';
+      default:
+        return role;
+    }
+  }
+
+  translateInviteStatus(status: InviteStatus): string {
+    switch (status) {
+      case 'active':
+        return '有効';
+      case 'used':
+        return '使用済み';
+      case 'expired':
+        return '期限切れ';
+      case 'revoked':
+        return '取り消し済み';
+      default:
+        return status;
+    }
+  }
+
+  buildInviteUrl(invite: ProjectInvite): string {
+    return `${location.origin}/invite/${invite.token}`;
+  }
 
   /**
    * プロジェクトを保存

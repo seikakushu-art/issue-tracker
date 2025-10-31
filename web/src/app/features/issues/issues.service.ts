@@ -19,6 +19,7 @@ import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
+import { ProjectsService } from '../projects/projects.service';
 
 /**
  * 課題（Issue）管理サービス
@@ -30,6 +31,7 @@ export class IssuesService {
   private auth = inject(Auth);
   private authReady: Promise<void> | null = null;
   private progressService = inject(ProgressService);
+  private projectsService = inject(ProjectsService);
 
   /**
    * Firestoreから取得した日時フィールドをDate型へ正規化するユーティリティ
@@ -176,7 +178,7 @@ export class IssuesService {
     goal?: string;
     themeColor?: string;
   }): Promise<string> {
-    await this.requireUser();
+    await this.projectsService.ensureProjectRole(projectId, ['admin']);
     
     // 名称重複チェック
     await this.checkNameUniqueness(projectId, input.name);
@@ -314,6 +316,7 @@ export class IssuesService {
       representativeTaskId: string | null;
     }>
   ): Promise<void> {
+    await this.projectsService.ensureProjectRole(projectId, ['admin']);
     // 名称変更の場合、重複チェック
     if (updates.name !== undefined) {
       await this.checkNameUniqueness(projectId, updates.name, issueId);
@@ -352,6 +355,7 @@ export class IssuesService {
    * @param taskId タスクID（null指定で解除）
    */
 async setRepresentativeTask(projectId: string, issueId: string, taskId: string | null): Promise<void> {
+  await this.projectsService.ensureProjectRole(projectId, ['admin']);
   const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
   await updateDoc(docRef, { representativeTaskId: taskId });
 }
@@ -363,6 +367,7 @@ async setRepresentativeTask(projectId: string, issueId: string, taskId: string |
    * @param archived アーカイブ状態
    */
   async archiveIssue(projectId: string, issueId: string, archived: boolean): Promise<void> {
+    await this.projectsService.ensureProjectRole(projectId, ['admin']);
     await this.updateIssue(projectId, issueId, { archived });
   }
 
@@ -372,6 +377,7 @@ async setRepresentativeTask(projectId: string, issueId: string, taskId: string |
    * @param issueId 課題ID
    */
   async deleteIssue(projectId: string, issueId: string): Promise<void> {
+    await this.projectsService.ensureProjectRole(projectId, ['admin']);
     // まず配下のタスクをすべて削除し、孤立ドキュメントを防ぐ
     const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`);
     const tasksSnap = await getDocs(tasksRef);
@@ -418,6 +424,8 @@ async setRepresentativeTask(projectId: string, issueId: string, taskId: string |
         progress: number | null;
       }>,
     ): Promise<void> {
+      await this.projectsService.ensureProjectRole(currentProjectId, ['admin']);
+      await this.projectsService.ensureProjectRole(targetProjectId, ['admin']);
       if (currentProjectId === targetProjectId) {
         return;
       }

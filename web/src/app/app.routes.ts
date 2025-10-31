@@ -4,6 +4,7 @@ import { IssuesListComponent } from './features/issues/issues-list.component';
 import { TasksListComponent } from './features/tasks/tasks-list.component';
 import { LoginComponent } from './features/auth/login.component';
 import { RegisterComponent } from './features/auth/register.component';
+import { ProjectInviteComponent } from './features/projects/project-invite.component';
 
 /**
  * アプリケーションのルート設定
@@ -20,6 +21,11 @@ export const routes: Routes = [
     path: 'register',
     component: RegisterComponent,
     title: 'アカウント作成'
+  },
+  {
+    path: 'invite/:token',
+    component: ProjectInviteComponent,
+    title: 'プロジェクト招待'
   },
 
   // プロジェクト一覧（ルート）

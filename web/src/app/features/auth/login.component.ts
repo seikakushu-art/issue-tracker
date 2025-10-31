@@ -264,6 +264,7 @@ export class LoginComponent implements OnInit {
   loading = false;
   errorMessage = '';
   successMessage = '';
+  private redirectUrl: string | null = null;
 
   loginForm = {
     email: '',
@@ -276,6 +277,7 @@ export class LoginComponent implements OnInit {
     if (registered === 'true') {
       this.successMessage = 'アカウントが作成されました。確認メールを確認してからログインしてください。';
     }
+    this.redirectUrl = this.route.snapshot.queryParams['redirect'] ?? null;
   }
 
   /**
@@ -306,8 +308,12 @@ export class LoginComponent implements OnInit {
         return;
       }
       
-      // ログイン成功時はプロジェクト一覧に遷移
-      this.router.navigate(['/']);
+      // ログイン成功時は指定のリダイレクト先があれば遷移
+      if (this.redirectUrl) {
+        this.router.navigateByUrl(this.redirectUrl);
+      } else {
+        this.router.navigate(['/']);
+      }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('ログインエラー:', error);

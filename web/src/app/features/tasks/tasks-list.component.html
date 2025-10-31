@@ -2,7 +2,7 @@
   <!-- ヘッダー -->
   <div class="header">
     <h2>タスク一覧</h2>
-    <button class="btn btn-primary" (click)="openCreateModal()">
+    <button class="btn btn-primary" *ngIf="canCreateTask()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規タスク
     </button>
   </div>
@@ -135,22 +135,22 @@
       <div class="task-header">
         <div class="task-actions">
           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
-          <button class="btn-icon btn-icon--labeled" (click)="editTask(task, $event)" title="編集">
+          <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="editTask(task, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
             <span class="btn-label">編集</span>
           </button>
           <!-- アーカイブ状態のトグルもラベル表示 -->
-          <button class="btn-icon btn-icon--labeled" (click)="archiveTask(task, $event)" title="アーカイブ切替">
+          <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="archiveTask(task, $event)" title="アーカイブ切替">
             <i class="icon-archive" aria-hidden="true"></i>
             <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
           </button>
-          <button class="btn-icon btn-icon--labeled" (click)="deleteTask(task, $event)" title="削除">
+          <button class="btn-icon btn-icon--labeled" *ngIf="canDeleteTask(task)" (click)="deleteTask(task, $event)" title="削除">
             <i class="icon-delete" aria-hidden="true"></i>
             <span class="btn-label">削除</span>
           </button>
           <button
           class="btn-icon btn-icon--labeled"
-          *ngIf="!isRepresentativeTask(task)"
+          *ngIf="isAdmin() && !isRepresentativeTask(task)"
           (click)="markAsRepresentative(task, $event)"
           [disabled]="representativeTaskUpdatingId === task.id"
           title="代表タスクに設定"
@@ -160,7 +160,7 @@
         </button>
         <button
           class="btn-icon btn-icon--labeled"
-          *ngIf="isRepresentativeTask(task)"
+          *ngIf="isAdmin() && isRepresentativeTask(task)"
           (click)="clearRepresentativeTask(task, $event)"
           [disabled]="representativeTaskUpdatingId === task.id"
           title="代表タスクを解除"
@@ -248,7 +248,7 @@
     <i class="icon-folder"></i>
     <h3>タスクがありません</h3>
     <p>新しいタスクを作成して始めましょう</p>
-    <button class="btn btn-primary" (click)="openCreateModal()">
+        <button class="btn btn-primary" *ngIf="canCreateTask()" (click)="openCreateModal()">
       タスクを作成
     </button>
   </div>
@@ -279,10 +279,10 @@
         <h2>{{ selectedTask.title }}</h2>
       </div>
       <div class="detail-actions">
-        <button class="btn btn-secondary btn-sm" (click)="editTask(selectedTask, $event)">
+        <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(selectedTask)" (click)="editTask(selectedTask, $event)">
           編集
         </button>
-        <button class="btn btn-secondary btn-sm" (click)="archiveTask(selectedTask, $event)">
+        <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(selectedTask)" (click)="archiveTask(selectedTask, $event)">
           {{ selectedTask.archived ? '復元' : 'アーカイブ' }}
         </button>
         <button class="btn-icon" (click)="closeDetailPanel()" aria-label="閉じる">
@@ -349,6 +349,7 @@
             <input
               type="checkbox"
               [checked]="item.completed"
+              [disabled]="!canEditTask(selectedTask)"
               (change)="toggleChecklistItem(selectedTask!, item.id, $any($event.target).checked)"
             >
             <span [class.completed]="item.completed">{{ item.text }}</span>
@@ -356,6 +357,7 @@
           <button
             type="button"
             class="btn-icon"
+            *ngIf="canEditTask(selectedTask)"
             (click)="removeChecklistItemFromDetail(item.id)"
             title="削除"
           >
@@ -372,8 +374,9 @@
           [(ngModel)]="newChecklistText"
           placeholder="新しい項目を入力"
           (keydown.enter)="addChecklistItemFromDetail()"
+          [disabled]="!canEditTask(selectedTask)"
         >
-        <button type="button" class="btn btn-secondary btn-sm" (click)="addChecklistItemFromDetail()">
+        <button type="button" class="btn btn-secondary btn-sm" (click)="addChecklistItemFromDetail()" [disabled]="!canEditTask(selectedTask)">
           追加
         </button>
       </div>

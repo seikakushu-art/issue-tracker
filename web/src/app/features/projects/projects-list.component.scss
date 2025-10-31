@@ -332,3 +332,114 @@
   cursor: not-allowed;
 }
 
+.invite-modal {
+  max-width: 640px;
+}
+
+.invite-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.invite-description {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.invite-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.invite-form .form-row {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 160px;
+  gap: 6px;
+}
+
+.invite-form select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.generated-link {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.generated-link input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.invite-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.invite-list th,
+.invite-list td {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.link-cell {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.link-cell input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.btn-small {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.success-message {
+  color: #047857;
+  font-size: 13px;
+}
+
+.error-message {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.info-text {
+  color: #4b5563;
+  font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .generated-link,
+  .link-cell {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-small {
+    width: 100%;
+  }
+}
+

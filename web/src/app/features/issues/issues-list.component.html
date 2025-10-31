@@ -2,7 +2,7 @@
   <!-- ヘッダー -->
   <div class="header">
     <h2>課題一覧</h2>
-    <button class="btn btn-primary" (click)="openCreateModal()">
+    <button class="btn btn-primary" *ngIf="isAdmin()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規課題
     </button>
   </div>
@@ -75,7 +75,7 @@
         [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
       ></div>
       <div class="issue-header">
-        <div class="issue-actions">
+        <div class="issue-actions" *ngIf="isAdmin()">
           <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
             <span class="action-label">編集</span>
@@ -170,7 +170,7 @@
     <i class="icon-folder"></i>
     <h3>課題がありません</h3>
     <p>新しい課題を作成して始めましょう</p>
-    <button class="btn btn-primary" (click)="openCreateModal()">
+    <button class="btn btn-primary" *ngIf="isAdmin()" (click)="openCreateModal()">
       課題を作成
     </button>
   </div>

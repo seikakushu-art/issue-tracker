@@ -6,7 +6,8 @@ import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { IssuesService } from '../issues/issues.service';
-import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem} from '../../models/schema';
+import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem, Role, Project } from '../../models/schema';
+import { ProjectsService } from '../projects/projects.service';
 
 /**
  * タスク一覧コンポーネント
@@ -23,6 +24,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private tasksService = inject(TasksService);
   private tagsService = inject(TagsService);
   private issuesService = inject(IssuesService);
+  private projectsService = inject(ProjectsService);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
 
@@ -49,6 +51,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
   representativeTaskMessage = '';
   representativeTaskError = '';
   private representativeFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+  currentRole: Role | null = null;
+  currentUid: string | null = null;
 
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
@@ -109,13 +113,19 @@ export class TasksListComponent implements OnInit, OnDestroy {
     if (!this.projectId || !this.issueId) return;
 
     try {
-      const [tasks, issue] = await Promise.all([
+      const projectPromise = (this.projectsService as unknown as { getProject: (id: string) => Promise<Project | null> }).getProject(this.projectId);
+      const uidPromise = (this.projectsService as unknown as { getSignedInUid: () => Promise<string> }).getSignedInUid();
+      const [tasks, issue, project, uid] = await Promise.all([
         this.tasksService.listTasks(this.projectId, this.issueId),
-        this.issuesService.getIssue(this.projectId, this.issueId)
+        this.issuesService.getIssue(this.projectId, this.issueId),
+        projectPromise,
+        uidPromise,
       ]);
 
       this.issueDetails = issue;
       this.tasks = tasks;
+      this.currentUid = uid;
+      this.currentRole = project?.roles?.[uid] ?? null;
       this.filterTasks();
       this.updateIssueProgress();
     } catch (error) {
@@ -130,6 +140,34 @@ export class TasksListComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('タグの読み込みに失敗しました:', error);
     }
+  }
+
+  isAdmin(): boolean {
+    return this.currentRole === 'admin';
+  }
+
+  canCreateTask(): boolean {
+    return this.currentRole === 'admin' || this.currentRole === 'member';
+  }
+
+  canEditTask(task: Task | null): boolean {
+    if (!task || !this.currentUid) {
+      return false;
+    }
+    if (this.isAdmin()) {
+      return true;
+    }
+    if (this.currentRole === 'member') {
+      return task.createdBy === this.currentUid || (task.assigneeIds ?? []).includes(this.currentUid);
+    }
+    return false;
+  }
+
+  canDeleteTask(task: Task): boolean {
+    if (this.isAdmin()) {
+      return true;
+    }
+    return this.currentRole === 'member' && this.currentUid === task.createdBy;
   }
 
   /** フィルタリング */
@@ -236,6 +274,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 新規作成モーダルを開く */
   openCreateModal() {
+    if (!this.canCreateTask()) {
+      alert('タスクを作成する権限がありません');
+      return;
+    }
     this.editingTask = null;
     this.taskForm = {
       title: '',
@@ -255,6 +297,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
   editTask(task: Task, event?: Event) {
     if (event) {
       event.stopPropagation();
+    }
+
+    if (!this.canEditTask(task)) {
+      alert('このタスクを編集する権限がありません');
+      return;
     }
 
     this.editingTask = task;
@@ -284,7 +331,19 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** タスク保存 */
   async saveTask() {
-    if (!this.taskForm.title || this.saving) return;
+    if (this.saving) return;
+
+    if (this.editingTask) {
+      if (!this.canEditTask(this.editingTask)) {
+        alert('このタスクを編集する権限がありません');
+        return;
+      }
+    } else if (!this.canCreateTask()) {
+      alert('タスクを作成する権限がありません');
+      return;
+    }
+
+    if (!this.taskForm.title) return;
 
     this.saving = true;
     try {
@@ -342,6 +401,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     if (!task.id) return;
+    if (!this.canDeleteTask(task)) {
+      alert('このタスクを削除する権限がありません');
+      return;
+    }
     if (!confirm(`タスク「${task.title}」を削除しますか？`)) return;
 
     try {
@@ -366,6 +429,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     if (!task.id) return;
+    if (!this.canEditTask(task)) {
+      alert('このタスクを変更する権限がありません');
+      return;
+    }
     const actionLabel = task.archived ? '復元' : 'アーカイブ';
     const confirmed = confirm(`タスク「${task.title}」を${actionLabel}しますか？`);
     if (!confirmed) {
@@ -398,6 +465,16 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** ClecklistItem追加 */
   addChecklistItem() {
+    if (this.editingTask) {
+      if (!this.canEditTask(this.editingTask)) {
+        alert('チェックリストを編集する権限がありません');
+        return;
+      }
+    } else if (!this.canCreateTask()) {
+      alert('チェックリストを編集する権限がありません');
+      return;
+    }
+
     if (this.taskForm.checklist.length < 200) {
       this.taskForm.checklist.push({
         id: this.generateId(),
@@ -411,6 +488,16 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** ChecklistItem削除 */
   removeChecklistItem(index: number) {
+    if (this.editingTask) {
+      if (!this.canEditTask(this.editingTask)) {
+        alert('チェックリストを編集する権限がありません');
+        return;
+      }
+    } else if (!this.canCreateTask()) {
+      alert('チェックリストを編集する権限がありません');
+      return;
+    }
+
     this.taskForm.checklist.splice(index, 1);
   }
 
@@ -421,6 +508,16 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** タグ選択切替 */
   toggleTag(tagId: string) {
+    if (this.editingTask) {
+      if (!this.canEditTask(this.editingTask)) {
+        alert('タグを編集する権限がありません');
+        return;
+      }
+    } else if (!this.canCreateTask()) {
+      alert('タグを編集する権限がありません');
+      return;
+    }
+
     const index = this.taskForm.tagIds.indexOf(tagId);
     if (index >= 0) {
       this.taskForm.tagIds.splice(index, 1);
@@ -705,6 +802,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 詳細パネルからチェックリストの完了状態を切り替える */
   async toggleChecklistItem(task: Task, itemId: string, completed: boolean) {
+    if (!this.canEditTask(task)) {
+      alert('チェックリストを更新する権限がありません');
+      return;
+    }
     const updatedChecklist = task.checklist.map(item =>
       item.id === itemId ? { ...item, completed } : item
     );
@@ -715,6 +816,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
   async addChecklistItemFromDetail() {
     const text = this.newChecklistText.trim();
     if (!text || !this.selectedTask) {
+      return;
+    }
+    if (!this.canEditTask(this.selectedTask)) {
+      alert('チェックリストを更新する権限がありません');
       return;
     }
 
@@ -732,6 +837,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
     if (!this.selectedTask) {
       return;
     }
+    if (!this.canEditTask(this.selectedTask)) {
+      alert('チェックリストを更新する権限がありません');
+      return;
+    }
 
     const updatedChecklist = this.selectedTask.checklist.filter(item => item.id !== itemId);
     await this.persistChecklist(this.selectedTask, updatedChecklist);
@@ -740,6 +849,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /** チェックリスト更新をFirestoreに反映 */
   private async persistChecklist(task: Task, checklist: ChecklistItem[]): Promise<void> {
     if (!task.id) {
+      return;
+    }
+    if (!this.canEditTask(task)) {
+      alert('チェックリストを更新する権限がありません');
       return;
     }
 

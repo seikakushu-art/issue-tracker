@@ -4,6 +4,11 @@
 export type Role = 'admin' | 'member' | 'guest';
 
 /**
+ * 招待リンクの状態
+ */
+export type InviteStatus = 'active' | 'used' | 'expired' | 'revoked';
+
+/**
  * タスクの重要度（4段階）
  */
 export type Importance = 'Critical' | 'High' | 'Medium' | 'Low';
@@ -34,6 +39,26 @@ export interface Project {
   archived: boolean;  // アーカイブ状態
   progress?: number;  // 進捗率（0-100、配下課題の加重平均から自動集計）
   createdAt?: Date | null;
+  /** 現在ログイン中ユーザーの役割（クライアント用） */
+  currentRole?: Role;
+}
+
+/**
+ * プロジェクトの招待情報
+ */
+export interface ProjectInvite {
+  id?: string;
+  projectId: string;
+  token: string;
+  role: Role;
+  status: InviteStatus;
+  createdBy: string;
+  createdAt?: Date | null;
+  expiresAt: Date;
+  usedBy?: string | null;
+  usedAt?: Date | null;
+  revokedBy?: string | null;
+  revokedAt?: Date | null;
 }
 
 /**

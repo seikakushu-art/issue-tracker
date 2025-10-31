@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
-import { Issue, Project,Importance,Tag } from '../../models/schema';
+import { Issue, Project,Importance,Tag, Role } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { FirebaseError } from 'firebase/app';
 import { TasksService, TaskSummary } from '../tasks/tasks.service';
@@ -39,6 +39,8 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   editingIssue: Issue | null = null;
   saving = false;
   showArchived = false;
+  currentRole: Role | null = null;
+  currentUid: string | null = null;
   /**
    * 課題IDごとのタスク概要（件数と代表タスク情報）をキャッシュ
    * UIのカード上で素早く表示できるよう、サービスからまとめて取得した内容を保持する
@@ -101,13 +103,18 @@ export class IssuesListComponent implements OnInit, OnDestroy {
     if (!this.projectId) return;
     
     try {
-      const [issues, project] = await Promise.all([
+      const projectPromise = (this.projectsService as unknown as { getProject: (id: string) => Promise<Project | null> }).getProject(this.projectId);
+      const uidPromise = (this.projectsService as unknown as { getSignedInUid: () => Promise<string> }).getSignedInUid();
+      const [issues, project, uid] = await Promise.all([
         this.issuesService.listIssues(this.projectId, this.showArchived),
-        this.projectsService.getProject(this.projectId),
+        projectPromise,
+        uidPromise,
       ]);
 
       this.projectDetails = project;
       this.issues = issues;
+      this.currentUid = uid;
+      this.currentRole = project?.roles?.[uid] ?? null;
       this.filterIssues();
       await this.refreshTaskSummaries();
       void this.loadTags(); // 直近で作成されたタグも反映
@@ -121,13 +128,18 @@ export class IssuesListComponent implements OnInit, OnDestroy {
    */
  private async loadAvailableProjects(): Promise<void> {
   try {
-    const projects = await this.projectsService.listMyProjects();
-    this.availableProjects = projects.filter((project): project is Project => Boolean(project.id));
+    const projectsServiceAny = this.projectsService as unknown as { listMyProjects: () => Promise<Project[]> };
+    const projects: Project[] = await projectsServiceAny.listMyProjects();
+    this.availableProjects = projects.filter((project): project is Project => Boolean(project.id) && project.currentRole === 'admin');
   } catch (error) {
     console.error('プロジェクト一覧の取得に失敗しました:', error);
     this.availableProjects = [];
   }
 }
+
+  isAdmin(): boolean {
+    return this.currentRole === 'admin';
+  }
 
 /**
  * タグ一覧を読み込み、IDから即座に参照できるようマップ化する
@@ -207,6 +219,10 @@ private async loadTags(): Promise<void> {
    * 新規課題作成モーダルを開く
    */
   openCreateModal() {
+    if (!this.isAdmin()) {
+      alert('課題を作成する権限がありません');
+      return;
+    }
     this.editingIssue = null;
     this.issueForm = {
       projectId: this.projectId,
@@ -225,6 +241,10 @@ private async loadTags(): Promise<void> {
    */
   editIssue(issue: Issue, event: Event) {
     event.stopPropagation();
+    if (!this.isAdmin()) {
+      alert('課題を編集する権限がありません');
+      return;
+    }
     this.editingIssue = issue;
     this.issueForm = {
       projectId: issue.projectId,
@@ -243,6 +263,10 @@ private async loadTags(): Promise<void> {
    */
   async archiveIssue(issue: Issue, event: Event) {
     event.stopPropagation();
+    if (!this.isAdmin()) {
+      alert('課題を変更する権限がありません');
+      return;
+    }
     const actionLabel = issue.archived ? '復元' : 'アーカイブ';
     if (confirm(`課題「${issue.name}」を${actionLabel}しますか？`)) {
       try {
@@ -259,6 +283,11 @@ private async loadTags(): Promise<void> {
    */
    async deleteIssue(issue: Issue, event: Event) {
     event.stopPropagation(); // カード遷移を阻止
+
+    if (!this.isAdmin()) {
+      alert('課題を削除する権限がありません');
+      return;
+    }
 
     if (!issue.id) {
       return; // ID未確定の課題は削除不可
@@ -283,6 +312,10 @@ private async loadTags(): Promise<void> {
    * 課題を保存
    */
   async saveIssue() {
+    if (!this.isAdmin()) {
+      alert('課題を変更する権限がありません');
+      return;
+    }
     if (!this.issueForm.name.trim()) {
       alert('課題名を入力してください');
       return;

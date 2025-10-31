@@ -46,7 +46,7 @@
       (keydown.enter)="selectProject(project)"
     >
       <div class="project-header">
-        <div class="project-actions">
+        <div class="project-actions" *ngIf="canManage(project)">
           <button class="btn-action" (click)="editProject(project, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
             <span class="action-label">編集</span>
@@ -54,6 +54,10 @@
           <button class="btn-action" (click)="archiveProject(project, $event)" title="アーカイブ">
             <i class="icon-archive" aria-hidden="true"></i>
             <span class="action-label">{{ project.archived ? '復元' : 'アーカイブ' }}</span>
+          </button>
+          <button class="btn-action" (click)="openInviteModal(project, $event)" title="招待リンク">
+            <i class="icon-link" aria-hidden="true"></i>
+            <span class="action-label">招待</span>
           </button>
           <button class="btn-action" (click)="deleteProject(project, $event)" title="削除">
             <i class="icon-delete" aria-hidden="true"></i>
@@ -119,9 +123,106 @@
   </div>
 </div>
 
+<!-- 招待リンク管理モーダル -->
+<div *ngIf="showInviteModal" class="modal-overlay" (click)="closeInviteModal()" (keydown.enter)="closeInviteModal()" (keydown.escape)="closeInviteModal()" role="button" tabindex="-1">
+  <div class="modal invite-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" role="dialog" tabindex="-1">
+    <div class="modal-header">
+      <h2>招待リンクの管理</h2>
+      <button
+        class="btn-icon close-button"
+        (click)="closeInviteModal()"
+        aria-label="閉じる"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="modal-body invite-body">
+      <p class="invite-description">
+        プロジェクト「{{ inviteProject?.name }}」にメンバーを招待します。
+      </p>
+
+      <form class="invite-form" (ngSubmit)="createInvite()">
+        <div class="form-row">
+          <label for="inviteRole">付与する権限</label>
+          <select id="inviteRole" [(ngModel)]="inviteForm.role" name="inviteRole">
+            <option value="admin">管理者</option>
+            <option value="member">メンバー</option>
+            <option value="guest">ゲスト</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="inviteExpiry">有効期限</label>
+          <select id="inviteExpiry" [(ngModel)]="inviteForm.expiresInHours" name="expiresIn">
+            <option [value]="24">24時間</option>
+            <option [value]="72">3日間</option>
+            <option [value]="168">7日間</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" [disabled]="inviteLoading">
+          {{ inviteLoading ? '発行中...' : '招待リンクを発行' }}
+        </button>
+      </form>
+
+      <div class="generated-link" *ngIf="generatedUrl">
+        <input type="text" [value]="generatedUrl" readonly>
+        <button type="button" class="btn btn-secondary" (click)="copyInvite(generatedUrl)">
+          リンクをコピー
+        </button>
+      </div>
+
+      <p *ngIf="inviteMessage" class="success-message">{{ inviteMessage }}</p>
+      <p *ngIf="inviteError" class="error-message">{{ inviteError }}</p>
+
+      <div class="invite-list" *ngIf="inviteLinks.length > 0">
+        <table>
+          <thead>
+            <tr>
+              <th>権限</th>
+              <th>期限</th>
+              <th>状態</th>
+              <th>URL</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let invite of inviteLinks">
+              <td>{{ translateRole(invite.role) }}</td>
+              <td>{{ invite.expiresAt | date:'yyyy/MM/dd HH:mm' }}</td>
+              <td>{{ translateInviteStatus(invite.status) }}</td>
+              <td>
+                <div class="link-cell">
+                  <input type="text" [value]="buildInviteUrl(invite)" readonly>
+                  <button type="button" class="btn btn-secondary btn-small" (click)="copyInvite(buildInviteUrl(invite))">
+                    コピー
+                  </button>
+                </div>
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-small"
+                  (click)="revokeInvite(invite)"
+                  [disabled]="invite.status !== 'active'"
+                >
+                  無効化
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p *ngIf="!inviteLoading && inviteLinks.length === 0" class="info-text">
+        発行済みの招待リンクはありません。
+      </p>
+    </div>
+  </div>
+</div>
+
 <!-- プロジェクト作成・編集モーダル -->
-<div *ngIf="showModal" class="modal-overlay" (click)="closeModal()" role="button" tabindex="-1">
-  <div class="modal" (click)="$event.stopPropagation()" role="button" tabindex="-1">
+<div *ngIf="showModal" class="modal-overlay" (click)="closeModal()" (keydown.enter)="closeModal()" (keydown.escape)="closeModal()" role="button" tabindex="-1">
+  <div class="modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" role="button" tabindex="-1">
     <div class="modal-header">
       <h2>{{ editingProject ? 'プロジェクト編集' : '新規プロジェクト' }}</h2>
       <button
