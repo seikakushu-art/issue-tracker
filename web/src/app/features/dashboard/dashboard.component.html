@@ -1,185 +1,266 @@
 <section class="dashboard">
-    <!-- ヘッダー: タイトルとフィルター操作をまとめる -->
+    <!-- ヘッダー: タイトルとフィルタ操作 -->
     <header class="dashboard__header">
-      <div class="dashboard__headline">
-        <h1>チームダッシュボード</h1>
-        <p>最新の進捗とボトルネックを一望できます。</p>
-      </div>
-      <div class="dashboard__filters">
-        <!-- フィルタープレースホルダー: 後続開発で動的化予定 -->
-        <div class="filter-group">
-          <span class="filter-group__label">期間フィルター</span>
-          <div class="filter-group__chips">
-            <button
-              type="button"
-              class="chip"
-              *ngFor="let filter of periodFilters"
-            >
-              {{ filter }}
-            </button>
-          </div>
+        <div class="dashboard__headline">
+            <h1>チームダッシュボード</h1>
+            <p>最新の進捗とボトルネックを一望できます。</p>
         </div>
-        <div class="dashboard__actions">
-          <button type="button" class="button button--ghost">フィルターを追加</button>
-          <button type="button" class="button button--primary">もっと見る</button>
+        <div class="dashboard__filters">
+            <div class="filter-group">
+                <span class="filter-group__label">期間フィルター</span>
+                <div class="filter-group__chips">
+                    <button type="button" class="chip" *ngFor="let filter of periodFilters">
+                        {{ filter }}
+                    </button>
+                </div>
+            </div>
+            <div class="dashboard__actions">
+                <button type="button" class="button button--ghost" (click)="refreshDashboard()">
+                    再読み込み
+                </button>
+                <a routerLink="/projects" class="button button--primary">プロジェクト一覧</a>
+            </div>
         </div>
-      </div>
     </header>
-  
-    <!-- コンテンツ領域: レスポンシブなウィジェット配置 -->
+
     <div class="dashboard__widgets">
-      <!-- ウィジェット①: サマリーカード -->
-      <section class="widget widget--summary" aria-labelledby="summary-title">
-        <div class="widget__header">
-          <h2 id="summary-title">概要サマリー</h2>
-          <a routerLink="/projects" class="widget__link">プロジェクト一覧へ</a>
-        </div>
-        <div class="widget__content widget__content--stats">
-          <article class="stat-card" *ngFor="let stat of summaryStats">
-            <h3>{{ stat.label }}</h3>
-            <p class="stat-card__value">{{ stat.value }}</p>
-            <span class="stat-card__trend">{{ stat.trend }}</span>
-          </article>
-        </div>
-      </section>
-  
-      <!-- ウィジェット②: ハイライトプロジェクト -->
-      <section class="widget widget--highlights" aria-labelledby="highlight-title">
-        <div class="widget__header">
-          <h2 id="highlight-title">注目プロジェクト</h2>
-          <button type="button" class="button button--ghost">フィルター設定</button>
-        </div>
-        <ul class="widget__content">
-          <li class="highlight-item" *ngFor="let project of projectHighlights">
-            <div>
-              <h3>{{ project.name }}</h3>
-              <p>{{ project.status }}</p>
+        <!-- ウィジェット①: サマリーメトリクス -->
+        <section class="widget widget--summary" aria-labelledby="summary-title">
+            <div class="widget__header">
+                <h2 id="summary-title">概要サマリー</h2>
+                <span class="widget__hint">進捗率・期限・重要度を自動集計</span>
             </div>
-            <a [routerLink]="project.link" class="widget__link">詳細</a>
-          </li>
-        </ul>
-      </section>
-  
-      <!-- ウィジェット③: アクティビティフィード -->
-      <section class="widget widget--activity" aria-labelledby="activity-title">
-        <div class="widget__header">
-          <h2 id="activity-title">最近の更新</h2>
-          <button type="button" class="button button--ghost">もっと見る</button>
-        </div>
-        <ul class="widget__content">
-          <li class="activity-item" *ngFor="let activity of activityFeed">
-            <h3>{{ activity.title }}</h3>
-            <p>{{ activity.detail }}</p>
-            <span class="activity-item__time">{{ activity.time }}</span>
-          </li>
-        </ul>
-      </section>
-  
-     <!-- ウィジェット④: 要対応タスク -->
-     <section class="widget widget--deadlines" aria-labelledby="actionable-title">
-        <div class="widget__header">
-            <h2 id="actionable-title">要対応タスク</h2>
-            <button
-              type="button"
-              class="button button--ghost"
-              (click)="refreshActionableTasks()"
-              [disabled]="actionableLoading()"
-            >
-              再読み込み
-            </button>
-          </div>
-          <div class="widget__content widget__content--actionable">
-            <div class="widget__loading" *ngIf="actionableLoading()">
-              <span class="spinner" aria-hidden="true"></span>
-              <span>読み込み中...</span>
+            <div class="widget__content widget__content--summary" *ngIf="!snapshotLoading(); else summaryLoading">
+                <ng-container *ngIf="summaryMetrics() as summary; else summaryEmpty">
+                    <div class="summary__chart">
+                        <svg viewBox="0 0 36 36" class="donut">
+                            <circle class="donut__bg" cx="18" cy="18" r="16"></circle>
+                            <circle class="donut__value" cx="18" cy="18" r="16"
+                                [attr.stroke-dasharray]="summary ? Math.round(summary.completionRate) + ' ' + (100 - Math.round(summary.completionRate)) : '0 100'">
+                            </circle>
+                        </svg>
+                        <div class="summary__value">
+                            <strong>{{ summary.completionRate | number: '1.0-0' }}%</strong>
+                            <span>全タスクの完了率</span>
+                        </div>
+                        <p class="summary__caption">平均進捗 {{ summary.averageProgress | number: '1.0-0' }}%</p>
+                    </div>
+                    <div class="summary__cards">
+                        <article class="summary-card">
+                            <h3>タスク総数</h3>
+                            <p class="summary-card__value">{{ summary.totalTasks }}</p>
+                            <span class="summary-card__hint">Critical未着手 {{ summary.criticalChecklistBacklog }}</span>
+                        </article>
+                        <article class="summary-card">
+                            <h3>期限超過</h3>
+                            <p class="summary-card__value">{{ summary.overdueCount }}</p>
+                            <span class="summary-card__hint">要再調整のタスク</span>
+                        </article>
+                        <article class="summary-card">
+                            <h3>重要度</h3>
+                            <ul class="summary-card__tags">
+                                <li>Critical: {{ summary.importanceCounts.Critical }}</li>
+                                <li>High: {{ summary.importanceCounts.High }}</li>
+                                <li>Medium: {{ summary.importanceCounts.Medium }}</li>
+                                <li>Low: {{ summary.importanceCounts.Low }}</li>
+                            </ul>
+                        </article>
+                    </div>
+                    <div class="summary__bars">
+                        <div class="status-bar" *ngFor="let bar of summaryStatusBars()">
+                            <span class="status-bar__label">{{ bar.label }}</span>
+                            <div class="status-bar__track">
+                                <div class="status-bar__fill" [style.width]="getStatusBarWidth(bar.value)"></div>
+                            </div>
+                            <span class="status-bar__value">{{ bar.value }}</span>
+                        </div>
+                    </div>
+                </ng-container>
             </div>
-            <p class="widget__error" *ngIf="!actionableLoading() && actionableError()">
-              {{ actionableError() }}
-            </p>
-            <p
-              class="widget__empty"
-              *ngIf="!actionableLoading() && !actionableError() && actionableTasks().length === 0"
-            >
-              現在対応が必要なタスクはありません。
-            </p>
-            <ul
-              class="actionable-list"
-              *ngIf="!actionableLoading() && actionableTasks().length > 0"
-            >
-              <li class="actionable-card" *ngFor="let card of actionableTasks(); trackBy: trackTask">
-                <div class="actionable-card__header">
-                  <span
-                    class="actionable-card__badge"
-                    [style.background-color]="card.badge.color"
-                  >
-                    {{ card.badge.label }}
-                  </span>
-                  <span class="actionable-card__project">{{ card.projectName }}</span>
+        </section>
+
+        <!-- ウィジェット②: プロジェクトカード -->
+        <section class="widget widget--projects" aria-labelledby="projects-title">
+            <div class="widget__header">
+                <h2 id="projects-title">プロジェクト進捗</h2>
+                <div class="widget__actions">
+                    <button type="button" class="button button--chip" *ngFor="let option of projectSortOptions"
+                        [class.button--chip-active]="selectedSort() === option.value"
+                        (click)="setProjectSort(option.value)">
+                        {{ option.label }}
+                    </button>
                 </div>
-                <div class="actionable-card__body">
-                  <h3>{{ card.title }}</h3>
-                  <div class="actionable-card__meta">
-                    <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
-                      {{ getImportanceLabel(card.importance) }}
-                    </span>
-                    <span class="status-badge" [ngClass]="'status-' + card.status">
-                      {{ card.statusLabel }}
-                    </span>
-                    <span class="due-label" *ngIf="card.dueDate">
-                      期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
-                    </span>
-                  </div>
-                  <ul class="actionable-card__reasons">
-                    <li *ngFor="let label of getHighlightLabels(card)">{{ label }}</li>
-                  </ul>
-                  <div class="actionable-card__mentions" *ngIf="card.mentionCount > 0">
-                    <h4>メンション {{ card.mentionCount }}件</h4>
-                    <ul>
-                      <li *ngFor="let mention of card.mentions">
-                        <span class="mention-date">{{ mention.createdAt | date: 'MM/dd HH:mm' }}</span>
-                        <span class="mention-text">{{ mention.text }}</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                <div class="actionable-card__actions">
-                  <button
-                    type="button"
-                    class="button button--ghost"
-                    (click)="markOnHold(card)"
-                    [disabled]="isUpdating(card)"
-                  >
-                    保留
-                  </button>
-                  <button
-                    type="button"
-                    class="button button--primary"
-                    (click)="markCompleted(card)"
-                    [disabled]="isUpdating(card)"
-                  >
-                    完了
-                  </button>
-                </div>
-              </li>
-            </ul>
-        </div>
-      </section>
-  
-      <!-- ウィジェット⑤: リソースリンク -->
-      <section class="widget widget--resources" aria-labelledby="resources-title">
-        <div class="widget__header">
-          <h2 id="resources-title">リソース</h2>
-          <button type="button" class="button button--ghost">並び替え</button>
-        </div>
-        <ul class="widget__content">
-          <li class="resource-item" *ngFor="let resource of resources">
-            <div>
-              <h3>{{ resource.label }}</h3>
-              <p>{{ resource.description }}</p>
             </div>
-            <a [href]="resource.href" class="widget__link">開く</a>
-          </li>
-        </ul>
-      </section>
+            <div class="widget__content widget__content--projects">
+                <p class="widget__error" *ngIf="snapshotError()">{{ snapshotError() }}</p>
+                <div class="widget__loading" *ngIf="snapshotLoading()">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span>読み込み中...</span>
+                </div>
+                <p class="widget__empty" *ngIf="!snapshotLoading() && sortedProjectCards().length === 0">
+                    表示できるプロジェクトがありません。
+                </p>
+                <ul class="project-list" *ngIf="!snapshotLoading() && sortedProjectCards().length > 0">
+                    <li class="project-card" *ngFor="let project of sortedProjectCards()"
+                        [ngClass]="getWarningClass(project.warningLevel)">
+                        <div class="project-card__header">
+                            <h3>{{ project.name }}</h3>
+                            <span class="project-card__members">メンバー {{ project.memberCount }}</span>
+                        </div>
+                        <div class="project-card__body">
+                            <div class="project-card__progress">
+                                <svg viewBox="0 0 36 36" class="donut">
+                                    <circle class="donut__bg" cx="18" cy="18" r="16"></circle>
+                                    <circle class="donut__value" cx="18" cy="18" r="16"
+                                        [attr.stroke-dasharray]="getCompletionDasharray(project)"></circle>
+                                </svg>
+                                <div class="project-card__progress-text">
+                                    <strong>{{ project.progress | number: '1.0-0' }}%</strong>
+                                    <span>{{ getProgressDelta(project) || '進捗確認済み' }}</span>
+                                </div>
+                            </div>
+                            <ul class="project-card__stats">
+                                <li>課題 {{ project.issueCount }}</li>
+                                <li>重要タスク {{ project.highPriorityBacklog }}</li>
+                                <li>遅延 {{ project.overdue ? 'あり' : 'なし' }}</li>
+                            </ul>
+                            <div class="project-card__bars">
+                                <div class="mini-bar" *ngFor="let bar of project.statusBars">
+                                    <span class="mini-bar__label">{{ bar.label }}</span>
+                                    <div class="mini-bar__track">
+                                        <div class="mini-bar__fill"
+                                            [style.width]="getProjectStatusWidth(project, bar.value)"></div>
+                                    </div>
+                                    <span class="mini-bar__value">{{ bar.value }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="project-card__footer">
+                            <a class="button button--ghost" [routerLink]="['/projects', project.projectId]">詳細へ</a>
+                            <button type="button" class="button button--primary"
+                                (click)="openProjectSmartFilter(project.projectId)">
+                                スマートフィルター
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ウィジェット③: ボトルネック検知 -->
+        <section class="widget widget--bottlenecks" aria-labelledby="bottleneck-title">
+            <div class="widget__header">
+                <h2 id="bottleneck-title">ボトルネック検知</h2>
+                <span class="widget__hint">進捗0%、長期保留、Critical無担当などを抽出</span>
+            </div>
+            <div class="widget__content widget__content--bottlenecks">
+                <p class="widget__empty" *ngIf="bottlenecks().length === 0">現在検出されたボトルネックはありません。</p>
+                <ul class="bottleneck-list" *ngIf="bottlenecks().length > 0">
+                    <li class="bottleneck-item" *ngFor="let insight of bottlenecks(); trackBy: trackBottleneck">
+                        <div class="bottleneck-item__body">
+                            <span class="bottleneck-item__type">{{ insight.label }}</span>
+                            <span class="bottleneck-item__id">PJ {{ insight.projectId }}<ng-container
+                                    *ngIf="insight.issueId"> / Issue {{ insight.issueId }}</ng-container><ng-container
+                                    *ngIf="insight.taskId"> / Task {{ insight.taskId }}</ng-container></span>
+                        </div>
+                        <button type="button" class="button button--ghost" (click)="goToSmartFilter(insight)">
+                            スマートフィルター
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ウィジェット④: 掲示板プレビュー -->
+        <section class="widget widget--board" aria-labelledby="board-title">
+            <div class="widget__header">
+                <h2 id="board-title">掲示板プレビュー</h2>
+                <span class="widget__hint">最新5件までの投稿を表示</span>
+            </div>
+            <div class="widget__content widget__content--board">
+                <app-board-preview [posts]="bulletinPosts()" moreLink="/board" />
+            </div>
+        </section>
+
+        <!-- ウィジェット⑤: 要対応タスク -->
+        <section class="widget widget--deadlines" aria-labelledby="actionable-title">
+            <div class="widget__header">
+                <h2 id="actionable-title">要対応タスク</h2>
+                <button type="button" class="button button--ghost" (click)="refreshActionableTasks()"
+                    [disabled]="actionableLoading()">
+                    再読み込み
+                </button>
+            </div>
+            <div class="widget__content widget__content--actionable">
+                <div class="widget__loading" *ngIf="actionableLoading()">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span>読み込み中...</span>
+                </div>
+                <p class="widget__error" *ngIf="!actionableLoading() && actionableError()">
+                    {{ actionableError() }}
+                </p>
+                <p class="widget__empty"
+                    *ngIf="!actionableLoading() && !actionableError() && actionableTasks().length === 0">
+                    現在対応が必要なタスクはありません。
+                </p>
+                <ul class="actionable-list" *ngIf="!actionableLoading() && actionableTasks().length > 0">
+                    <li class="actionable-card" *ngFor="let card of actionableTasks(); trackBy: trackTask">
+                        <div class="actionable-card__header">
+                            <span class="actionable-card__badge" [style.background-color]="card.badge.color">
+                                {{ card.badge.label }}
+                            </span>
+                            <span class="actionable-card__project">{{ card.projectName }}</span>
+                        </div>
+                        <div class="actionable-card__body">
+                            <h3>{{ card.title }}</h3>
+                            <div class="actionable-card__meta">
+                                <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
+                                    {{ getImportanceLabel(card.importance) }}
+                                </span>
+                                <span class="status-badge" [ngClass]="'status-' + card.status">
+                                    {{ card.statusLabel }}
+                                </span>
+                                <span class="due-label" *ngIf="card.dueDate">
+                                    期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
+                                </span>
+                            </div>
+                            <ul class="actionable-card__reasons">
+                                <li *ngFor="let label of getHighlightLabels(card)">{{ label }}</li>
+                            </ul>
+                            <div class="actionable-card__mentions" *ngIf="card.mentionCount > 0">
+                                <h4>メンション {{ card.mentionCount }}件</h4>
+                                <ul>
+                                    <li *ngFor="let mention of card.mentions">
+                                        <span class="mention-date">{{ mention.createdAt | date: 'MM/dd HH:mm' }}</span>
+                                        <span class="mention-text">{{ mention.text }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="actionable-card__actions">
+                            <button type="button" class="button button--ghost" (click)="markOnHold(card)"
+                                [disabled]="isUpdating(card)">
+                                保留
+                            </button>
+                            <button type="button" class="button button--primary" (click)="markCompleted(card)"
+                                [disabled]="isUpdating(card)">
+                                完了
+                            </button>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
     </div>
-  </section>
+</section>
+
+<ng-template #summaryLoading>
+    <div class="widget__loading">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>読み込み中...</span>
+    </div>
+</ng-template>
+
+<ng-template #summaryEmpty>
+    <p class="widget__empty">まだタスクデータがありません。</p>
+</ng-template>

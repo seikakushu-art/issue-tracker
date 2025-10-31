@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Router, RouterModule } from '@angular/router';
 import {
   ActionableTaskCard,
   HighlightReason,
@@ -8,76 +8,109 @@ import {
 } from '../../core/notification.service';
 import { TasksService } from '../tasks/tasks.service';
 import { Importance } from '../../models/schema';
+import {
+  DashboardService,
+  DashboardSnapshot,
+  ProjectCardMetric,
+  BottleneckInsight,
+  BulletinPreviewItem,
+} from './dashboard.service';
+import { BoardPreviewComponent } from './components/board-preview/board-preview.component';
+
+type ProjectSortKey = 'overdue_first' | 'progress_desc' | 'backlog_desc';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, BoardPreviewComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss'],
 })
 export class DashboardComponent implements OnInit {
   private readonly notificationService = inject(NotificationService);
   private readonly tasksService = inject(TasksService);
-  /** ダッシュボード上部で使う期間フィルター候補（現状はダミー） */
+  private readonly dashboardService = inject(DashboardService);
+  private readonly router = inject(Router);
+
+  /** Mathオブジェクトをテンプレートで使用するため */
+  readonly Math = Math;
+
+  /** 期間フィルター候補 */
   readonly periodFilters = ['今週', '今月', '四半期'];
 
-  /**
-   * ウィジェット①: 重要指標の要約（表示順の指定に利用）
-   * 実データは未接続のためサンプル値を設定
-   */
-  readonly summaryStats = [
-    { label: '進行中のプロジェクト', value: 8, trend: '+2件' },
-    { label: '今週の完了タスク', value: 42, trend: '+18%' },
-    { label: 'ブロッカー', value: 3, trend: '要対応' },
+  /** プロジェクトカードの並び替え候補 */
+  readonly projectSortOptions: { label: string; value: ProjectSortKey }[] = [
+    { label: '遅延リスク順', value: 'overdue_first' },
+    { label: '進捗率順', value: 'progress_desc' },
+    { label: '重要タスク多い順', value: 'backlog_desc' },
   ];
 
-  /** ウィジェット②: 現在注目すべきプロジェクト一覧（プレースホルダー） */
-  readonly projectHighlights = [
-    { name: 'モバイルアプリ刷新', status: '進行中', link: '/projects/alpha' },
-    {
-      name: 'バックエンドAPI統合',
-      status: 'レビュー中',
-      link: '/projects/beta',
-    },
-  ];
+  /** 掲示板プレビュー（プレースホルダー） */
+  readonly bulletinPosts = signal<BulletinPreviewItem[]>(
+    this.dashboardService.getBulletinPlaceholder(),
+  );
 
-  /** ウィジェット③: チームからの最新更新メモ（プレースホルダー） */
-  readonly activityFeed = [
-    {
-      title: 'タスク #123 を完了',
-      detail: '高橋がチェックリストを更新しました',
-      time: '2時間前',
-    },
-    {
-      title: '課題 #456 を作成',
-      detail: '佐藤がバグレポートを登録',
-      time: '昨日',
-    },
-  ];
+  /** ダッシュボード集計スナップショット */
+  readonly snapshot = signal<DashboardSnapshot | null>(null);
+  /** スナップショットの読み込み状態 */
+  readonly snapshotLoading = signal(false);
+  /** 取得エラー表示 */
+  readonly snapshotError = signal<string | null>(null);
+  /** プロジェクトカードのソート状態 */
+  readonly selectedSort = signal<ProjectSortKey>('overdue_first');
 
-  /** ウィジェット⑤: その他ナレッジ・リソースへの導線（仮） */
-  readonly resources = [
-    {
-      label: 'リリースノート',
-      description: '最新の改善点をチェック',
-      href: '#',
-    },
-    { label: '運用ガイド', description: 'オンボーディング資料', href: '#' },
-  ];
-  /** アラート対象タスクのリスト */
+  /** サマリーメトリクス */
+  readonly summaryMetrics = computed(() => this.snapshot()?.summary ?? null);
+  /** ステータス別棒グラフ（全体） */
+  readonly summaryStatusBars = computed(() => {
+    const summary = this.summaryMetrics();
+    if (!summary) {
+      return [] as { label: string; value: number }[];
+    }
+    return [
+      { label: '未着手', value: summary.statusCounts.incomplete },
+      { label: '進行中', value: summary.statusCounts.in_progress },
+      { label: '保留', value: summary.statusCounts.on_hold },
+      { label: '完了', value: summary.statusCounts.completed },
+    ];
+  });
+
+  /** ソート済みプロジェクトカード */
+  readonly sortedProjectCards = computed(() =>
+    this.sortProjectCards(this.snapshot()?.projectCards ?? []),
+  );
+  /** ボトルネック検知結果 */
+  readonly bottlenecks = computed(() => this.snapshot()?.bottlenecks ?? []);
+
+  /** アラート対象タスク */
   readonly actionableTasks = signal<ActionableTaskCard[]>([]);
-  /** フェッチ状態 */
+  /** アラート取得の読み込み状態 */
   readonly actionableLoading = signal(false);
-  /** エラーメッセージ */
+  /** アラート取得のエラーメッセージ */
   readonly actionableError = signal<string | null>(null);
   /** 更新中タスクID集合 */
   private readonly updatingTaskIds = signal<Set<string>>(new Set());
 
   ngOnInit(): void {
+    void this.refreshDashboard();
     void this.refreshActionableTasks();
   }
-
+  /** ダッシュボードデータを再取得する */
+  async refreshDashboard(): Promise<void> {
+    this.snapshotLoading.set(true);
+    this.snapshotError.set(null);
+    try {
+      const snapshot = await this.dashboardService.loadSnapshot();
+      this.snapshot.set(snapshot);
+    } catch (error) {
+      console.error('Failed to load dashboard snapshot', error);
+      this.snapshotError.set(
+        'ダッシュボード情報の取得に失敗しました。リロードしてください。',
+      );
+    } finally {
+      this.snapshotLoading.set(false);
+    }
+  }
   /** 重要タスクリストを再取得する */
   async refreshActionableTasks(): Promise<void> {
     this.actionableLoading.set(true);
@@ -94,7 +127,80 @@ export class DashboardComponent implements OnInit {
       this.actionableLoading.set(false);
     }
   }
+  /** プロジェクトの並び替えを切り替える */
+  setProjectSort(value: ProjectSortKey): void {
+    this.selectedSort.set(value);
+  }
 
+  /** プロジェクトカードのドーナツ表示用 dasharray を計算 */
+  getCompletionDasharray(metric: ProjectCardMetric): string {
+    const completed = Math.min(Math.max(metric.donutChart.completed, 0), 100);
+    const remaining = Math.max(0, 100 - completed);
+    return `${completed} ${remaining}`;
+  }
+
+  /** プロジェクトカードの進捗デルタラベルを返す */
+  getProgressDelta(metric: ProjectCardMetric): string | null {
+    if (metric.elapsedRatio === null) {
+      return null;
+    }
+    const delta = metric.progress / 100 - metric.elapsedRatio;
+    const percentage = Math.round(delta * 100);
+    if (percentage === 0) {
+      return '予定どおり';
+    }
+    return percentage > 0 ? `+${percentage}%` : `${percentage}%`;
+  }
+
+  /** 警告レベルに応じたクラス名 */
+  getWarningClass(level: ProjectCardMetric['warningLevel']): string {
+    return `project-card--${level}`;
+  }
+
+  /** 全体サマリーの棒グラフ幅を算出 */
+  getStatusBarWidth(value: number): string {
+    const summary = this.summaryMetrics();
+    const total = summary?.totalTasks ?? 0;
+    if (total === 0) {
+      return '0%';
+    }
+    return `${Math.round((value / total) * 100)}%`;
+  }
+
+  /** プロジェクト内のステータス棒グラフ幅を算出 */
+  getProjectStatusWidth(metric: ProjectCardMetric, value: number): string {
+    const total = metric.statusBars.reduce((sum, item) => sum + item.value, 0);
+    if (total === 0) {
+      return '0%';
+    }
+    return `${Math.round((value / total) * 100)}%`;
+  }
+
+  /** スマートフィルター用リンクを遷移 */
+  goToSmartFilter(insight: BottleneckInsight): void {
+    if (insight.issueId) {
+      void this.router.navigate(
+        ['/projects', insight.projectId, 'issues', insight.issueId],
+        {
+          queryParams: {
+            smartFilter: insight.type,
+            taskId: insight.taskId ?? null,
+          },
+        },
+      );
+      return;
+    }
+    void this.router.navigate(['/projects', insight.projectId], {
+      queryParams: { smartFilter: insight.type },
+    });
+  }
+
+  /** プロジェクトカードからスマートフィルター画面へ遷移する */
+  openProjectSmartFilter(projectId: string): void {
+    void this.router.navigate(['/projects', projectId], {
+      queryParams: { smartFilter: 'project_health' },
+    });
+  }
   /** トラック関数 */
   trackTask(_: number, card: ActionableTaskCard): string {
     return card.taskId;
@@ -142,9 +248,34 @@ export class DashboardComponent implements OnInit {
     await this.executeTaskUpdate(card, { status: 'on_hold' });
   }
 
-  /**
-   * タスク更新処理の共通化
-   */
+  /** ボトルネック行のトラック関数 */
+  trackBottleneck(_: number, insight: BottleneckInsight): string {
+    return [insight.projectId, insight.issueId, insight.taskId, insight.type]
+      .filter(Boolean)
+      .join(':');
+  }
+
+  /** 掲示板投稿トラック関数 */
+  trackPost(_: number, post: BulletinPreviewItem): string {
+    return post.id;
+  }
+
+  /** ハイライト理由を表示順に整形 */
+  getHighlightLabels(card: ActionableTaskCard): string[] {
+    const priority: HighlightReason[] = [
+      'overdue',
+      'due_today',
+      'on_hold',
+      'no_progress',
+      'mentioned',
+    ];
+    const ordered = [...card.highlightDetails].sort(
+      (a, b) => priority.indexOf(a.reason) - priority.indexOf(b.reason),
+    );
+    return ordered.map((detail) => detail.label);
+  }
+
+  /** タスク更新処理の共通化 */
   private async executeTaskUpdate(
     card: ActionableTaskCard,
     updates: Parameters<TasksService['updateTask']>[3],
@@ -158,6 +289,7 @@ export class DashboardComponent implements OnInit {
         updates,
       );
       await this.refreshActionableTasks();
+      await this.refreshDashboard();
     } catch (error) {
       console.error('Failed to update task from dashboard shortcut', error);
       this.actionableError.set(
@@ -181,18 +313,25 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  /** ハイライト理由を表示順に整形 */
-  getHighlightLabels(card: ActionableTaskCard): string[] {
-    const priority: HighlightReason[] = [
-      'overdue',
-      'due_today',
-      'on_hold',
-      'no_progress',
-      'mentioned',
-    ];
-    const ordered = [...card.highlightDetails].sort(
-      (a, b) => priority.indexOf(a.reason) - priority.indexOf(b.reason),
-    );
-    return ordered.map((detail) => detail.label);
+  /** プロジェクトカード配列を現在のソート条件で並び替える */
+  private sortProjectCards(cards: ProjectCardMetric[]): ProjectCardMetric[] {
+    const sortKey = this.selectedSort();
+    const cloned = [...cards];
+    switch (sortKey) {
+      case 'progress_desc':
+        return cloned.sort((a, b) => b.progress - a.progress);
+      case 'backlog_desc':
+        return cloned.sort(
+          (a, b) => b.highPriorityBacklog - a.highPriorityBacklog,
+        );
+      case 'overdue_first':
+      default:
+        return cloned.sort((a, b) => {
+          if (a.overdue === b.overdue) {
+            return a.progress - b.progress;
+          }
+          return a.overdue ? -1 : 1;
+        });
+    }
   }
 }

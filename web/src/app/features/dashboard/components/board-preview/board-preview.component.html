@@ -1,0 +1,21 @@
+<section class="board-preview" aria-labelledby="board-preview-title">
+    <div class="board-preview__header">
+      <h3 id="board-preview-title">掲示板プレビュー</h3>
+      <a [routerLink]="moreLink" class="board-preview__more" *ngIf="moreLink">もっと見る</a>
+    </div>
+    <p class="board-preview__empty" *ngIf="hasNoPosts">
+      まだ掲示板に投稿はありません。ここに最新のお知らせが最大5件まで表示されます。
+    </p>
+    <ul class="board-preview__list" *ngIf="!hasNoPosts">
+      <li class="board-preview__item" *ngFor="let post of visiblePosts">
+        <div class="board-preview__meta">
+          <span class="board-preview__author">{{ post.author }}</span>
+          <time class="board-preview__time" [attr.datetime]="post.postedAt.toISOString()">
+            {{ post.postedAt | date: 'MM/dd HH:mm' }}
+          </time>
+        </div>
+        <h4 class="board-preview__title">{{ post.title }}</h4>
+        <p class="board-preview__excerpt">{{ post.excerpt }}</p>
+      </li>
+    </ul>
+  </section>
