@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute,Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
@@ -26,6 +26,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private issuesService = inject(IssuesService);
   private projectsService = inject(ProjectsService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private destroy$ = new Subject<void>();
 
   projectId!: string;
@@ -106,6 +107,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
       clearTimeout(this.representativeFeedbackTimeout);
       this.representativeFeedbackTimeout = null;
     }
+  }
+
+  goToDashboard(): void {
+    void this.router.navigate(['/dashboard']);
   }
 
   /** データ読み込み */

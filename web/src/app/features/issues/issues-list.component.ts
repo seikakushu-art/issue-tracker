@@ -9,6 +9,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { FirebaseError } from 'firebase/app';
 import { TasksService, TaskSummary } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
+import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -41,6 +42,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   showArchived = false;
   currentRole: Role | null = null;
   currentUid: string | null = null;
+  readonly maxVisibleMembers = 4;
   /**
    * 課題IDごとのタスク概要（件数と代表タスク情報）をキャッシュ
    * UIのカード上で素早く表示できるよう、サービスからまとめて取得した内容を保持する
@@ -53,6 +55,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
     Medium: '重要',
     Low: '普通',
   };
+  private memberColorCache = new Map<string, string>();
 
   // 所属プロジェクトの選択肢を保持
   availableProjects: Project[] = [];
@@ -167,6 +170,29 @@ private async loadTags(): Promise<void> {
       this.showArchived || !issue.archived
     );
     this.sortIssues();
+  }
+
+  goToDashboard(): void {
+    void this.router.navigate(['/dashboard']);
+  }
+
+  getVisibleMemberIds(memberIds: string[]): string[] {
+    return memberIds.slice(0, this.maxVisibleMembers);
+  }
+
+  getMemberInitial(memberId: string): string {
+    return getAvatarInitial(memberId);
+  }
+
+  getMemberColor(memberId: string): string {
+    if (!this.memberColorCache.has(memberId)) {
+      this.memberColorCache.set(memberId, getAvatarColor(memberId));
+    }
+    return this.memberColorCache.get(memberId)!;
+  }
+
+  getMemberLabel(memberId: string, index: number): string {
+    return `メンバー${index + 1} (${memberId})`;
   }
 
   /**

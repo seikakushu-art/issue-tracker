@@ -1,7 +1,13 @@
 <div class="tasks-container">
   <!-- ヘッダー -->
   <div class="header">
-    <h2>タスク一覧</h2>
+    <div class="header-left">
+      <button class="btn btn-secondary back-button" type="button" (click)="goToDashboard()">
+        <span class="back-button__icon" aria-hidden="true">←</span>
+        ダッシュボードへ戻る
+      </button>
+      <h2>タスク一覧</h2>
+    </div>
     <button class="btn btn-primary" *ngIf="canCreateTask()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規タスク
     </button>

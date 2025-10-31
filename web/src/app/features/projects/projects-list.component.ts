@@ -8,6 +8,7 @@ import { InviteStatus, Project, ProjectInvite, Role } from '../../models/schema'
 import { IssuesService } from '../issues/issues.service';
 import { FirebaseError } from '@angular/fire/app';
 import { ProjectInviteService } from './project-invite.service';
+import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 
 /**
  * プロジェクト一覧コンポーネント
@@ -34,6 +35,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   saving = false;
   showArchived = false;
   currentUid: string | null = null;
+  readonly maxVisibleMembers = 4;
 
   // 招待リンク関連
   showInviteModal = false;
@@ -63,6 +65,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
 
   /** 課題数のキャッシュ（一覧表示・並び替え用） */
   private issueCountMap: Record<string, number> = {};
+  private memberColorCache = new Map<string, string>();
 
 
   ngOnInit() {
@@ -178,6 +181,30 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   selectProject(project: Project) {
     this.router.navigate(['/projects', project.id]);
   }
+
+  goToDashboard(): void {
+    void this.router.navigate(['/dashboard']);
+  }
+
+  getVisibleMemberIds(memberIds: string[]): string[] {
+    return memberIds.slice(0, this.maxVisibleMembers);
+  }
+
+  getMemberInitial(memberId: string): string {
+    return getAvatarInitial(memberId);
+  }
+
+  getMemberColor(memberId: string): string {
+    if (!this.memberColorCache.has(memberId)) {
+      this.memberColorCache.set(memberId, getAvatarColor(memberId));
+    }
+    return this.memberColorCache.get(memberId)!;
+  }
+
+  getMemberLabel(memberId: string, index: number): string {
+    return `メンバー${index + 1} (${memberId})`;
+  }
+
 
   /**
    * 新規プロジェクト作成モーダルを開く

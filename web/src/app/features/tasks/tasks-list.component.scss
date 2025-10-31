@@ -9,6 +9,23 @@
   margin-bottom: 24px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.back-button__icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
 .header h2 {
   margin: 0;
   color: #333;

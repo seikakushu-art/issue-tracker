@@ -1,7 +1,13 @@
 <div class="issues-container">
   <!-- ヘッダー -->
   <div class="header">
-    <h2>課題一覧</h2>
+    <div class="header-left">
+      <button class="btn btn-secondary back-button" type="button" (click)="goToDashboard()">
+        <span class="back-button__icon" aria-hidden="true">←</span>
+        ダッシュボードへ戻る
+      </button>
+      <h2>課題一覧</h2>
+    </div>
     <button class="btn btn-primary" *ngIf="isAdmin()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規課題
     </button>
@@ -33,6 +39,24 @@
     <div class="summary-meta">
       <span>メンバー: {{ projectDetails.memberIds.length }}人</span>
       <span>課題数: {{ filteredIssues.length }}</span>
+    </div>
+    <div class="summary-members" *ngIf="projectDetails.memberIds.length > 0">
+      <span class="summary-members__label">参加メンバー</span>
+      <div class="summary-members__avatars" aria-label="プロジェクトメンバー">
+        <ng-container *ngFor="let memberId of getVisibleMemberIds(projectDetails.memberIds); let i = index">
+          <span
+            class="summary-avatar"
+            [style.background]="getMemberColor(memberId)"
+            [attr.title]="getMemberLabel(memberId, i)"
+            [attr.aria-label]="getMemberLabel(memberId, i)"
+          >
+            {{ getMemberInitial(memberId) }}
+          </span>
+        </ng-container>
+      </div>
+      <span class="summary-members__more" *ngIf="projectDetails.memberIds.length > maxVisibleMembers">
+        +{{ projectDetails.memberIds.length - maxVisibleMembers }}
+      </span>
     </div>
   </section>
 

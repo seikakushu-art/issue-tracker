@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule,DOCUMENT } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import {
@@ -33,6 +33,7 @@ export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
   private readonly router = inject(Router);
   private readonly userProfileService = inject(UserProfileService);
+  private readonly document = inject(DOCUMENT);
 
   /** Mathオブジェクトをテンプレートで使用するため */
   readonly Math = Math;
@@ -140,6 +141,15 @@ export class DashboardComponent implements OnInit {
     } finally {
       this.actionableLoading.set(false);
     }
+  }
+  scrollToDailyWork(): void {
+    const anchor = this.document.getElementById('daily-work-board');
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const fallback = this.document.getElementById('daily-work-actionable');
+    fallback?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   /** プロジェクトの並び替えを切り替える */
   setProjectSort(value: ProjectSortKey): void {

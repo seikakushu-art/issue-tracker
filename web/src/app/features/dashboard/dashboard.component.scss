@@ -28,6 +28,14 @@
   gap: 16px;
 }
 
+.dashboard__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .dashboard__headline h1 {
   margin: 0 0 8px;
   font-size: 32px;
@@ -159,6 +167,17 @@
   background: linear-gradient(135deg, #2563eb, #0ea5e9);
   color: #ffffff;
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
+}
+
+.button--accent {
+  background: linear-gradient(135deg, #f97316, #fb7185);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(249, 115, 22, 0.25);
+}
+
+.button--accent:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 32px rgba(249, 115, 22, 0.28);
 }
 
 .button--primary:hover {
