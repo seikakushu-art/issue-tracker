@@ -38,6 +38,7 @@ export class AuthService {
       password,
     );
     if (displayName) await updateProfile(cred.user, { displayName });
+    await cred.user.reload();
     await sendEmailVerification(cred.user, this.verificationSettings());
     return cred.user;
   }

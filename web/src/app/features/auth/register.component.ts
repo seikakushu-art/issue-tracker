@@ -1,8 +1,9 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnDestroy ,inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { UserProfileService } from '../../core/user-profile.service';
 
 /**
  * アカウント作成画面コンポーネント
@@ -35,6 +36,30 @@ import { AuthService } from '../../core/auth.service';
               placeholder="表示名を入力"
               [disabled]="loading"
             >
+          </div>
+          <div class="form-group form-group--file">
+            <label for="icon">プロフィールアイコン</label>
+            <div class="file-input__wrapper">
+              <input
+                id="icon"
+                type="file"
+                accept="image/*"
+                (change)="onIconSelected($event)"
+                [disabled]="loading"
+              >
+              <small class="file-input__hint">2MB 以下の画像ファイルを選択してください</small>
+            </div>
+            <div class="icon-preview" *ngIf="iconPreviewUrl">
+              <img [src]="iconPreviewUrl" alt="選択中のアイコン">
+              <button
+                type="button"
+                class="btn btn-tertiary"
+                (click)="clearIconSelection()"
+                [disabled]="loading"
+              >
+                選択をクリア
+              </button>
+            </div>
           </div>
 
           <div class="form-group">
@@ -161,6 +186,37 @@ import { AuthService } from '../../core/auth.service';
     .form-group {
       margin-bottom: 20px;
     }
+    .form-group--file input[type="file"] {
+      display: block;
+      width: 100%;
+    }
+
+    .file-input__wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-input__hint {
+      color: #666;
+      font-size: 12px;
+    }
+
+    .icon-preview {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon-preview img {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #e1e5e9;
+    }
+
 
     .form-group label {
       display: block;
@@ -226,6 +282,18 @@ import { AuthService } from '../../core/auth.service';
       text-decoration: underline;
     }
 
+    .btn-tertiary {
+      background: #f1f5f9;
+      color: #334155;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .btn-tertiary:hover:not(:disabled) {
+      background: #e2e8f0;
+    }
+
     .btn-link:hover:not(:disabled) {
       color: #5a6fd8;
     }
@@ -282,13 +350,23 @@ import { AuthService } from '../../core/auth.service';
     .icon-success::before { content: '✅'; }
   `]
 })
-export class RegisterComponent {
+export class RegisterComponent implements OnDestroy {
   private authService = inject(AuthService);
   private router = inject(Router);
+  private userProfileService = inject(UserProfileService);
 
   loading = false;
   errorMessage = '';
   successMessage = '';
+
+  /** 選択中のアイコン画像を一時的に保持 */
+  selectedIconFile: File | null = null;
+  /** プレビュー表示用の Object URL */
+  iconPreviewUrl: string | null = null;
+  /** DOM の file input を再利用して値リセットに使う */
+  private iconInputElement: HTMLInputElement | null = null;
+  /** Object URL をクリーンアップするための保持 */
+  private iconObjectUrl: string | null = null;
 
   registerForm = {
     displayName: '',
@@ -296,6 +374,11 @@ export class RegisterComponent {
     password: '',
     confirmPassword: ''
   };
+
+  ngOnDestroy(): void {
+    // 画面遷移時に Object URL を解放
+    this.revokeIconPreview();
+  }
 
   /**
    * フォームの有効性をチェック
@@ -351,6 +434,18 @@ export class RegisterComponent {
         this.registerForm.password,
         this.registerForm.displayName
       );
+      if (this.selectedIconFile) {
+        try {
+          await this.userProfileService.updateUserProfile({
+            displayName: this.registerForm.displayName,
+            photoFile: this.selectedIconFile,
+          });
+        } catch (error) {
+          console.error('プロフィール画像の更新に失敗しました', error);
+          this.errorMessage = 'プロフィール画像のアップロードに失敗しました。ログイン後にユーザー設定から再度お試しください。';
+        }
+      }
+
 
       this.successMessage = '確認メールを送信しました。メールのリンクを開いてからログインしてください。';
       
@@ -399,5 +494,67 @@ export class RegisterComponent {
    */
   goToLogin() {
     this.router.navigate(['/login']);
+  }
+  /**
+   * プロフィールアイコンの選択時にバリデーションとプレビュー生成を行う
+   */
+  onIconSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.iconInputElement = input;
+
+    const file = input.files?.[0];
+    if (!file) {
+      this.clearIconSelection();
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      this.errorMessage = '画像ファイルを選択してください';
+      input.value = '';
+      this.clearIconSelection();
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      this.errorMessage = 'アイコン画像は 2MB 以下のファイルを選択してください';
+      input.value = '';
+      this.clearIconSelection();
+      return;
+    }
+
+    this.errorMessage = '';
+    this.selectedIconFile = file;
+    this.updateIconPreview(file);
+  }
+
+  /**
+   * アイコン選択をリセットしてプレビューを消去
+   */
+  clearIconSelection() {
+    this.selectedIconFile = null;
+    this.revokeIconPreview();
+    this.iconPreviewUrl = null;
+    if (this.iconInputElement) {
+      this.iconInputElement.value = '';
+    }
+  }
+
+  /**
+   * Object URL を生成してプレビューへ反映
+   */
+  private updateIconPreview(file: File) {
+    this.revokeIconPreview();
+    this.iconObjectUrl = URL.createObjectURL(file);
+    this.iconPreviewUrl = this.iconObjectUrl;
+  }
+
+  /**
+   * Object URL を解放してメモリリークを防ぐ
+   */
+  private revokeIconPreview() {
+    if (this.iconObjectUrl) {
+      URL.revokeObjectURL(this.iconObjectUrl);
+      this.iconObjectUrl = null;
+    }
   }
 }

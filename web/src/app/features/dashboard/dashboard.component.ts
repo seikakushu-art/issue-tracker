@@ -16,6 +16,7 @@ import {
   BulletinPreviewItem,
 } from './dashboard.service';
 import { BoardPreviewComponent } from './components/board-preview/board-preview.component';
+import { UserProfileService } from '../../core/user-profile.service';
 
 type ProjectSortKey = 'overdue_first' | 'progress_desc' | 'backlog_desc';
 
@@ -31,6 +32,7 @@ export class DashboardComponent implements OnInit {
   private readonly tasksService = inject(TasksService);
   private readonly dashboardService = inject(DashboardService);
   private readonly router = inject(Router);
+  private readonly userProfileService = inject(UserProfileService);
 
   /** Mathオブジェクトをテンプレートで使用するため */
   readonly Math = Math;
@@ -90,10 +92,22 @@ export class DashboardComponent implements OnInit {
   readonly actionableError = signal<string | null>(null);
   /** 更新中タスクID集合 */
   private readonly updatingTaskIds = signal<Set<string>>(new Set());
+   /** ログイン中ユーザーの Signal */
+   readonly currentUser = this.userProfileService.user;
+   /** 表示名（未設定の場合はフォールバック） */
+   readonly userDisplayName = computed(
+     () => this.currentUser()?.displayName || 'ゲストユーザー',
+   );
+   /** アイコン URL（未設定の場合は null） */
+   readonly userPhotoUrl = computed(() => this.currentUser()?.photoURL ?? null);
 
   ngOnInit(): void {
     void this.refreshDashboard();
     void this.refreshActionableTasks();
+  }
+   /** ユーザー設定画面へ遷移する */
+   goToUserSettings(): void {
+    void this.router.navigate(['/settings']);
   }
   /** ダッシュボードデータを再取得する */
   async refreshDashboard(): Promise<void> {
