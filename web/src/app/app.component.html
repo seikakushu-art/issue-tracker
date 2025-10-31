@@ -1,1 +1,18 @@
-<router-outlet />
+<!-- アプリ全体のナビゲーションと内容ラッパー -->
+<div class="app-shell">
+    <header class="app-header">
+      <div class="app-brand">
+        <span class="app-brand__logo">IssueTracker</span>
+      </div>
+      <nav class="app-nav" aria-label="主要ナビゲーション">
+        <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">ダッシュボード</a>
+        <a routerLink="/projects" routerLinkActive="active">プロジェクト一覧</a>
+        <a routerLink="/login" routerLinkActive="active">ログイン</a>
+      </nav>
+    </header>
+  
+    <main class="app-main">
+      <router-outlet />
+    </main>
+  </div>
+

@@ -1,0 +1,112 @@
+<section class="dashboard">
+    <!-- ヘッダー: タイトルとフィルター操作をまとめる -->
+    <header class="dashboard__header">
+      <div class="dashboard__headline">
+        <h1>チームダッシュボード</h1>
+        <p>最新の進捗とボトルネックを一望できます。</p>
+      </div>
+      <div class="dashboard__filters">
+        <!-- フィルタープレースホルダー: 後続開発で動的化予定 -->
+        <div class="filter-group">
+          <span class="filter-group__label">期間フィルター</span>
+          <div class="filter-group__chips">
+            <button
+              type="button"
+              class="chip"
+              *ngFor="let filter of periodFilters"
+            >
+              {{ filter }}
+            </button>
+          </div>
+        </div>
+        <div class="dashboard__actions">
+          <button type="button" class="button button--ghost">フィルターを追加</button>
+          <button type="button" class="button button--primary">もっと見る</button>
+        </div>
+      </div>
+    </header>
+  
+    <!-- コンテンツ領域: レスポンシブなウィジェット配置 -->
+    <div class="dashboard__widgets">
+      <!-- ウィジェット①: サマリーカード -->
+      <section class="widget widget--summary" aria-labelledby="summary-title">
+        <div class="widget__header">
+          <h2 id="summary-title">概要サマリー</h2>
+          <a routerLink="/projects" class="widget__link">プロジェクト一覧へ</a>
+        </div>
+        <div class="widget__content widget__content--stats">
+          <article class="stat-card" *ngFor="let stat of summaryStats">
+            <h3>{{ stat.label }}</h3>
+            <p class="stat-card__value">{{ stat.value }}</p>
+            <span class="stat-card__trend">{{ stat.trend }}</span>
+          </article>
+        </div>
+      </section>
+  
+      <!-- ウィジェット②: ハイライトプロジェクト -->
+      <section class="widget widget--highlights" aria-labelledby="highlight-title">
+        <div class="widget__header">
+          <h2 id="highlight-title">注目プロジェクト</h2>
+          <button type="button" class="button button--ghost">フィルター設定</button>
+        </div>
+        <ul class="widget__content">
+          <li class="highlight-item" *ngFor="let project of projectHighlights">
+            <div>
+              <h3>{{ project.name }}</h3>
+              <p>{{ project.status }}</p>
+            </div>
+            <a [routerLink]="project.link" class="widget__link">詳細</a>
+          </li>
+        </ul>
+      </section>
+  
+      <!-- ウィジェット③: アクティビティフィード -->
+      <section class="widget widget--activity" aria-labelledby="activity-title">
+        <div class="widget__header">
+          <h2 id="activity-title">最近の更新</h2>
+          <button type="button" class="button button--ghost">もっと見る</button>
+        </div>
+        <ul class="widget__content">
+          <li class="activity-item" *ngFor="let activity of activityFeed">
+            <h3>{{ activity.title }}</h3>
+            <p>{{ activity.detail }}</p>
+            <span class="activity-item__time">{{ activity.time }}</span>
+          </li>
+        </ul>
+      </section>
+  
+      <!-- ウィジェット④: 期限が近いタスク -->
+      <section class="widget widget--deadlines" aria-labelledby="deadline-title">
+        <div class="widget__header">
+          <h2 id="deadline-title">期限間近のタスク</h2>
+          <button type="button" class="button button--ghost">日付を変更</button>
+        </div>
+        <ul class="widget__content">
+          <li class="deadline-item" *ngFor="let deadline of upcomingDeadlines">
+            <div>
+              <h3>{{ deadline.task }}</h3>
+              <p>{{ deadline.project }}</p>
+            </div>
+            <span class="deadline-item__due">{{ deadline.due }}</span>
+          </li>
+        </ul>
+      </section>
+  
+      <!-- ウィジェット⑤: リソースリンク -->
+      <section class="widget widget--resources" aria-labelledby="resources-title">
+        <div class="widget__header">
+          <h2 id="resources-title">リソース</h2>
+          <button type="button" class="button button--ghost">並び替え</button>
+        </div>
+        <ul class="widget__content">
+          <li class="resource-item" *ngFor="let resource of resources">
+            <div>
+              <h3>{{ resource.label }}</h3>
+              <p>{{ resource.description }}</p>
+            </div>
+            <a [href]="resource.href" class="widget__link">開く</a>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </section>
