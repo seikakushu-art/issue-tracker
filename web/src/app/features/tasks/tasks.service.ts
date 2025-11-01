@@ -5,6 +5,8 @@ import {
   addDoc,
   query,
   getDocs,
+  orderBy,
+  limit,
   serverTimestamp,
   doc,
   updateDoc,
@@ -12,7 +14,7 @@ import {
   getDoc,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Task, TaskStatus, ChecklistItem, Importance } from '../../models/schema';
+import { Task, TaskStatus, ChecklistItem, Importance, Comment } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
@@ -43,6 +45,33 @@ export class TasksService {
   private authReady: Promise<void> | null = null;
   private progressService = inject(ProgressService);
   private projectsService = inject(ProjectsService);
+
+  /**
+   * Firestore から取得した日時相当の値を Date 型へ正規化する
+   */
+  private normalizeDate(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'toDate' in value &&
+      typeof (value as { toDate: () => Date }).toDate === 'function'
+    ) {
+      const converted = (value as { toDate: () => Date }).toDate();
+      return Number.isNaN(converted.getTime()) ? null : converted;
+    }
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  }
+
 
   private async ensureAuthReady() {
     if (!this.authReady) {
@@ -398,6 +427,90 @@ export class TasksService {
     await deleteDoc(docRef);
     await this.refreshProgress(projectId, issueId);
   }
+  /**
+   * タスクに紐づくコメント一覧を取得する
+   */
+  async listComments(projectId: string, issueId: string, taskId: string): Promise<Comment[]> {
+    await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
+
+    const commentRef = collection(
+      this.db,
+      `projects/${projectId}/issues/${issueId}/tasks/${taskId}/comments`
+    );
+
+    const snap = await getDocs(query(commentRef, orderBy('createdAt', 'asc'), limit(500)));
+    return snap.docs.map((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      return this.hydrateComment(docSnap.id, data);
+    });
+  }
+
+  /**
+   * コメントを追加する
+   */
+  async addComment(
+    projectId: string,
+    issueId: string,
+    taskId: string,
+    input: { text: string; mentions?: string[]; authorName?: string | null; authorPhotoUrl?: string | null }
+  ): Promise<Comment> {
+    const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
+    const trimmed = (input.text ?? '').trim();
+    if (!trimmed) {
+      throw new Error('コメントを入力してください');
+    }
+    if (trimmed.length > 5000) {
+      throw new Error('コメントは5000文字以内で入力してください');
+    }
+
+    const mentions = Array.from(new Set((input.mentions ?? []).filter((value): value is string => Boolean(value))));
+
+    const commentRef = collection(
+      this.db,
+      `projects/${projectId}/issues/${issueId}/tasks/${taskId}/comments`
+    );
+
+    const countSnap = await getDocs(query(commentRef, limit(501)));
+    if (countSnap.size >= 500) {
+      throw new Error('コメントは最大500件までです');
+    }
+
+    const payload: Record<string, unknown> = {
+      text: trimmed,
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+    };
+
+    if (mentions.length > 0) {
+      payload['mentions'] = mentions;
+    }
+
+    if (input.authorName !== undefined && input.authorName !== null && input.authorName.trim().length > 0) {
+      payload['authorName'] = input.authorName.trim();
+    }
+
+    if (input.authorPhotoUrl !== undefined) {
+      payload['authorPhotoUrl'] = input.authorPhotoUrl || null;
+    }
+
+    const createdRef = await addDoc(commentRef, payload);
+    const createdSnap = await getDoc(createdRef);
+    const data = createdSnap.data();
+    if (!data) {
+      return {
+        id: createdRef.id,
+        text: trimmed,
+        createdBy: uid,
+        createdAt: new Date(),
+        mentions,
+        authorName: input.authorName ?? null,
+        authorPhotoUrl: input.authorPhotoUrl ?? null,
+      } satisfies Comment;
+    }
+
+    return this.hydrateComment(createdRef.id, data as Record<string, unknown>);
+  }
 
   /**
    * 課題内でタスクタイトルの重複をチェックする
@@ -417,6 +530,23 @@ export class TasksService {
     if (duplicate) {
       throw new Error(`タスク名 "${title}" は既にこの課題内で使用されています`);
     }
+  }
+
+  private hydrateComment(id: string, data: Record<string, unknown>): Comment {
+    const mentionsRaw = Array.isArray(data['mentions']) ? data['mentions'] : [];
+    const createdAt = this.normalizeDate(data['createdAt']) ?? new Date();
+    const authorNameRaw = data['authorName'];
+    const authorPhotoRaw = data['authorPhotoUrl'];
+
+    return {
+      id,
+      text: (data['text'] as string) ?? '',
+      createdBy: (data['createdBy'] as string) ?? '',
+      createdAt,
+      mentions: mentionsRaw.map((value) => String(value)),
+      authorName: typeof authorNameRaw === 'string' && authorNameRaw.trim().length > 0 ? authorNameRaw : null,
+      authorPhotoUrl: typeof authorPhotoRaw === 'string' && authorPhotoRaw.trim().length > 0 ? authorPhotoRaw : null,
+    } satisfies Comment;
   }
 
   /**

@@ -414,9 +414,103 @@
       <p class="placeholder-text">添付ファイルの管理機能は現在準備中です。</p>
     </section>
 
-    <section class="detail-section">
-      <h3>コメント</h3>
-      <p class="placeholder-text">コメント機能（メンション対応）は今後の開発予定です。</p>
+    <section class="detail-section comments-section">
+      <div class="comments-header">
+        <h3>コメント</h3>
+        <span class="comments-count">{{ comments.length }}/500</span>
+      </div>
+
+      <div *ngIf="commentsLoading" class="comments-loading">コメントを読み込み中です...</div>
+      <div *ngIf="commentError" class="feedback feedback--error">
+        <i class="icon-error" aria-hidden="true"></i>
+        {{ commentError }}
+      </div>
+
+      <div *ngIf="!commentsLoading && comments.length > 0" class="comments-list">
+        <article class="comment-item" *ngFor="let comment of comments">
+          <div class="comment-avatar">
+            <ng-container *ngIf="comment.authorPhotoUrl; else commentAvatarFallback">
+              <img [src]="comment.authorPhotoUrl" [alt]="comment.authorName + 'のアイコン'">
+            </ng-container>
+            <ng-template #commentAvatarFallback>
+              <span class="comment-avatar-fallback" [style.backgroundColor]="getCommentAvatarColor(comment)">
+                {{ getCommentInitial(comment) }}
+              </span>
+            </ng-template>
+          </div>
+          <div class="comment-body">
+            <div class="comment-meta">
+              <span class="comment-author">{{ comment.authorName }}</span>
+              <time class="comment-time">{{ comment.createdAt | date:'yyyy/MM/dd HH:mm' }}</time>
+            </div>
+            <p class="comment-text">{{ comment.text }}</p>
+            <div class="comment-mentions" *ngIf="comment.mentions?.length">
+              <span class="mention-chip" *ngFor="let mentionId of comment.mentions">
+                {{ '@' + getMentionLabel(mentionId) }}
+              </span>
+            </div>
+          </div>
+        </article>
+      </div>
+      <p *ngIf="!commentsLoading && comments.length === 0 && !commentError" class="placeholder-text">まだコメントはありません。</p>
+
+      <p *ngIf="commentLimitReached" class="comment-limit-message">コメント数が上限に達しました（最大500件）。</p>
+
+      <div class="comment-form" *ngIf="canPostComment(); else commentPermissionNotice">
+        <textarea
+          [(ngModel)]="commentForm.text"
+          name="taskComment"
+          placeholder="コメントを入力（最大5000文字）"
+          [maxlength]="5000"
+          [disabled]="commentSubmitting || commentLimitReached"
+          (input)="commentError = ''"
+          aria-label="コメントを入力"
+        ></textarea>
+
+        <div class="comment-form-footer">
+          <div class="mention-selector" *ngIf="mentionableMembers.length > 0">
+            <span class="mention-label">メンション</span>
+            <div class="mention-list">
+              <button
+                type="button"
+                class="mention-option"
+                *ngFor="let member of mentionableMembers"
+                (click)="toggleMention(member)"
+                [class.selected]="isMentionSelected(member.uid)"
+              >
+                <ng-container *ngIf="member.photoURL; else mentionAvatarFallback">
+                  <span class="mention-avatar">
+                    <img [src]="member.photoURL" [alt]="member.displayName + 'のアイコン'">
+                  </span>
+                </ng-container>
+                <ng-template #mentionAvatarFallback>
+                  <span class="mention-avatar-fallback" [style.backgroundColor]="getMemberAvatarColor(member.uid)">
+                    {{ getMemberInitial(member) }}
+                  </span>
+                </ng-template>
+                <span class="mention-name">{{ member.displayName }}</span>
+                <span class="mention-check" *ngIf="isMentionSelected(member.uid)">✓</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="comment-actions">
+            <span class="char-count">{{ commentForm.text.length }}/5000</span>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="submitComment()"
+              [disabled]="!canSubmitComment() || commentSubmitting"
+            >
+              {{ commentSubmitting ? '投稿中...' : '投稿' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #commentPermissionNotice>
+        <p class="placeholder-text">コメントを投稿するには管理者またはメンバー権限が必要です。</p>
+      </ng-template>
     </section>
   </aside>
 </div>

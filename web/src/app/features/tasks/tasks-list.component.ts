@@ -6,8 +6,15 @@ import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { IssuesService } from '../issues/issues.service';
-import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem, Role, Project } from '../../models/schema';
+import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem, Role, Project, Comment } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
+import { UserDirectoryService, UserDirectoryProfile } from '../../core/user-directory.service';
+import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
+
+interface TaskCommentView extends Comment {
+  authorName: string;
+  authorPhotoUrl: string | null;
+}
 
 /**
  * タスク一覧コンポーネント
@@ -25,6 +32,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private tagsService = inject(TagsService);
   private issuesService = inject(IssuesService);
   private projectsService = inject(ProjectsService);
+  private userDirectoryService = inject(UserDirectoryService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
@@ -54,6 +62,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private representativeFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
   currentRole: Role | null = null;
   currentUid: string | null = null;
+  currentUserProfile: UserDirectoryProfile | null = null;
+  projectMemberProfiles: Record<string, UserDirectoryProfile> = {};
+  mentionableMembers: UserDirectoryProfile[] = [];
 
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
@@ -75,6 +86,15 @@ export class TasksListComponent implements OnInit, OnDestroy {
     tagIds: [] as string[],
     checklist: [] as ChecklistItem[]
   };
+  comments: TaskCommentView[] = [];
+  commentsLoading = false;
+  commentSubmitting = false;
+  commentError = '';
+  commentForm = {
+    text: '',
+    mentions: [] as string[],
+  };
+  commentLimitReached = false;
 
   // カラーパレット（課題テーマカラー用）
   private colorPalette = [
@@ -127,12 +147,24 @@ export class TasksListComponent implements OnInit, OnDestroy {
         uidPromise,
       ]);
 
+      await this.loadProjectMembers(project?.memberIds ?? [], uid);
+
       this.issueDetails = issue;
       this.tasks = tasks;
       this.currentUid = uid;
       this.currentRole = project?.roles?.[uid] ?? null;
       this.filterTasks();
       this.updateIssueProgress();
+      if (this.selectedTaskId) {
+        const refreshed = tasks.find(task => task.id === this.selectedTaskId);
+        if (refreshed && refreshed.id) {
+          this.selectedTask = refreshed;
+          this.resetCommentState();
+          void this.loadTaskComments(refreshed.id);
+        } else {
+          this.closeDetailPanel();
+        }
+      }
     } catch (error) {
       console.error('データの読み込みに失敗しました:', error);
     }
@@ -152,6 +184,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   canCreateTask(): boolean {
+    return this.currentRole === 'admin' || this.currentRole === 'member';
+  }
+
+  canPostComment(): boolean {
     return this.currentRole === 'admin' || this.currentRole === 'member';
   }
 
@@ -262,11 +298,180 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return this.importanceDisplay[importance ?? 'Low'].weight;
   }
 
+  private resetCommentState(): void {
+    this.comments = [];
+    this.commentsLoading = false;
+    this.commentSubmitting = false;
+    this.commentError = '';
+    this.commentForm = {
+      text: '',
+      mentions: [],
+    };
+    this.commentLimitReached = false;
+  }
+
+  private async loadProjectMembers(memberIds: string[], currentUid: string | null): Promise<void> {
+    if (!memberIds || memberIds.length === 0) {
+      this.projectMemberProfiles = {};
+      this.mentionableMembers = [];
+      this.currentUserProfile = currentUid ? { uid: currentUid, displayName: currentUid, photoURL: null } : null;
+      return;
+    }
+
+    try {
+      const profiles = await this.userDirectoryService.getProfiles(memberIds);
+      const profileMap: Record<string, UserDirectoryProfile> = {};
+      for (const profile of profiles) {
+        profileMap[profile.uid] = profile;
+      }
+      this.projectMemberProfiles = profileMap;
+      this.mentionableMembers = profiles.filter(profile => profile.uid !== currentUid);
+      this.currentUserProfile = currentUid
+        ? profileMap[currentUid] ?? { uid: currentUid, displayName: currentUid, photoURL: null }
+        : null;
+    } catch (error) {
+      console.error('メンバー情報の取得に失敗しました:', error);
+      this.projectMemberProfiles = {};
+      this.mentionableMembers = [];
+      this.currentUserProfile = currentUid ? { uid: currentUid, displayName: currentUid, photoURL: null } : null;
+    }
+  }
+
+  private composeCommentView(comment: Comment): TaskCommentView {
+    const profile = comment.createdBy ? this.projectMemberProfiles[comment.createdBy] : undefined;
+    const authorName = typeof comment.authorName === 'string' && comment.authorName.trim().length > 0
+      ? comment.authorName
+      : profile?.displayName ?? comment.createdBy;
+    const authorPhotoUrl = comment.authorPhotoUrl ?? profile?.photoURL ?? null;
+
+    return {
+      ...comment,
+      authorName,
+      authorPhotoUrl,
+      mentions: Array.isArray(comment.mentions) ? comment.mentions : [],
+    };
+  }
+
+  private updateCommentLimitState(): void {
+    this.commentLimitReached = this.comments.length >= 500;
+  }
+
+  private async loadTaskComments(taskId: string): Promise<void> {
+    if (!this.projectId || !this.issueId) {
+      return;
+    }
+    this.commentsLoading = true;
+    this.commentError = '';
+    try {
+      const comments = await this.tasksService.listComments(this.projectId, this.issueId, taskId);
+      this.comments = comments.map(comment => this.composeCommentView(comment));
+    } catch (error) {
+      console.error('コメントの読み込みに失敗しました:', error);
+      this.commentError = 'コメントの読み込みに失敗しました。';
+      this.comments = [];
+    } finally {
+      this.commentsLoading = false;
+      this.updateCommentLimitState();
+    }
+  }
+
+  canSubmitComment(): boolean {
+    if (!this.canPostComment() || !this.selectedTaskId) {
+      return false;
+    }
+    const trimmed = this.commentForm.text.trim();
+    return trimmed.length > 0 && trimmed.length <= 5000 && !this.commentLimitReached;
+  }
+
+  async submitComment(): Promise<void> {
+    if (!this.selectedTaskId || !this.canSubmitComment()) {
+      return;
+    }
+
+    this.commentSubmitting = true;
+    this.commentError = '';
+    try {
+      const created = await this.tasksService.addComment(
+        this.projectId,
+        this.issueId,
+        this.selectedTaskId,
+        {
+          text: this.commentForm.text,
+          mentions: this.commentForm.mentions,
+          authorName: this.currentUserProfile?.displayName ?? this.currentUid ?? null,
+          authorPhotoUrl: this.currentUserProfile?.photoURL ?? null,
+        },
+      );
+      const view = this.composeCommentView(created);
+      this.comments = [...this.comments, view].sort(
+        (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+      );
+      this.commentForm = { text: '', mentions: [] };
+      this.updateCommentLimitState();
+    } catch (error) {
+      console.error('コメントの投稿に失敗しました:', error);
+      this.commentError = error instanceof Error ? error.message : 'コメントの投稿に失敗しました。';
+    } finally {
+      this.commentSubmitting = false;
+    }
+  }
+
+  toggleMention(member: UserDirectoryProfile): void {
+    if (this.commentLimitReached) {
+      return;
+    }
+
+    if (this.commentForm.mentions.includes(member.uid)) {
+      this.commentForm.mentions = this.commentForm.mentions.filter(id => id !== member.uid);
+      return;
+    }
+
+    const mentionToken = `@${member.displayName}`;
+    const trimmed = this.commentForm.text.trimEnd();
+    const appended = trimmed.length > 0 ? `${trimmed} ${mentionToken} ` : `${mentionToken} `;
+
+    if (appended.length > 5000) {
+      this.commentError = 'メンションを追加すると文字数上限を超えます。';
+      return;
+    }
+
+    this.commentForm.mentions = [...this.commentForm.mentions, member.uid];
+    this.commentForm.text = appended;
+    this.commentError = '';
+  }
+
+  isMentionSelected(uid: string): boolean {
+    return this.commentForm.mentions.includes(uid);
+  }
+
+  getMentionLabel(uid: string): string {
+    return this.projectMemberProfiles[uid]?.displayName ?? uid;
+  }
+
+  getCommentInitial(comment: TaskCommentView): string {
+    return getAvatarInitial(comment.authorName || comment.createdBy, '?');
+  }
+
+  getCommentAvatarColor(comment: TaskCommentView): string {
+    const base = comment.createdBy || comment.authorName;
+    return getAvatarColor(base);
+  }
+
+  getMemberAvatarColor(uid: string): string {
+    return getAvatarColor(uid);
+  }
+
+  getMemberInitial(member: UserDirectoryProfile): string {
+    return getAvatarInitial(member.displayName || member.uid, '?');
+  }
+
   /** タスク選択 */
   selectTask(task: Task) {
     if (task.id) {
       this.selectedTaskId = task.id;
       this.selectedTask = task;
+      this.resetCommentState();
+      void this.loadTaskComments(task.id);
     }
   }
 
@@ -275,6 +480,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.selectedTaskId = null;
     this.selectedTask = null;
     this.newChecklistText = '';
+    this.resetCommentState();
   }
 
   /** 新規作成モーダルを開く */
