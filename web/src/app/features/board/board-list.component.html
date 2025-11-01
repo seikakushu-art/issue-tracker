@@ -1,0 +1,129 @@
+<section class="board" aria-labelledby="board-page-title">
+    <div class="board__header">
+      <h1 id="board-page-title">掲示板</h1>
+      <p class="board__description">
+        所属プロジェクト向けのお知らせを共有できます。投稿は最大5件のプロジェクトに同時配信され、対象メンバーのみが閲覧できます。
+      </p>
+    </div>
+  
+    <section class="board__form" aria-labelledby="board-form-title">
+      <div class="board__form-header">
+        <h2 id="board-form-title">新規投稿</h2>
+        <p class="board__form-hint">管理者・メンバーのみ投稿できます。</p>
+      </div>
+  
+      <ng-container *ngIf="hasPostPermission(); else noPermission">
+        <form (ngSubmit)="submit()" novalidate>
+          <div class="form-field">
+            <label for="board-title-input">タイトル<span aria-hidden="true" class="form-field__required">*</span></label>
+            <input
+              id="board-title-input"
+              type="text"
+              name="title"
+              [(ngModel)]="postForm.title"
+              [disabled]="submitting()"
+              required
+              placeholder="例：月次定例のアジェンダ更新のお知らせ"
+            />
+          </div>
+  
+          <div class="form-field">
+            <label for="board-content-input">内容<span aria-hidden="true" class="form-field__required">*</span></label>
+            <textarea
+              id="board-content-input"
+              name="content"
+              rows="6"
+              [(ngModel)]="postForm.content"
+              [disabled]="submitting()"
+              required
+              placeholder="共有したい内容を記載してください"
+            ></textarea>
+          </div>
+  
+          <div class="form-field">
+            <span class="form-field__label">対象プロジェクト<span aria-hidden="true" class="form-field__required">*</span></span>
+            <div class="form-field__checkboxes" role="group" aria-describedby="project-help">
+              <label *ngFor="let project of postableProjects()" class="checkbox-option">
+                <input
+                  type="checkbox"
+                  [value]="project.id"
+                  (change)="onProjectCheckboxChange(project.id, $event)"
+                  [checked]="isProjectSelected(project.id)"
+                  [disabled]="submitting()"
+                />
+                <span>{{ project.name }}</span>
+              </label>
+            </div>
+            <p id="project-help" class="form-field__help">最大5件まで選択できます。</p>
+          </div>
+  
+          <p class="form-message form-message--error" *ngIf="formError()">{{ formError() }}</p>
+          <p class="form-message form-message--success" *ngIf="successMessage()">{{ successMessage() }}</p>
+  
+          <div class="form-actions">
+            <button type="submit" class="button" [disabled]="!canSubmit()">投稿する</button>
+          </div>
+        </form>
+      </ng-container>
+  
+      <ng-template #noPermission>
+        <p class="board__no-permission">
+          投稿権限を持つプロジェクトに所属していません。管理者から権限付与を依頼してください。
+        </p>
+      </ng-template>
+    </section>
+  
+    <section class="board__posts" aria-labelledby="board-posts-title">
+      <div class="board__posts-header">
+        <h2 id="board-posts-title">最新の投稿</h2>
+      </div>
+  
+      <div class="board__posts-loading" *ngIf="loadingPosts()">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>読み込み中...</span>
+      </div>
+  
+      <p class="board__posts-error" *ngIf="!loadingPosts() && postsError()">{{ postsError() }}</p>
+      <p class="board__posts-empty" *ngIf="!loadingPosts() && !postsError() && posts().length === 0">
+        閲覧可能な投稿はまだありません。
+      </p>
+  
+      <ul class="board__posts-list" *ngIf="!loadingPosts() && !postsError() && posts().length > 0">
+        <li class="board-post" *ngFor="let post of posts(); trackBy: trackByPostId" [attr.id]="'post-' + post.id">
+          <header class="board-post__header">
+            <div class="board-post__author">
+              <ng-container *ngIf="post.authorPhotoUrl; else authorFallback">
+                <img
+                  [src]="post.authorPhotoUrl"
+                  class="board-post__avatar"
+                  [alt]="post.authorName + 'のアイコン'"
+                />
+              </ng-container>
+              <ng-template #authorFallback>
+                <span
+                  class="board-post__avatar board-post__avatar--fallback"
+                  [style.backgroundColor]="getAvatarColor(post.authorId)"
+                >
+                  {{ getAvatarInitial(post.authorName || post.authorId) }}
+                </span>
+              </ng-template>
+              <div class="board-post__author-meta">
+                <span class="board-post__author-name">{{ post.authorName }}</span>
+                <time
+                  class="board-post__timestamp"
+                  [attr.datetime]="post.createdAt ? post.createdAt.toISOString() : ''"
+                >
+                  {{ post.createdAt ? (post.createdAt | date: 'yyyy/MM/dd HH:mm') : '日時不明' }}
+                </time>
+              </div>
+            </div>
+            <ul class="board-post__projects">
+              <li *ngFor="let name of post.projectNames">{{ name }}</li>
+            </ul>
+          </header>
+          <h3 class="board-post__title">{{ post.title }}</h3>
+          <p class="board-post__content">{{ post.content }}</p>
+        </li>
+      </ul>
+    </section>
+  </section>

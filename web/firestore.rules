@@ -9,11 +9,41 @@ function role(projectId) {
 return get(/databases/$(database)/documents/projects/$(projectId)).data.roles[request.auth.uid];
 }
 
+function canPostToProject(projectId) {
+return isMember(projectId) && (role(projectId) == 'admin' || role(projectId) == 'member');
+}
+
+function canViewBulletin(projectIds) {
+return projectIds.size() > 0 && (
+  (projectIds.size() > 0 && isMember(projectIds[0])) ||
+  (projectIds.size() > 1 && isMember(projectIds[1])) ||
+  (projectIds.size() > 2 && isMember(projectIds[2])) ||
+  (projectIds.size() > 3 && isMember(projectIds[3])) ||
+  (projectIds.size() > 4 && isMember(projectIds[4]))
+);
+}
+
+function canPostBulletin(projectIds) {
+return projectIds.size() > 0 && projectIds.size() <= 5 &&
+  canPostToProject(projectIds[0]) &&
+  (projectIds.size() < 2 || canPostToProject(projectIds[1])) &&
+  (projectIds.size() < 3 || canPostToProject(projectIds[2])) &&
+  (projectIds.size() < 4 || canPostToProject(projectIds[3])) &&
+  (projectIds.size() < 5 || canPostToProject(projectIds[4]));
+}
 
 match /users/{uid} {
 allow read, write: if signedIn() && uid == request.auth.uid;
 }
 
+match /bulletinPosts/{postId} {
+allow read: if signedIn() && canViewBulletin(resource.data.projectIds);
+allow create: if signedIn() && canPostBulletin(request.resource.data.projectIds);
+allow update, delete: if signedIn() &&
+  request.auth.uid == resource.data.authorId &&
+  canPostBulletin(resource.data.projectIds) &&
+  canPostBulletin(request.resource.data.projectIds);
+}
 
 match /projects/{projectId} {
 allow create: if signedIn();

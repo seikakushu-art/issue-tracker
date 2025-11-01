@@ -83,10 +83,14 @@ export interface DashboardSnapshot {
 export interface BulletinPreviewItem {
   id: string;
   title: string;
+  authorId: string;
+  authorName: string;
+  authorPhotoUrl: string | null;
   author: string;
   postedAt: Date;
   excerpt: string;
   href: string;
+  fragment?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -357,26 +361,38 @@ export class DashboardService {
       {
         id: 'draft-release-note',
         title: 'バージョン2.1 リリース準備メモ',
+        authorId: 'placeholder-owner',
+        authorName: 'プロダクトオーナー',
+        authorPhotoUrl: null,
         author: 'プロダクトオーナー',
         postedAt: new Date(now.getTime() - 1000 * 60 * 60 * 4),
         excerpt: 'UIの最終確認とQA結果の共有をお願いします。',
         href: '#',
+        fragment: null,
       },
       {
         id: 'security-training',
         title: '来週のセキュリティ研修について',
+        authorId: 'placeholder-security',
+        authorName: '情シスチーム',
+        authorPhotoUrl: null,
         author: '情シスチーム',
         postedAt: new Date(now.getTime() - 1000 * 60 * 60 * 24),
         excerpt: '参加登録フォームと事前資料のリンクを共有します。',
         href: '#',
+        fragment: null,
       },
       {
         id: 'customer-voice',
         title: '顧客ヒアリング抜粋',
+        authorId: 'placeholder-cs',
+        authorName: 'CS担当',
+        authorPhotoUrl: null,
         author: 'CS担当',
         postedAt: new Date(now.getTime() - 1000 * 60 * 60 * 36),
         excerpt: '運用フローの改善要求が増えています。',
         href: '#',
+        fragment: null,
       },
     ];
   }

@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, Router, ActivatedRoute,NavigationEnd} from '@angular/router';
+import { RouterOutlet, Router, ActivatedRoute,NavigationEnd,RouterLink, RouterLinkActive} from '@angular/router';
 import { Subject, takeUntil,filter, startWith} from 'rxjs';
 import { ProjectsService } from './features/projects/projects.service';
 import { IssuesService } from './features/issues/issues.service';
@@ -14,7 +14,7 @@ import { Project, Issue, Task } from './models/schema';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="app-container">
       <!-- ヘッダー -->
@@ -38,6 +38,11 @@ import { Project, Issue, Task } from './models/schema';
             </span>
           </nav>
         </div>
+        <nav class="primary-nav" aria-label="主要ナビゲーション">
+          <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">ダッシュボード</a>
+          <a routerLink="/projects" routerLinkActive="active">プロジェクト一覧</a>
+          <a routerLink="/board" routerLinkActive="active">掲示板</a>
+        </nav>
     </header>
 
       <!-- メインコンテンツ -->
@@ -65,6 +70,9 @@ import { Project, Issue, Task } from './models/schema';
       border-bottom: 1px solid #e1e5e9;
       padding: 0 20px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .header-content {
@@ -74,6 +82,31 @@ import { Project, Issue, Task } from './models/schema';
       align-items: center;
       justify-content: space-between;
       height: 60px;
+    }
+
+    .primary-nav {
+      max-width: 1200px;
+      margin: 0 auto 12px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .primary-nav a {
+      text-decoration: none;
+      color: #475569;
+      font-weight: 600;
+      padding-bottom: 4px;
+      border-bottom: 3px solid transparent;
+      transition: color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .primary-nav a:hover {
+      color: #2563eb;
+    }
+
+    .primary-nav a.active {
+      color: #2563eb;
+      border-color: #2563eb;
     }
 
     .app-title {

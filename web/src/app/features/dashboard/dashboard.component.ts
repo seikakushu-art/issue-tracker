@@ -7,7 +7,7 @@ import {
   NotificationService,
 } from '../../core/notification.service';
 import { TasksService } from '../tasks/tasks.service';
-import { Importance } from '../../models/schema';
+import { BulletinPost, Importance } from '../../models/schema';
 import {
   DashboardService,
   DashboardSnapshot,
@@ -17,6 +17,7 @@ import {
 } from './dashboard.service';
 import { BoardPreviewComponent } from './components/board-preview/board-preview.component';
 import { UserProfileService } from '../../core/user-profile.service';
+import { BoardService } from '../board/board.service';
 
 type ProjectSortKey = 'overdue_first' | 'progress_desc' | 'backlog_desc';
 
@@ -33,6 +34,7 @@ export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
   private readonly router = inject(Router);
   private readonly userProfileService = inject(UserProfileService);
+  private readonly boardService = inject(BoardService);
   private readonly document = inject(DOCUMENT);
 
   /** Mathオブジェクトをテンプレートで使用するため */
@@ -48,10 +50,10 @@ export class DashboardComponent implements OnInit {
     { label: '重要タスク多い順', value: 'backlog_desc' },
   ];
 
-  /** 掲示板プレビュー（プレースホルダー） */
-  readonly bulletinPosts = signal<BulletinPreviewItem[]>(
-    this.dashboardService.getBulletinPlaceholder(),
-  );
+   /** 掲示板プレビュー */
+   readonly bulletinPosts = signal<BulletinPreviewItem[]>([]);
+   readonly bulletinLoading = signal(false);
+   readonly bulletinError = signal<string | null>(null);
 
   /** ダッシュボード集計スナップショット */
   readonly snapshot = signal<DashboardSnapshot | null>(null);
@@ -105,6 +107,7 @@ export class DashboardComponent implements OnInit {
   ngOnInit(): void {
     void this.refreshDashboard();
     void this.refreshActionableTasks();
+    void this.loadBulletinPreview();
   }
    /** ユーザー設定画面へ遷移する */
    goToUserSettings(): void {
@@ -124,6 +127,40 @@ export class DashboardComponent implements OnInit {
       );
     } finally {
       this.snapshotLoading.set(false);
+    }
+  }
+
+   /** 掲示板プレビューを読み込む */
+   async loadBulletinPreview(): Promise<void> {
+    this.bulletinLoading.set(true);
+    this.bulletinError.set(null);
+    try {
+      const posts = await this.boardService.listAccessiblePosts({ limit: 5 });
+      const transformed = posts
+        .filter((post): post is BulletinPostWithRequiredId => Boolean(post.id))
+        .map((post) => ({
+          id: post.id!,
+          title: post.title,
+          authorId: post.authorId,
+          authorName: post.authorName,
+          authorPhotoUrl: post.authorPhotoUrl ?? null,
+          author: post.authorName,
+          postedAt: post.createdAt ?? new Date(),
+          excerpt: this.buildExcerpt(post.content),
+          href: '/board',
+          fragment: post.id!,
+        } satisfies BulletinPreviewItem));
+      if (transformed.length === 0) {
+        this.bulletinPosts.set([]);
+      } else {
+        this.bulletinPosts.set(transformed);
+      }
+    } catch (error) {
+      console.error('Failed to load bulletin preview', error);
+      this.bulletinError.set('掲示板の最新投稿を読み込めませんでした。時間をおいて再度お試しください。');
+      this.bulletinPosts.set([]);
+    } finally {
+      this.bulletinLoading.set(false);
     }
   }
   /** 重要タスクリストを再取得する */
@@ -358,4 +395,13 @@ export class DashboardComponent implements OnInit {
         });
     }
   }
+  private buildExcerpt(content: string, maxLength = 80): string {
+    const normalized = (content ?? '').trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, maxLength)}…`;
+  }
 }
+
+type BulletinPostWithRequiredId = BulletinPost & { id: string };

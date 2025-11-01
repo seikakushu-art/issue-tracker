@@ -9,12 +9,31 @@
     <ul class="board-preview__list" *ngIf="!hasNoPosts">
       <li class="board-preview__item" *ngFor="let post of visiblePosts">
         <div class="board-preview__meta">
-          <span class="board-preview__author">{{ post.author }}</span>
+          <div class="board-preview__author">
+            <ng-container *ngIf="post.authorPhotoUrl; else previewFallback">
+              <img
+                [src]="post.authorPhotoUrl"
+                class="board-preview__avatar"
+                [alt]="post.authorName + 'のアイコン'"
+              />
+            </ng-container>
+            <ng-template #previewFallback>
+              <span
+                class="board-preview__avatar board-preview__avatar--fallback"
+                [style.backgroundColor]="getAvatarColor(post)"
+              >
+                {{ getAvatarInitial(post) }}
+              </span>
+            </ng-template>
+            <span class="board-preview__author-name">{{ post.authorName }}</span>
+          </div>
           <time class="board-preview__time" [attr.datetime]="post.postedAt.toISOString()">
             {{ post.postedAt | date: 'MM/dd HH:mm' }}
           </time>
         </div>
-        <h4 class="board-preview__title">{{ post.title }}</h4>
+        <h4 class="board-preview__title">
+          <a [routerLink]="post.href" [fragment]="post.fragment ?? undefined">{{ post.title }}</a>
+        </h4>
         <p class="board-preview__excerpt">{{ post.excerpt }}</p>
       </li>
     </ul>

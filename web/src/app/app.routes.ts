@@ -7,6 +7,7 @@ import { RegisterComponent } from './features/auth/register.component';
 import { ProjectInviteComponent } from './features/projects/project-invite.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { UserSettingsComponent } from './features/user-settings/user-settings.component';
+import { BoardListComponent } from './features/board/board-list.component';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -32,6 +33,12 @@ export const routes: Routes = [
     path: 'settings',
     component: UserSettingsComponent,
     title: 'ユーザー設定'
+  },
+
+  {
+    path: 'board',
+    component: BoardListComponent,
+    title: '掲示板'
   },
   // ダッシュボード: トップと明示的な /dashboard の両方で表示
   {

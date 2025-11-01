@@ -194,7 +194,14 @@
                 <span class="widget__hint">最新5件までの投稿を表示</span>
             </div>
             <div class="widget__content widget__content--board">
-                <app-board-preview [posts]="bulletinPosts()" moreLink="/board" />
+                <div class="widget__loading" *ngIf="bulletinLoading()">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span>読み込み中...</span>
+                </div>
+                <p class="widget__error" *ngIf="!bulletinLoading() && bulletinError()">
+                    {{ bulletinError() }}
+                </p>
+                <app-board-preview *ngIf="!bulletinLoading() && !bulletinError()" [posts]="bulletinPosts()" moreLink="/board" />
             </div>
         </section>
 

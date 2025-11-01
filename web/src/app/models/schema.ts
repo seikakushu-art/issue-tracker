@@ -147,4 +147,17 @@ export interface Task {
   // サブコレクションとして管理されるもの：
   // - comments（コメント、最大500件）
   // - attachments（添付ファイル、最大20件、合計500MB）
+}/**
+ * 掲示板の投稿
+ */
+export interface BulletinPost {
+  id?: string;
+  title: string;
+  content: string;
+  projectIds: string[];
+  authorId: string;
+  authorName: string;
+  authorPhotoUrl?: string | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
 }

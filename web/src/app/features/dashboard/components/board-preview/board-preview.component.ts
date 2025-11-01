@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { BulletinPreviewItem } from '../../dashboard.service';
+import { getAvatarColor, getAvatarInitial } from '../../../../shared/avatar-utils';
 
 @Component({
   selector: 'app-board-preview',
@@ -15,6 +16,14 @@ export class BoardPreviewComponent {
   @Input({ required: true }) posts: BulletinPreviewItem[] = [];
   /** 詳細ページへ遷移するリンク */
   @Input() moreLink = '#';
+
+  getAvatarInitial(author: BulletinPreviewItem): string {
+    return getAvatarInitial(author.authorName || author.authorId, '?');
+  }
+
+  getAvatarColor(author: BulletinPreviewItem): string {
+    return getAvatarColor(author.authorId || author.authorName);
+  }
 
   /** 表示対象に制限した投稿配列を返す */
   get visiblePosts(): BulletinPreviewItem[] {
