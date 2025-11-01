@@ -78,14 +78,29 @@
         <div class="project-members" *ngIf="project.memberIds.length > 0">
           <div class="avatar-group" aria-label="参加メンバー">
             <ng-container *ngFor="let memberId of getVisibleMemberIds(project.memberIds); let i = index">
-              <span
-                class="avatar"
-                [style.background]="getMemberColor(memberId)"
-                [attr.title]="getMemberLabel(memberId, i)"
-                [attr.aria-label]="getMemberLabel(memberId, i)"
-              >
-                {{ getMemberInitial(memberId) }}
-              </span>
+              <ng-container *ngIf="getMemberPhoto(memberId) as photoUrl; else projectMemberFallback">
+                <span
+                  class="avatar avatar--image"
+                  [attr.title]="getMemberLabel(memberId, i)"
+                  [attr.aria-label]="getMemberLabel(memberId, i)"
+                >
+                  <img
+                    class="avatar__image"
+                    [src]="photoUrl"
+                    [alt]="getMemberDisplayName(memberId) + 'のアイコン'"
+                  >
+                </span>
+              </ng-container>
+              <ng-template #projectMemberFallback>
+                <span
+                  class="avatar"
+                  [style.background]="getMemberColor(memberId)"
+                  [attr.title]="getMemberLabel(memberId, i)"
+                  [attr.aria-label]="getMemberLabel(memberId, i)"
+                >
+                  {{ getMemberInitial(memberId) }}
+                </span>
+              </ng-template>
             </ng-container>
           </div>
           <span class="avatar-count" *ngIf="project.memberIds.length > maxVisibleMembers">

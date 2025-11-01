@@ -9,6 +9,7 @@ import { IssuesService } from '../issues/issues.service';
 import { FirebaseError } from '@angular/fire/app';
 import { ProjectInviteService } from './project-invite.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
+import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 
 /**
  * プロジェクト一覧コンポーネント
@@ -25,6 +26,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   private projectsService = inject(ProjectsService);
   private issuesService = inject(IssuesService);
   private inviteService = inject(ProjectInviteService);
+  private userDirectoryService = inject(UserDirectoryService);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
@@ -66,6 +68,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   /** 課題数のキャッシュ（一覧表示・並び替え用） */
   private issueCountMap: Record<string, number> = {};
   private memberColorCache = new Map<string, string>();
+  private memberProfiles: Record<string, UserDirectoryProfile> = {};
 
 
   ngOnInit() {
@@ -85,9 +88,36 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       this.currentUid = await this.projectsService.getSignedInUid();
       this.projects = await this.projectsService.listMyProjects();
       await this.loadIssueCounts();
+      await this.loadMemberProfiles(this.projects);
       this.filterProjects();
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
+    }
+  }
+  private async loadMemberProfiles(projects: Project[]): Promise<void> {
+    const memberIdSet = new Set<string>();
+    for (const project of projects ?? []) {
+      for (const memberId of project.memberIds ?? []) {
+        if (typeof memberId === 'string' && memberId.trim().length > 0) {
+          memberIdSet.add(memberId);
+        }
+      }
+    }
+
+    if (memberIdSet.size === 0) {
+      this.memberProfiles = {};
+      return;
+    }
+
+    try {
+      const profiles = await this.userDirectoryService.getProfiles(Array.from(memberIdSet));
+      this.memberProfiles = profiles.reduce<Record<string, UserDirectoryProfile>>((acc, profile) => {
+        acc[profile.uid] = profile;
+        return acc;
+      }, {});
+    } catch (error) {
+      console.error('プロジェクトメンバーの取得に失敗しました:', error);
+      this.memberProfiles = {};
     }
   }
 
@@ -191,7 +221,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   getMemberInitial(memberId: string): string {
-    return getAvatarInitial(memberId);
+    return getAvatarInitial(this.getMemberDisplayName(memberId));
   }
 
   getMemberColor(memberId: string): string {
@@ -202,7 +232,21 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   getMemberLabel(memberId: string, index: number): string {
-    return `メンバー${index + 1} (${memberId})`;
+    return `メンバー${index + 1} (${this.getMemberDisplayName(memberId)})`;
+  }
+
+  getMemberDisplayName(memberId: string): string {
+    const profile = this.memberProfiles[memberId];
+    if (profile?.username && profile.username.trim().length > 0) {
+      return profile.username;
+    }
+    return memberId;
+  }
+
+  getMemberPhoto(memberId: string): string | null {
+    const profile = this.memberProfiles[memberId];
+    const photoUrl = profile?.photoURL;
+    return typeof photoUrl === 'string' && photoUrl.trim().length > 0 ? photoUrl : null;
   }
 
 

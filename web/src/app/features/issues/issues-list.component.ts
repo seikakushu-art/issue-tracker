@@ -10,6 +10,7 @@ import { FirebaseError } from 'firebase/app';
 import { TasksService, TaskSummary } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
+import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -26,6 +27,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   private projectsService = inject(ProjectsService);
   private tasksService = inject(TasksService);
   private tagsService = inject(TagsService);
+  private userDirectoryService = inject(UserDirectoryService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
@@ -56,6 +58,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
     Low: '普通',
   };
   private memberColorCache = new Map<string, string>();
+  private memberProfiles: Record<string, UserDirectoryProfile> = {};
 
   // 所属プロジェクトの選択肢を保持
   availableProjects: Project[] = [];
@@ -118,6 +121,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       this.issues = issues;
       this.currentUid = uid;
       this.currentRole = project?.roles?.[uid] ?? null;
+      await this.loadMemberProfiles(project?.memberIds ?? []);
       this.filterIssues();
       await this.refreshTaskSummaries();
       void this.loadTags(); // 直近で作成されたタグも反映
@@ -145,8 +149,8 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   }
 
 /**
- * タグ一覧を読み込み、IDから即座に参照できるようマップ化する
- */
+   * タグ一覧を読み込み、IDから即座に参照できるようマップ化する
+   */
 private async loadTags(): Promise<void> {
   try {
     const tags = await this.tagsService.listTags();
@@ -159,6 +163,25 @@ private async loadTags(): Promise<void> {
   } catch (error) {
     console.error('タグの取得に失敗しました:', error);
     this.tagMap = {};
+  }
+}
+
+private async loadMemberProfiles(memberIds: string[]): Promise<void> {
+  const uniqueIds = Array.from(new Set((memberIds ?? []).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)));
+  if (uniqueIds.length === 0) {
+    this.memberProfiles = {};
+    return;
+  }
+
+  try {
+    const profiles = await this.userDirectoryService.getProfiles(uniqueIds);
+    this.memberProfiles = profiles.reduce<Record<string, UserDirectoryProfile>>((acc, profile) => {
+      acc[profile.uid] = profile;
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error('メンバー情報の取得に失敗しました:', error);
+    this.memberProfiles = {};
   }
   }
 
@@ -181,7 +204,7 @@ private async loadTags(): Promise<void> {
   }
 
   getMemberInitial(memberId: string): string {
-    return getAvatarInitial(memberId);
+    return getAvatarInitial(this.getMemberDisplayName(memberId));
   }
 
   getMemberColor(memberId: string): string {
@@ -192,7 +215,21 @@ private async loadTags(): Promise<void> {
   }
 
   getMemberLabel(memberId: string, index: number): string {
-    return `メンバー${index + 1} (${memberId})`;
+    return `メンバー${index + 1} (${this.getMemberDisplayName(memberId)})`;
+  }
+
+  getMemberDisplayName(memberId: string): string {
+    const profile = this.memberProfiles[memberId];
+    if (profile?.username && profile.username.trim().length > 0) {
+      return profile.username;
+    }
+    return memberId;
+  }
+
+  getMemberPhoto(memberId: string): string | null {
+    const profile = this.memberProfiles[memberId];
+    const photoUrl = profile?.photoURL;
+    return typeof photoUrl === 'string' && photoUrl.trim().length > 0 ? photoUrl : null;
   }
 
   /**
