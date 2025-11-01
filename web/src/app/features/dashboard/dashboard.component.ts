@@ -97,12 +97,17 @@ export class DashboardComponent implements OnInit {
   private readonly updatingTaskIds = signal<Set<string>>(new Set());
    /** ログイン中ユーザーの Signal */
    readonly currentUser = this.userProfileService.user;
+   /** Firestore に登録されたユーザー名 */
+   readonly currentUsername = this.userProfileService.username;
    /** 表示名（未設定の場合はフォールバック） */
-   readonly userDisplayName = computed(
-     () => this.currentUser()?.displayName || 'ゲストユーザー',
+   readonly userDisplayName = computed(() =>
+    this.currentUsername() || this.currentUser()?.displayName || 'ゲストユーザー',
    );
    /** アイコン URL（未設定の場合は null） */
-   readonly userPhotoUrl = computed(() => this.currentUser()?.photoURL ?? null);
+   readonly userPhotoUrl = computed(() => {
+    const directoryProfile = this.userProfileService.directoryProfile();
+    return directoryProfile?.photoURL ?? this.currentUser()?.photoURL ?? null;
+  });
 
   ngOnInit(): void {
     void this.refreshDashboard();
@@ -142,9 +147,9 @@ export class DashboardComponent implements OnInit {
           id: post.id!,
           title: post.title,
           authorId: post.authorId,
-          authorName: post.authorName,
+          authorUsername: post.authorUsername,
           authorPhotoUrl: post.authorPhotoUrl ?? null,
-          author: post.authorName,
+          author: post.authorUsername,
           postedAt: post.createdAt ?? new Date(),
           excerpt: this.buildExcerpt(post.content),
           href: '/board',

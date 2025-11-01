@@ -110,7 +110,7 @@ export interface Comment {
   createdBy: string;  // 作成者のユーザーID
   createdAt: Date;  // 作成日時
   mentions?: string[];  // メンションされたユーザーID配列
-  authorName?: string | null;  // 表示名（未設定時はユーザーIDを用いる）
+  authorUsername?: string | null;  // 表示に使うユーザー名
   authorPhotoUrl?: string | null;  // アイコン画像URL
 }
 
@@ -158,7 +158,7 @@ export interface BulletinPost {
   content: string;
   projectIds: string[];
   authorId: string;
-  authorName: string;
+  authorUsername: string;
   authorPhotoUrl?: string | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;

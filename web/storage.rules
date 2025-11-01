@@ -8,9 +8,16 @@ firestore.get(/databases/(default)/documents/projects/$(projectId)).data.memberI
 (request.auth.uid in firestore.get(/databases/(default)/documents/projects/$(projectId)).data.memberIds);
 }
 
-
+function ownsUsername(username) {
+return request.auth != null &&
+firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.username == username;
+}
 match /attachments/{projectId}/{taskId}/{fileId} {
 allow read, write: if member(projectId);
+}
+match /avatars/{username}/{fileName} {
+allow read: if true;
+allow write: if ownsUsername(username);
 }
 }
 }

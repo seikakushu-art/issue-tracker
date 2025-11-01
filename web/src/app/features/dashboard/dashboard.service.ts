@@ -84,7 +84,7 @@ export interface BulletinPreviewItem {
   id: string;
   title: string;
   authorId: string;
-  authorName: string;
+  authorUsername: string;
   authorPhotoUrl: string | null;
   author: string;
   postedAt: Date;
@@ -362,7 +362,7 @@ export class DashboardService {
         id: 'draft-release-note',
         title: 'バージョン2.1 リリース準備メモ',
         authorId: 'placeholder-owner',
-        authorName: 'プロダクトオーナー',
+        authorUsername: 'プロダクトオーナー',
         authorPhotoUrl: null,
         author: 'プロダクトオーナー',
         postedAt: new Date(now.getTime() - 1000 * 60 * 60 * 4),
@@ -374,7 +374,7 @@ export class DashboardService {
         id: 'security-training',
         title: '来週のセキュリティ研修について',
         authorId: 'placeholder-security',
-        authorName: '情シスチーム',
+        authorUsername: '情シスチーム',
         authorPhotoUrl: null,
         author: '情シスチーム',
         postedAt: new Date(now.getTime() - 1000 * 60 * 60 * 24),
@@ -386,7 +386,7 @@ export class DashboardService {
         id: 'customer-voice',
         title: '顧客ヒアリング抜粋',
         authorId: 'placeholder-cs',
-        authorName: 'CS担当',
+        authorUsername: 'CS担当',
         authorPhotoUrl: null,
         author: 'CS担当',
         postedAt: new Date(now.getTime() - 1000 * 60 * 60 * 36),

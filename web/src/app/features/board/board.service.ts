@@ -7,6 +7,8 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  getDoc,
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { firstValueFrom, TimeoutError } from 'rxjs';
@@ -104,11 +106,19 @@ export class BoardService {
     const projectIds = Array.isArray(projectIdsRaw)
       ? projectIdsRaw.map((projectId) => String(projectId))
       : [];
+      const authorUsernameRaw = record['authorUsername'] ?? record['authorName'];
+      const authorIdRaw = record['authorId'];
+      const authorUsername = typeof authorUsernameRaw === 'string' && authorUsernameRaw.trim().length > 0
+        ? authorUsernameRaw.trim()
+        : typeof authorIdRaw === 'string'
+          ? authorIdRaw
+          : 'unknown';
 
     return {
       ...data,
       id,
       projectIds,
+      authorUsername,
       authorPhotoUrl: (record['authorPhotoUrl'] as string | null | undefined) ?? null,
       createdAt: this.normalizeDate(record['createdAt']) ?? null,
       updatedAt: this.normalizeDate(record['updatedAt']) ?? null,
@@ -129,6 +139,37 @@ export class BoardService {
     }
     const roles = project.roles ?? {};
     return roles[uid] ?? null;
+  }
+
+  private async resolveAuthorProfile(user: User): Promise<{ username: string; photoURL: string | null }> {
+    const usernamePattern = /^[a-z0-9_]{3,10}$/;
+    try {
+      const snapshot = await getDoc(doc(this.db, 'users', user.uid));
+      if (snapshot.exists()) {
+        const data = snapshot.data() as Record<string, unknown>;
+        const rawUsername = typeof data['username'] === 'string' ? data['username'].trim().toLowerCase() : '';
+        const username = usernamePattern.test(rawUsername) ? rawUsername : user.uid;
+        const photoUrlRaw = data['photoURL'];
+        const photoURL = typeof photoUrlRaw === 'string' && photoUrlRaw.trim().length > 0
+          ? photoUrlRaw
+          : user.photoURL ?? null;
+        return { username, photoURL };
+      }
+    } catch (error) {
+      console.error('掲示板投稿用のユーザー情報取得に失敗しました:', error);
+    }
+
+    const fallbackDisplayName = typeof user.displayName === 'string' ? user.displayName.trim().toLowerCase() : '';
+    const fallbackEmailId = typeof user.email === 'string' && user.email.includes('@')
+      ? user.email.split('@')[0].trim().toLowerCase()
+      : '';
+    const fallbackUsername = [fallbackDisplayName, fallbackEmailId]
+      .map((candidate) => candidate.replace(/[^a-z0-9_]/g, ''))
+      .map((candidate) => candidate.slice(0, 10))
+      .find((candidate) => usernamePattern.test(candidate))
+      ?? user.uid;
+
+    return { username: fallbackUsername, photoURL: user.photoURL ?? null };
   }
 
   async createPost(input: { title: string; content: string; projectIds: string[] }): Promise<string> {
@@ -168,14 +209,15 @@ export class BoardService {
         throw new Error('所属していない、または投稿権限のないプロジェクトが含まれています');
       }
     }
+    const authorProfile = await this.resolveAuthorProfile(user);
 
     const payload: Record<string, unknown> = {
       title: rawTitle,
       content: rawContent,
       projectIds: uniqueProjectIds,
       authorId: uid,
-      authorName: user.displayName ?? '名称未設定ユーザー',
-      authorPhotoUrl: user.photoURL ?? null,
+      authorUsername: authorProfile.username,
+      authorPhotoUrl: authorProfile.photoURL,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };

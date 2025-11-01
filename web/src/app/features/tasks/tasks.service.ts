@@ -452,7 +452,7 @@ export class TasksService {
     projectId: string,
     issueId: string,
     taskId: string,
-    input: { text: string; mentions?: string[]; authorName?: string | null; authorPhotoUrl?: string | null }
+    input: { text: string; mentions?: string[]; authorUsername?: string | null; authorPhotoUrl?: string | null }
   ): Promise<Comment> {
     const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
 
@@ -486,8 +486,8 @@ export class TasksService {
       payload['mentions'] = mentions;
     }
 
-    if (input.authorName !== undefined && input.authorName !== null && input.authorName.trim().length > 0) {
-      payload['authorName'] = input.authorName.trim();
+    if (input.authorUsername !== undefined && input.authorUsername !== null && input.authorUsername.trim().length > 0) {
+      payload['authorUsername'] = input.authorUsername.trim();
     }
 
     if (input.authorPhotoUrl !== undefined) {
@@ -504,7 +504,7 @@ export class TasksService {
         createdBy: uid,
         createdAt: new Date(),
         mentions,
-        authorName: input.authorName ?? null,
+        authorUsername: input.authorUsername ?? null,
         authorPhotoUrl: input.authorPhotoUrl ?? null,
       } satisfies Comment;
     }
@@ -535,7 +535,7 @@ export class TasksService {
   private hydrateComment(id: string, data: Record<string, unknown>): Comment {
     const mentionsRaw = Array.isArray(data['mentions']) ? data['mentions'] : [];
     const createdAt = this.normalizeDate(data['createdAt']) ?? new Date();
-    const authorNameRaw = data['authorName'];
+    const authorUsernameRaw = data['authorUsername'] ?? data['authorName'];
     const authorPhotoRaw = data['authorPhotoUrl'];
 
     return {
@@ -544,7 +544,7 @@ export class TasksService {
       createdBy: (data['createdBy'] as string) ?? '',
       createdAt,
       mentions: mentionsRaw.map((value) => String(value)),
-      authorName: typeof authorNameRaw === 'string' && authorNameRaw.trim().length > 0 ? authorNameRaw : null,
+      authorUsername: typeof authorUsernameRaw === 'string' && authorUsernameRaw.trim().length > 0 ? authorUsernameRaw : null,
       authorPhotoUrl: typeof authorPhotoRaw === 'string' && authorPhotoRaw.trim().length > 0 ? authorPhotoRaw : null,
     } satisfies Comment;
   }

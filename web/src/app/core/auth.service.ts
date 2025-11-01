@@ -6,7 +6,6 @@ import {
   signInWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  updateProfile,
 } from '@angular/fire/auth';
 import {
   setPersistence,
@@ -31,13 +30,12 @@ export class AuthService {
     );
   }
 
-  async register(email: string, password: string, displayName: string) {
+  async register(email: string, password: string) {
     const cred = await createUserWithEmailAndPassword(
       this.auth,
       email,
       password,
     );
-    if (displayName) await updateProfile(cred.user, { displayName });
     await cred.user.reload();
     await sendEmailVerification(cred.user, this.verificationSettings());
     return cred.user;

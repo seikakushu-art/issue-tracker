@@ -430,7 +430,7 @@
         <article class="comment-item" *ngFor="let comment of comments">
           <div class="comment-avatar">
             <ng-container *ngIf="comment.authorPhotoUrl; else commentAvatarFallback">
-              <img [src]="comment.authorPhotoUrl" [alt]="comment.authorName + 'のアイコン'">
+              <img [src]="comment.authorPhotoUrl" [alt]="comment.authorUsername + 'のアイコン'">
             </ng-container>
             <ng-template #commentAvatarFallback>
               <span class="comment-avatar-fallback" [style.backgroundColor]="getCommentAvatarColor(comment)">
@@ -440,7 +440,7 @@
           </div>
           <div class="comment-body">
             <div class="comment-meta">
-              <span class="comment-author">{{ comment.authorName }}</span>
+              <span class="comment-author">{{ comment.authorUsername }}</span>
               <time class="comment-time">{{ comment.createdAt | date:'yyyy/MM/dd HH:mm' }}</time>
             </div>
             <p class="comment-text">{{ comment.text }}</p>
@@ -480,7 +480,7 @@
               >
                 <ng-container *ngIf="member.photoURL; else mentionAvatarFallback">
                   <span class="mention-avatar">
-                    <img [src]="member.photoURL" [alt]="member.displayName + 'のアイコン'">
+                    <img [src]="member.photoURL" [alt]="member.username + 'のアイコン'">
                   </span>
                 </ng-container>
                 <ng-template #mentionAvatarFallback>
@@ -488,7 +488,7 @@
                     {{ getMemberInitial(member) }}
                   </span>
                 </ng-template>
-                <span class="mention-name">{{ member.displayName }}</span>
+                <span class="mention-name">{{ member.username }}</span>
                 <span class="mention-check" *ngIf="isMentionSelected(member.uid)">✓</span>
               </button>
             </div>

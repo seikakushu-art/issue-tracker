@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserProfileService } from '../../core/user-profile.service';
@@ -22,16 +22,18 @@ import { UserProfileService } from '../../core/user-profile.service';
 
         <form class="settings__form" (ngSubmit)="save()">
           <div class="form-group">
-            <label for="displayName">表示名</label>
+          <label for="username">ユーザー名</label>
             <input
-              id="displayName"
+              id="username"
               type="text"
-              [(ngModel)]="displayName"
-              name="displayName"
-              required
+              [value]="username"
+              name="username"
+              readonly
+              aria-readonly="true"
               [disabled]="loading"
-              placeholder="表示名を入力"
+              placeholder="ユーザー名"
             >
+            <small class="form-group__hint">ユーザー名は登録後に変更できません。</small>
           </div>
 
           <div class="form-group form-group--file">
@@ -131,6 +133,13 @@ import { UserProfileService } from '../../core/user-profile.service';
       flex-direction: column;
       gap: 8px;
     }
+
+    .form-group__hint {
+      margin-top: -4px;
+      color: #64748b;
+      font-size: 12px;
+    }
+
 
     .form-group label {
       font-weight: 600;
@@ -286,11 +295,11 @@ import { UserProfileService } from '../../core/user-profile.service';
     }
   `],
 })
-export class UserSettingsComponent implements OnInit, OnDestroy {
+export class UserSettingsComponent implements OnDestroy {
   private readonly userProfileService = inject(UserProfileService);
   private readonly router = inject(Router);
 
-  displayName = '';
+  username = '';
   iconPreviewUrl: string | null = null;
   private originalPhotoUrl: string | null = null;
   private iconObjectUrl: string | null = null;
@@ -301,32 +310,37 @@ export class UserSettingsComponent implements OnInit, OnDestroy {
   errorMessage = '';
   successMessage = '';
 
-  ngOnInit(): void {
-    this.applyUserProfile();
-  }
+  private readonly profileEffect = effect(() => this.applyUserProfile());
 
   ngOnDestroy(): void {
     this.revokeIconPreview();
+    this.profileEffect.destroy();
   }
 
   /**
    * 現在のユーザー情報をフォームへ反映
    */
   private applyUserProfile(): void {
-    const user = this.userProfileService.user();
-    if (!user) {
-      this.displayName = '';
+    const authUser = this.userProfileService.user();
+    const directoryProfile = this.userProfileService.directoryProfile();
+
+    if (!authUser) {
+      this.username = '';
       this.iconPreviewUrl = null;
       this.originalPhotoUrl = null;
       return;
     }
 
-    this.displayName = user.displayName ?? '';
-    this.originalPhotoUrl = user.photoURL ?? null;
+    const resolvedUsername = directoryProfile?.username
+    ?? authUser.displayName
+    ?? authUser.uid
+    ?? '';
+  const resolvedPhotoUrl = directoryProfile?.photoURL ?? authUser.photoURL ?? null;
 
-    // 編集中に新しいファイルを選択していない場合のみ既存の URL を反映
+  this.username = resolvedUsername;
+  this.originalPhotoUrl = resolvedPhotoUrl;
     if (!this.selectedIconFile) {
-      this.iconPreviewUrl = this.originalPhotoUrl;
+      this.iconPreviewUrl = resolvedPhotoUrl;
     }
   }
 
@@ -339,8 +353,7 @@ export class UserSettingsComponent implements OnInit, OnDestroy {
     this.successMessage = '';
 
     try {
-      await this.userProfileService.updateUserProfile({
-        displayName: this.displayName,
+      await this.userProfileService.updateUserAvatar({
         photoFile: this.selectedIconFile ?? undefined,
       });
 

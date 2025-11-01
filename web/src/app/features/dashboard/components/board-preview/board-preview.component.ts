@@ -18,11 +18,11 @@ export class BoardPreviewComponent {
   @Input() moreLink = '#';
 
   getAvatarInitial(author: BulletinPreviewItem): string {
-    return getAvatarInitial(author.authorName || author.authorId, '?');
+    return getAvatarInitial(author.authorUsername || author.authorId, '?');
   }
 
   getAvatarColor(author: BulletinPreviewItem): string {
-    return getAvatarColor(author.authorId || author.authorName);
+    return getAvatarColor(author.authorId || author.authorUsername);
   }
 
   /** 表示対象に制限した投稿配列を返す */

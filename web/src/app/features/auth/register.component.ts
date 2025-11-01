@@ -26,16 +26,21 @@ import { UserProfileService } from '../../core/user-profile.service';
 
         <form class="auth-form" (ngSubmit)="register()">
           <div class="form-group">
-            <label for="displayName">表示名</label>
-            <input 
-              id="displayName"
-              type="text" 
-              [(ngModel)]="registerForm.displayName" 
-              name="displayName"
+          <label for="username">ユーザー名</label>
+            <input
+              id="username"
+              type="text"
+              [(ngModel)]="registerForm.username"
+              (ngModelChange)="onUsernameChange($event)"
+              name="username"
               required
-              placeholder="表示名を入力"
+              minlength="3"
+              maxlength="10"
+              placeholder="半角英数字と_で3〜10文字"
+              autocomplete="username"
               [disabled]="loading"
             >
+            <small class="form-group__hint">※小文字のみ使用できます。同じユーザー名は登録できません。</small>
           </div>
           <div class="form-group form-group--file">
             <label for="icon">プロフィールアイコン</label>
@@ -242,6 +247,13 @@ import { UserProfileService } from '../../core/user-profile.service';
       box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
 
+    .form-group__hint {
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 12px;
+    }
+
+
     .form-group input:disabled {
       background: #f8f9fa;
       cursor: not-allowed;
@@ -369,7 +381,7 @@ export class RegisterComponent implements OnDestroy {
   private iconObjectUrl: string | null = null;
 
   registerForm = {
-    displayName: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -379,13 +391,30 @@ export class RegisterComponent implements OnDestroy {
     // 画面遷移時に Object URL を解放
     this.revokeIconPreview();
   }
+  /**
+   * ユーザー名入力の変換・制限を行う
+   */
+  onUsernameChange(value: string): void {
+    const sanitized = (value ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 10);
+    this.registerForm.username = sanitized;
+    if (this.errorMessage) {
+      this.errorMessage = '';
+    }
+  }
+
+  private isUsernameValid(value: string): boolean {
+    return /^[a-z0-9_]{3,10}$/.test(value);
+  }
 
   /**
    * フォームの有効性をチェック
    */
   isFormValid(): boolean {
     return !!(
-      this.registerForm.displayName &&
+      this.isUsernameValid(this.registerForm.username) &&
       this.registerForm.email &&
       this.registerForm.password &&
       this.registerForm.confirmPassword &&
@@ -428,25 +457,45 @@ export class RegisterComponent implements OnDestroy {
         return;
       }
 
-      // AuthServiceを使用してアカウント作成（メール認証送信含む）
-      await this.authService.register(
-        this.registerForm.email,
-        this.registerForm.password,
-        this.registerForm.displayName
-      );
-      if (this.selectedIconFile) {
-        try {
-          await this.userProfileService.updateUserProfile({
-            displayName: this.registerForm.displayName,
-            photoFile: this.selectedIconFile,
-          });
-        } catch (error) {
-          console.error('プロフィール画像の更新に失敗しました', error);
-          this.errorMessage = 'プロフィール画像のアップロードに失敗しました。ログイン後にユーザー設定から再度お試しください。';
-        }
+      const normalizedUsername = this.registerForm.username.trim().toLowerCase();
+      if (!this.isUsernameValid(normalizedUsername)) {
+        this.errorMessage = 'ユーザー名は半角英数字とアンダースコアで3〜10文字の小文字にしてください';
+        this.loading = false;
+        return;
       }
 
+      this.registerForm.username = normalizedUsername;
 
+      const isAvailable = await this.userProfileService.isUsernameAvailable(normalizedUsername);
+      if (!isAvailable) {
+        this.errorMessage = 'このユーザー名は既に使用されています';
+        this.loading = false;
+        return;
+      }
+
+      // AuthServiceを使用してアカウント作成（メール認証送信含む）
+      const createdUser = await this.authService.register(
+        this.registerForm.email,
+        this.registerForm.password,
+      );
+      try {
+        await this.userProfileService.initializeUserProfile({
+          username: normalizedUsername,
+          photoFile: this.selectedIconFile ?? undefined,
+        });
+      } catch (profileError) {
+        console.error('ユーザープロフィールの初期化に失敗しました', profileError);
+        this.errorMessage = profileError instanceof Error
+          ? profileError.message
+          : 'プロフィール情報の初期化に失敗しました。別のユーザー名でお試しください。';
+        try {
+          await createdUser.delete();
+        } catch (cleanupError) {
+          console.error('作成済みユーザーのクリーンアップに失敗しました', cleanupError);
+        }
+        this.loading = false;
+        return;
+      }
       this.successMessage = '確認メールを送信しました。メールのリンクを開いてからログインしてください。';
       
       // ログイン画面に遷移（メール認証が完了するまでログインできない）

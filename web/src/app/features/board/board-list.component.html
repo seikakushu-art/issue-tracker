@@ -96,7 +96,7 @@
                 <img
                   [src]="post.authorPhotoUrl"
                   class="board-post__avatar"
-                  [alt]="post.authorName + 'のアイコン'"
+                  [alt]="post.authorUsername + 'のアイコン'"
                 />
               </ng-container>
               <ng-template #authorFallback>
@@ -104,11 +104,11 @@
                   class="board-post__avatar board-post__avatar--fallback"
                   [style.backgroundColor]="getAvatarColor(post.authorId)"
                 >
-                  {{ getAvatarInitial(post.authorName || post.authorId) }}
+                  {{ getAvatarInitial(post.authorUsername || post.authorId) }}
                 </span>
               </ng-template>
               <div class="board-post__author-meta">
-                <span class="board-post__author-name">{{ post.authorName }}</span>
+                <span class="board-post__author-name">{{ post.authorUsername }}</span>
                 <time
                   class="board-post__timestamp"
                   [attr.datetime]="post.createdAt ? post.createdAt.toISOString() : ''"

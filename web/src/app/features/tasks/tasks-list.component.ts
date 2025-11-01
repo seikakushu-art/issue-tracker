@@ -13,7 +13,7 @@ import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { Auth,User } from '@angular/fire/auth';
 
 interface TaskCommentView extends Comment {
-  authorName: string;
+  authorUsername: string;
   authorPhotoUrl: string | null;
 }
 
@@ -321,17 +321,23 @@ export class TasksListComponent implements OnInit, OnDestroy {
       console.warn('Firebase Auth の初期化に時間がかかっています:', error);
     }
 
+    const normalizeUsername = (value: string | null | undefined): string | null => {
+      if (typeof value !== 'string') {
+        return null;
+      }
+      const normalized = value.trim().toLowerCase();
+      return /^[a-z0-9_]{3,10}$/.test(normalized) ? normalized : null;
+    };
+
     const baseFallbackProfile = (uid: string): UserDirectoryProfile => {
       const authUser = authUserForFallback && authUserForFallback.uid === uid ? authUserForFallback : null;
-      const displayNameFromAuth = typeof authUser?.displayName === 'string' && authUser.displayName.trim().length > 0
-        ? authUser.displayName.trim()
-        : typeof authUser?.email === 'string' && authUser.email.includes('@')
-          ? authUser.email.split('@')[0]
-          : uid;
+      const usernameFromAuth = normalizeUsername(authUser?.displayName)
+      ?? normalizeUsername(authUser?.email?.split('@')[0] ?? null)
+      ?? uid;
       const photoUrlFromAuth = typeof authUser?.photoURL === 'string' && authUser.photoURL.trim().length > 0
         ? authUser.photoURL
         : null;
-      return { uid, displayName: displayNameFromAuth, photoURL: photoUrlFromAuth };
+      return { uid, username: usernameFromAuth, photoURL: photoUrlFromAuth };
     };
     if (!memberIds || memberIds.length === 0) {
       this.projectMemberProfiles = {};
@@ -353,7 +359,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         const fallbackProfile = baseFallbackProfile(currentUid);
         this.currentUserProfile = {
           uid: currentUid,
-          displayName: directoryProfile?.displayName ?? fallbackProfile.displayName,
+          username: directoryProfile?.username ?? fallbackProfile.username,
           photoURL: directoryProfile?.photoURL ?? fallbackProfile.photoURL,
         };
       } else {
@@ -371,9 +377,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
     const profile = comment.createdBy ? this.projectMemberProfiles[comment.createdBy] : undefined;
     const isCurrentUserComment = this.currentUid !== null && comment.createdBy === this.currentUid;
     const fallbackProfile = isCurrentUserComment ? this.currentUserProfile : undefined;
-    const authorName = typeof comment.authorName === 'string' && comment.authorName.trim().length > 0
-      ? comment.authorName
-      : profile?.displayName ?? fallbackProfile?.displayName ?? comment.createdBy;
+    const authorUsername = typeof comment.authorUsername === 'string' && comment.authorUsername.trim().length > 0
+    ? comment.authorUsername
+    : profile?.username ?? fallbackProfile?.username ?? comment.createdBy;
     const authorPhotoUrl = comment.authorPhotoUrl
       ?? profile?.photoURL
       ?? fallbackProfile?.photoURL
@@ -381,7 +387,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     return {
       ...comment,
-      authorName,
+      authorUsername,
       authorPhotoUrl,
       mentions: Array.isArray(comment.mentions) ? comment.mentions : [],
     };
@@ -433,7 +439,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         {
           text: this.commentForm.text,
           mentions: this.commentForm.mentions,
-          authorName: this.currentUserProfile?.displayName ?? this.currentUid ?? null,
+          authorUsername: this.currentUserProfile?.username ?? this.currentUid ?? null,
           authorPhotoUrl: this.currentUserProfile?.photoURL ?? null,
         },
       );
@@ -461,7 +467,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const mentionToken = `@${member.displayName}`;
+    const mentionToken = `@${member.username}`;
     const trimmed = this.commentForm.text.trimEnd();
     const appended = trimmed.length > 0 ? `${trimmed} ${mentionToken} ` : `${mentionToken} `;
 
@@ -480,15 +486,15 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   getMentionLabel(uid: string): string {
-    return this.projectMemberProfiles[uid]?.displayName ?? uid;
+    return this.projectMemberProfiles[uid]?.username ?? uid;
   }
 
   getCommentInitial(comment: TaskCommentView): string {
-    return getAvatarInitial(comment.authorName || comment.createdBy, '?');
+    return getAvatarInitial(comment.authorUsername || comment.createdBy, '?');
   }
 
   getCommentAvatarColor(comment: TaskCommentView): string {
-    const base = comment.createdBy || comment.authorName;
+    const base = comment.createdBy || comment.authorUsername;
     return getAvatarColor(base);
   }
 
@@ -497,7 +503,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   getMemberInitial(member: UserDirectoryProfile): string {
-    return getAvatarInitial(member.displayName || member.uid, '?');
+    return getAvatarInitial(member.username || member.uid, '?');
   }
 
   /** タスク選択 */

@@ -14,7 +14,7 @@
               <img
                 [src]="post.authorPhotoUrl"
                 class="board-preview__avatar"
-                [alt]="post.authorName + 'のアイコン'"
+                [alt]="post.authorUsername + 'のアイコン'"
               />
             </ng-container>
             <ng-template #previewFallback>
@@ -25,7 +25,7 @@
                 {{ getAvatarInitial(post) }}
               </span>
             </ng-template>
-            <span class="board-preview__author-name">{{ post.authorName }}</span>
+            <span class="board-preview__author-name">{{ post.authorUsername }}</span>
           </div>
           <time class="board-preview__time" [attr.datetime]="post.postedAt.toISOString()">
             {{ post.postedAt | date: 'MM/dd HH:mm' }}
