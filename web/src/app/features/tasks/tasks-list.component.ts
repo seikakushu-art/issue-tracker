@@ -10,6 +10,7 @@ import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem, Role, Project,
 import { ProjectsService } from '../projects/projects.service';
 import { UserDirectoryService, UserDirectoryProfile } from '../../core/user-directory.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
+import { Auth,User } from '@angular/fire/auth';
 
 interface TaskCommentView extends Comment {
   authorName: string;
@@ -33,6 +34,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private issuesService = inject(IssuesService);
   private projectsService = inject(ProjectsService);
   private userDirectoryService = inject(UserDirectoryService);
+  private auth = inject(Auth);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
@@ -311,10 +313,30 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   private async loadProjectMembers(memberIds: string[], currentUid: string | null): Promise<void> {
+    let authUserForFallback: User | null = null;
+    try {
+      await this.auth.authStateReady();
+      authUserForFallback = this.auth.currentUser;
+    } catch (error) {
+      console.warn('Firebase Auth の初期化に時間がかかっています:', error);
+    }
+
+    const baseFallbackProfile = (uid: string): UserDirectoryProfile => {
+      const authUser = authUserForFallback && authUserForFallback.uid === uid ? authUserForFallback : null;
+      const displayNameFromAuth = typeof authUser?.displayName === 'string' && authUser.displayName.trim().length > 0
+        ? authUser.displayName.trim()
+        : typeof authUser?.email === 'string' && authUser.email.includes('@')
+          ? authUser.email.split('@')[0]
+          : uid;
+      const photoUrlFromAuth = typeof authUser?.photoURL === 'string' && authUser.photoURL.trim().length > 0
+        ? authUser.photoURL
+        : null;
+      return { uid, displayName: displayNameFromAuth, photoURL: photoUrlFromAuth };
+    };
     if (!memberIds || memberIds.length === 0) {
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
-      this.currentUserProfile = currentUid ? { uid: currentUid, displayName: currentUid, photoURL: null } : null;
+      this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid)  : null;
       return;
     }
 
@@ -326,23 +348,36 @@ export class TasksListComponent implements OnInit, OnDestroy {
       }
       this.projectMemberProfiles = profileMap;
       this.mentionableMembers = profiles.filter(profile => profile.uid !== currentUid);
-      this.currentUserProfile = currentUid
-        ? profileMap[currentUid] ?? { uid: currentUid, displayName: currentUid, photoURL: null }
-        : null;
+      if (currentUid) {
+        const directoryProfile = profileMap[currentUid];
+        const fallbackProfile = baseFallbackProfile(currentUid);
+        this.currentUserProfile = {
+          uid: currentUid,
+          displayName: directoryProfile?.displayName ?? fallbackProfile.displayName,
+          photoURL: directoryProfile?.photoURL ?? fallbackProfile.photoURL,
+        };
+      } else {
+        this.currentUserProfile = null;
+      }
     } catch (error) {
       console.error('メンバー情報の取得に失敗しました:', error);
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
-      this.currentUserProfile = currentUid ? { uid: currentUid, displayName: currentUid, photoURL: null } : null;
+      this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid) : null;
     }
   }
 
   private composeCommentView(comment: Comment): TaskCommentView {
     const profile = comment.createdBy ? this.projectMemberProfiles[comment.createdBy] : undefined;
+    const isCurrentUserComment = this.currentUid !== null && comment.createdBy === this.currentUid;
+    const fallbackProfile = isCurrentUserComment ? this.currentUserProfile : undefined;
     const authorName = typeof comment.authorName === 'string' && comment.authorName.trim().length > 0
       ? comment.authorName
-      : profile?.displayName ?? comment.createdBy;
-    const authorPhotoUrl = comment.authorPhotoUrl ?? profile?.photoURL ?? null;
+      : profile?.displayName ?? fallbackProfile?.displayName ?? comment.createdBy;
+    const authorPhotoUrl = comment.authorPhotoUrl
+      ?? profile?.photoURL
+      ?? fallbackProfile?.photoURL
+      ?? null;
 
     return {
       ...comment,
