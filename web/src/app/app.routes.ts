@@ -8,6 +8,7 @@ import { ProjectInviteComponent } from './features/projects/project-invite.compo
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { UserSettingsComponent } from './features/user-settings/user-settings.component';
 import { BoardListComponent } from './features/board/board-list.component';
+import { AttachmentsListComponent } from './features/attachments/attachments-list.component';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -39,6 +40,11 @@ export const routes: Routes = [
     path: 'board',
     component: BoardListComponent,
     title: '掲示板'
+  },
+  {
+    path: 'attachments',
+    component: AttachmentsListComponent,
+    title: '添付ファイル一覧'
   },
   // ダッシュボード: トップと明示的な /dashboard の両方で表示
   {

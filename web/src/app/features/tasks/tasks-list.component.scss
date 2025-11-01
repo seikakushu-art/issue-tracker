@@ -818,6 +818,135 @@
   color: #333;
 }
 
+.attachments-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attachment-upload-button {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.attachment-upload-button input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.attachment-limit-message {
+  margin: 0;
+  font-size: 12px;
+  color: #c53030;
+}
+
+.attachment-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.attachment-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attachment-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attachment-name {
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.attachment-name:hover {
+  text-decoration: underline;
+}
+
+.attachment-size {
+  font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.attachment-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.attachment-uploader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.attachment-uploader img,
+.attachment-uploader-fallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.attachment-uploader img {
+  object-fit: cover;
+}
+
+.attachment-uploader-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.attachment-uploader-name {
+  font-size: 13px;
+  color: #374151;
+}
+
+.attachment-time {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.attachment-delete {
+  align-self: flex-end;
+}
+
+
 .detail-meta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

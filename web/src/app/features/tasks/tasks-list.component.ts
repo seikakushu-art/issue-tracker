@@ -6,7 +6,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { IssuesService } from '../issues/issues.service';
-import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem, Role, Project, Comment } from '../../models/schema';
+import { Task, TaskStatus, Importance, Tag, Issue, ChecklistItem, Role, Project, Comment, Attachment } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { UserDirectoryService, UserDirectoryProfile } from '../../core/user-directory.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
@@ -17,6 +17,10 @@ interface TaskCommentView extends Comment {
   authorPhotoUrl: string | null;
 }
 
+interface TaskAttachmentView extends Attachment {
+  uploaderLabel: string;
+  uploaderPhotoUrl: string | null;
+}
 /**
  * タスク一覧コンポーネント
  * 課題配下のタスク一覧表示、作成、編集、削除機能を提供
@@ -42,6 +46,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   projectId!: string;
   issueId!: string;
 
+  projectDetails: Project | null = null;
   issueDetails: Issue | null = null;
   issueProgress = 0;
   taskPreview: Task[] = [];
@@ -98,6 +103,15 @@ export class TasksListComponent implements OnInit, OnDestroy {
   };
   commentLimitReached = false;
 
+  attachments: TaskAttachmentView[] = [];
+  attachmentsLoading = false;
+  attachmentsError = '';
+  attachmentUploadError = '';
+  attachmentUploadMessage = '';
+  attachmentUploading = false;
+  attachmentDeletingId: string | null = null;
+  attachmentLimitReached = false;
+
   // カラーパレット（課題テーマカラー用）
   private colorPalette = [
     '#007bff', '#20c997', '#ffc107', '#dc3545', '#6f42c1',
@@ -111,6 +125,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
     Medium: { label: '重要', weight: 2 },
     Low: { label: '普通', weight: 1 }
   };
+
+  readonly attachmentLimit = 20;
 
   ngOnInit() {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
@@ -152,6 +168,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       await this.loadProjectMembers(project?.memberIds ?? [], uid);
 
       this.issueDetails = issue;
+      this.projectDetails = project;
       this.tasks = tasks;
       this.currentUid = uid;
       this.currentRole = project?.roles?.[uid] ?? null;
@@ -162,7 +179,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
         if (refreshed && refreshed.id) {
           this.selectedTask = refreshed;
           this.resetCommentState();
+          this.resetAttachmentState();
           void this.loadTaskComments(refreshed.id);
+          void this.loadTaskAttachments(refreshed.id);
         } else {
           this.closeDetailPanel();
         }
@@ -191,6 +210,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   canPostComment(): boolean {
     return this.currentRole === 'admin' || this.currentRole === 'member';
+  }
+
+  canUploadAttachment(task: Task | null): boolean {
+    return this.canEditTask(task);
+  }
+
+  canDeleteAttachment(attachment: TaskAttachmentView): boolean {
+    if (this.isAdmin()) {
+      return true;
+    }
+    return this.currentRole === 'member' && this.currentUid === attachment.uploadedBy;
   }
 
   canEditTask(task: Task | null): boolean {
@@ -312,6 +342,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.commentLimitReached = false;
   }
 
+  private resetAttachmentState(): void {
+    this.attachments = [];
+    this.attachmentsLoading = false;
+    this.attachmentsError = '';
+    this.attachmentUploadError = '';
+    this.attachmentUploadMessage = '';
+    this.attachmentUploading = false;
+    this.attachmentDeletingId = null;
+    this.attachmentLimitReached = false;
+  }
+
   private async loadProjectMembers(memberIds: string[], currentUid: string | null): Promise<void> {
     let authUserForFallback: User | null = null;
     try {
@@ -365,12 +406,33 @@ export class TasksListComponent implements OnInit, OnDestroy {
       } else {
         this.currentUserProfile = null;
       }
+
+      this.attachments = this.attachments.map(attachment => this.composeAttachmentView(attachment));
     } catch (error) {
       console.error('メンバー情報の取得に失敗しました:', error);
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
       this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid) : null;
+      this.attachments = this.attachments.map(attachment => this.composeAttachmentView(attachment));
     }
+  }
+
+  private composeAttachmentView(attachment: Attachment): TaskAttachmentView {
+    const profile = attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
+    const isCurrentUserAttachment = this.currentUid !== null && attachment.uploadedBy === this.currentUid;
+    const fallbackProfile = isCurrentUserAttachment ? this.currentUserProfile : undefined;
+    const uploaderLabel = profile?.username
+      ?? fallbackProfile?.username
+      ?? (attachment.uploadedBy || '不明なユーザー');
+    const uploaderPhotoUrl = profile?.photoURL
+      ?? fallbackProfile?.photoURL
+      ?? null;
+
+    return {
+      ...attachment,
+      uploaderLabel,
+      uploaderPhotoUrl,
+    };
   }
 
   private composeCommentView(comment: Comment): TaskCommentView {
@@ -416,6 +478,42 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
+  private updateAttachmentLimitState(): void {
+    this.attachmentLimitReached = this.attachments.length >= this.attachmentLimit;
+  }
+
+  private async loadTaskAttachments(taskId: string, options: { silent?: boolean } = {}): Promise<void> {
+    if (!this.projectId || !this.issueId) {
+      return;
+    }
+
+    const { silent = false } = options;
+    if (!silent) {
+      this.attachmentsLoading = true;
+      this.attachmentsError = '';
+    }
+
+    try {
+      this.attachmentsError = '';
+      const attachments = await this.tasksService.listAttachments(this.projectId, this.issueId, taskId);
+      this.attachments = attachments
+        .map(attachment => this.composeAttachmentView(attachment))
+        .sort((a, b) => {
+          const timeA = a.uploadedAt?.getTime() ?? 0;
+          const timeB = b.uploadedAt?.getTime() ?? 0;
+          return timeB - timeA;
+        });
+      this.updateAttachmentLimitState();
+    } catch (error) {
+      console.error('添付ファイルの読み込みに失敗しました:', error);
+      this.attachmentsError = error instanceof Error ? error.message : '添付ファイルの読み込みに失敗しました。';
+      this.attachments = [];
+      this.updateAttachmentLimitState();
+    } finally {
+      this.attachmentsLoading = false;
+    }
+  }
+
   canSubmitComment(): boolean {
     if (!this.canPostComment() || !this.selectedTaskId) {
       return false;
@@ -456,6 +554,127 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.commentSubmitting = false;
     }
   }
+
+  formatFileSize(bytes: number | null | undefined): string {
+    if (typeof bytes !== 'number' || Number.isNaN(bytes) || bytes <= 0) {
+      return '0 B';
+    }
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+    const formatted = unitIndex === 0 ? Math.round(size).toString() : size.toFixed(size >= 10 ? 0 : 1);
+    return `${formatted} ${units[unitIndex]}`;
+  }
+
+  trackAttachmentById(_: number, attachment: TaskAttachmentView): string {
+    return attachment.id;
+  }
+
+  async onAttachmentSelected(event: Event): Promise<void> {
+    const input = event.target instanceof HTMLInputElement ? event.target : null;
+    if (!input || !input.files || !this.selectedTaskId || !this.selectedTask) {
+      return;
+    }
+
+    if (!this.canUploadAttachment(this.selectedTask)) {
+      alert('添付ファイルを追加する権限がありません');
+      input.value = '';
+      return;
+    }
+
+    if (this.attachmentLimitReached) {
+      this.attachmentUploadError = `添付ファイルは最大${this.attachmentLimit}件までです。`;
+      input.value = '';
+      return;
+    }
+
+    const files = Array.from(input.files).filter(file => file.size > 0);
+    if (files.length === 0) {
+      input.value = '';
+      return;
+    }
+
+    this.attachmentUploadError = '';
+    this.attachmentUploadMessage = '';
+    this.attachmentUploading = true;
+
+    let successCount = 0;
+    for (const file of files) {
+      try {
+        const created = await this.tasksService.uploadAttachment(
+          this.projectId,
+          this.issueId,
+          this.selectedTaskId,
+          file,
+          {
+            taskTitle: this.selectedTask.title,
+            projectName: this.projectDetails?.name ?? null,
+            issueName: this.issueDetails?.name ?? null,
+          },
+        );
+        this.attachments = [
+          this.composeAttachmentView(created),
+          ...this.attachments,
+        ].sort((a, b) => (b.uploadedAt?.getTime() ?? 0) - (a.uploadedAt?.getTime() ?? 0));
+        successCount += 1;
+      } catch (error) {
+        console.error('添付ファイルのアップロードに失敗しました:', error);
+        this.attachmentUploadError = error instanceof Error ? error.message : '添付ファイルのアップロードに失敗しました。';
+        break;
+      }
+    }
+
+    if (successCount > 0) {
+      const suffix = this.attachmentUploadError ? '（一部失敗）' : '';
+      this.attachmentUploadMessage = `${successCount}件の添付ファイルを追加しました${suffix}。`;
+    }
+
+    this.updateAttachmentLimitState();
+    this.attachmentUploading = false;
+    if (this.selectedTaskId) {
+      void this.loadTaskAttachments(this.selectedTaskId, { silent: true });
+    }
+    input.value = '';
+  }
+
+  async deleteAttachment(attachment: TaskAttachmentView): Promise<void> {
+    if (!this.selectedTaskId || !this.selectedTask) {
+      return;
+    }
+
+    if (!this.canDeleteAttachment(attachment)) {
+      alert('この添付ファイルを削除する権限がありません');
+      return;
+    }
+
+    const confirmed = confirm(`添付ファイル「${attachment.fileName}」を削除しますか？`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.attachmentDeletingId = attachment.id;
+    this.attachmentsError = '';
+    try {
+      await this.tasksService.deleteAttachment(
+        this.projectId,
+        this.issueId,
+        this.selectedTaskId,
+        attachment.id,
+      );
+      await this.loadTaskAttachments(this.selectedTaskId, { silent: true });
+    } catch (error) {
+      console.error('添付ファイルの削除に失敗しました:', error);
+      this.attachmentsError = error instanceof Error ? error.message : '添付ファイルの削除に失敗しました。';
+    } finally {
+      this.attachmentDeletingId = null;
+      this.updateAttachmentLimitState();
+    }
+  }
+
 
   toggleMention(member: UserDirectoryProfile): void {
     if (this.commentLimitReached) {
@@ -506,13 +725,19 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return getAvatarInitial(member.username || member.uid, '?');
   }
 
+  getAttachmentInitial(attachment: TaskAttachmentView): string {
+    return getAvatarInitial(attachment.uploaderLabel || attachment.uploadedBy, '?');
+  }
+
   /** タスク選択 */
   selectTask(task: Task) {
     if (task.id) {
       this.selectedTaskId = task.id;
       this.selectedTask = task;
       this.resetCommentState();
+      this.resetAttachmentState();
       void this.loadTaskComments(task.id);
+      void this.loadTaskAttachments(task.id);
     }
   }
 
@@ -522,6 +747,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.selectedTask = null;
     this.newChecklistText = '';
     this.resetCommentState();
+    this.resetAttachmentState();
   }
 
   /** 新規作成モーダルを開く */

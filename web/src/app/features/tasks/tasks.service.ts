@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
   collection,
+  collectionGroup,
   addDoc,
   query,
   getDocs,
@@ -12,14 +13,17 @@ import {
   updateDoc,
   deleteDoc,
   getDoc,
+  setDoc,
+  where,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Task, TaskStatus, ChecklistItem, Importance, Comment } from '../../models/schema';
+import { Task, TaskStatus, ChecklistItem, Importance, Comment, Attachment } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
 import { ProjectsService } from '../projects/projects.service';
+import { Storage, deleteObject, getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
 
 /**
  * 課題カードに表示する代表タスク情報
@@ -45,6 +49,10 @@ export class TasksService {
   private authReady: Promise<void> | null = null;
   private progressService = inject(ProgressService);
   private projectsService = inject(ProjectsService);
+  private storage = inject(Storage);
+
+  private readonly attachmentCountLimit = 20;
+  private readonly attachmentTotalSizeLimit = 500 * 1024 * 1024; // 500MB
 
   /**
    * Firestore から取得した日時相当の値を Date 型へ正規化する
@@ -70,6 +78,73 @@ export class TasksService {
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     }
     return null;
+  }
+
+  private hydrateAttachment(id: string, data: Record<string, unknown>): Attachment {
+    const fileSizeRaw = data['fileSize'];
+    const parsedSize = typeof fileSizeRaw === 'number'
+      ? fileSizeRaw
+      : typeof fileSizeRaw === 'string'
+        ? Number.parseInt(fileSizeRaw, 10)
+        : 0;
+
+    const attachment: Attachment = {
+      id,
+      fileName: typeof data['fileName'] === 'string' ? data['fileName'] : '未設定のファイル名',
+      fileUrl: typeof data['fileUrl'] === 'string' ? data['fileUrl'] : '',
+      fileSize: Number.isNaN(parsedSize) ? 0 : parsedSize,
+      uploadedBy: typeof data['uploadedBy'] === 'string' ? data['uploadedBy'] : '',
+      uploadedAt: this.normalizeDate(data['uploadedAt']),
+    };
+
+    if (typeof data['storagePath'] === 'string' && data['storagePath'].trim().length > 0) {
+      attachment.storagePath = data['storagePath'];
+    }
+    if (typeof data['projectId'] === 'string' && data['projectId'].trim().length > 0) {
+      attachment.projectId = data['projectId'];
+    }
+    if (typeof data['projectName'] === 'string') {
+      attachment.projectName = data['projectName'];
+    }
+    if (typeof data['issueId'] === 'string' && data['issueId'].trim().length > 0) {
+      attachment.issueId = data['issueId'];
+    }
+    if (typeof data['issueName'] === 'string') {
+      attachment.issueName = data['issueName'];
+    }
+    if (typeof data['taskId'] === 'string' && data['taskId'].trim().length > 0) {
+      attachment.taskId = data['taskId'];
+    }
+    if (typeof data['taskTitle'] === 'string') {
+      attachment.taskTitle = data['taskTitle'];
+    }
+
+    return attachment;
+  }
+
+  private buildAttachmentStoragePath(
+    projectId: string,
+    issueId: string,
+    taskId: string,
+    attachmentId: string,
+    fileName: string,
+  ): string {
+    const safeName = fileName
+      .normalize('NFKC')
+      .replace(/[\s]+/g, '_')
+      .replace(/[^a-zA-Z0-9_.-]/g, '_');
+    return `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments/${attachmentId}_${safeName}`;
+  }
+
+  private chunkArray<T>(items: T[], size: number): T[][] {
+    if (size <= 0) {
+      return [items];
+    }
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+      chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
   }
 
 
@@ -510,6 +585,192 @@ export class TasksService {
     }
 
     return this.hydrateComment(createdRef.id, data as Record<string, unknown>);
+  }
+
+   /**
+   * タスクに紐づく添付ファイル一覧を取得する
+   */
+   async listAttachments(projectId: string, issueId: string, taskId: string): Promise<Attachment[]> {
+    await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
+
+    const attachmentRef = collection(
+      this.db,
+      `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments`
+    );
+
+    const snap = await getDocs(
+      query(
+        attachmentRef,
+        orderBy('uploadedAt', 'desc'),
+        limit(this.attachmentCountLimit),
+      ),
+    );
+
+    return snap.docs.map((docSnap) =>
+      this.hydrateAttachment(docSnap.id, docSnap.data() as Record<string, unknown>)
+    );
+  }
+
+  /**
+   * 添付ファイルをアップロードする
+   */
+  async uploadAttachment(
+    projectId: string,
+    issueId: string,
+    taskId: string,
+    file: File,
+    metadata: { taskTitle: string; projectName?: string | null; issueName?: string | null },
+  ): Promise<Attachment> {
+    const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
+    if (!(file instanceof File)) {
+      throw new Error('有効なファイルを選択してください');
+    }
+
+    const attachmentRef = collection(
+      this.db,
+      `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments`
+    );
+
+    const existingSnap = await getDocs(attachmentRef);
+    const existingAttachments = existingSnap.docs.map((docSnap) =>
+      this.hydrateAttachment(docSnap.id, docSnap.data() as Record<string, unknown>)
+    );
+
+    if (existingAttachments.length >= this.attachmentCountLimit) {
+      throw new Error(`添付ファイルは最大${this.attachmentCountLimit}件までです`);
+    }
+
+    const totalSize = existingAttachments.reduce((sum, attachment) => sum + (attachment.fileSize ?? 0), 0);
+    if (totalSize + file.size > this.attachmentTotalSizeLimit) {
+      throw new Error('添付ファイルの合計サイズは500MBまでです');
+    }
+
+    const docRef = doc(attachmentRef);
+    const storagePath = this.buildAttachmentStoragePath(projectId, issueId, taskId, docRef.id, file.name);
+    const storageRef = ref(this.storage, storagePath);
+
+    await uploadBytes(storageRef, file, {
+      contentType: file.type || undefined,
+    });
+    const downloadUrl = await getDownloadURL(storageRef);
+
+    const payload: Record<string, unknown> = {
+      fileName: file.name,
+      fileUrl: downloadUrl,
+      fileSize: file.size,
+      uploadedBy: uid,
+      uploadedAt: serverTimestamp(),
+      storagePath,
+      projectId,
+      issueId,
+      taskId,
+    };
+
+    if (metadata.taskTitle) {
+      payload['taskTitle'] = metadata.taskTitle;
+    }
+    if (metadata.projectName !== undefined) {
+      payload['projectName'] = metadata.projectName;
+    }
+    if (metadata.issueName !== undefined) {
+      payload['issueName'] = metadata.issueName;
+    }
+
+    await setDoc(docRef, payload);
+    const createdSnap = await getDoc(docRef);
+    const createdData = createdSnap.data();
+    if (!createdData) {
+      return {
+        id: docRef.id,
+        fileName: file.name,
+        fileUrl: downloadUrl,
+        fileSize: file.size,
+        uploadedBy: uid,
+        uploadedAt: new Date(),
+        storagePath,
+        projectId,
+        projectName: metadata.projectName ?? null,
+        issueId,
+        issueName: metadata.issueName ?? null,
+        taskId,
+        taskTitle: metadata.taskTitle,
+      } satisfies Attachment;
+    }
+
+    return this.hydrateAttachment(docRef.id, createdData as Record<string, unknown>);
+  }
+
+  /**
+   * 添付ファイルを削除する
+   */
+  async deleteAttachment(
+    projectId: string,
+    issueId: string,
+    taskId: string,
+    attachmentId: string,
+  ): Promise<void> {
+    const { role, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
+    const docRef = doc(
+      this.db,
+      `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments/${attachmentId}`
+    );
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) {
+      throw new Error('添付ファイルが見つかりません');
+    }
+
+    const attachment = this.hydrateAttachment(snap.id, snap.data() as Record<string, unknown>);
+    if (role === 'member' && attachment.uploadedBy !== uid) {
+      throw new Error('この添付ファイルを削除する権限がありません');
+    }
+
+    if (attachment.storagePath) {
+      try {
+        await deleteObject(ref(this.storage, attachment.storagePath));
+      } catch (error) {
+        console.warn('ストレージファイルの削除に失敗しました:', error);
+      }
+    }
+
+    await deleteDoc(docRef);
+  }
+
+  /**
+   * 指定したプロジェクトに紐づく添付ファイルをまとめて取得する
+   */
+  async listAttachmentsForProjects(projectIds: string[]): Promise<Attachment[]> {
+    const normalized = Array.from(
+      new Set(
+        projectIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      ),
+    );
+
+    if (normalized.length === 0) {
+      return [];
+    }
+
+    const attachmentsGroup = collectionGroup(this.db, 'attachments');
+    const results: Attachment[] = [];
+
+    for (const chunk of this.chunkArray(normalized, 10)) {
+      if (chunk.length === 0) {
+        continue;
+      }
+      const snap = await getDocs(query(attachmentsGroup, where('projectId', 'in', chunk)));
+      for (const docSnap of snap.docs) {
+        results.push(this.hydrateAttachment(docSnap.id, docSnap.data() as Record<string, unknown>));
+      }
+    }
+
+    results.sort((a, b) => {
+      const timeA = a.uploadedAt?.getTime() ?? 0;
+      const timeB = b.uploadedAt?.getTime() ?? 0;
+      return timeB - timeA;
+    });
+
+    return results;
   }
 
   /**

@@ -1,0 +1,70 @@
+<section class="attachments-page">
+    <header class="page-header">
+      <div class="page-header__titles">
+        <h1>添付ファイル一覧</h1>
+        <p>所属プロジェクトで共有されている添付ファイルを一括で確認できます。</p>
+      </div>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="refresh()"
+        [disabled]="loading()"
+      >
+        {{ loading() ? '更新中…' : '再読み込み' }}
+      </button>
+    </header>
+  
+    <p *ngIf="lastUpdated()" class="last-updated">
+      最終更新: {{ lastUpdated() | date:'yyyy/MM/dd HH:mm:ss' }}
+    </p>
+  
+    <div *ngIf="loading()" class="state state--loading">添付ファイルを読み込み中です…</div>
+  
+    <div *ngIf="error()" class="feedback feedback--error">
+      <i class="icon-error" aria-hidden="true"></i>
+      {{ error() }}
+    </div>
+  
+    <table *ngIf="!loading() && attachments().length > 0" class="attachments-table">
+      <thead>
+        <tr>
+          <th scope="col">ファイル名</th>
+          <th scope="col">所属タスク</th>
+          <th scope="col">プロジェクト</th>
+          <th scope="col">作成者</th>
+          <th scope="col" class="numeric">サイズ</th>
+          <th scope="col">日付</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let attachment of attachments(); trackBy: trackByAttachmentId">
+          <td>
+            <a [href]="attachment.fileUrl" target="_blank" rel="noopener">
+              {{ attachment.fileName }}
+            </a>
+          </td>
+          <td>
+            <div class="task-cell">
+              <span class="task-title">{{ attachment.taskTitle || '名称未設定のタスク' }}</span>
+              <span class="task-issue" *ngIf="attachment.issueName">{{ attachment.issueName }}</span>
+              <a
+                *ngIf="getTaskLink(attachment) as link"
+                class="task-link"
+                [routerLink]="link"
+              >
+                タスクを開く
+              </a>
+            </div>
+          </td>
+          <td>{{ attachment.projectName || '不明なプロジェクト' }}</td>
+          <td>{{ attachment.uploaderName }}</td>
+          <td class="numeric">{{ formatFileSize(attachment.fileSize) }}</td>
+          <td>{{ attachment.uploadedAt ? (attachment.uploadedAt | date:'yyyy/MM/dd HH:mm') : '---' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  
+    <p *ngIf="!loading() && attachments().length === 0 && !error()" class="empty-state">
+      添付ファイルはまだ登録されていません。
+    </p>
+  </section>

@@ -98,7 +98,14 @@ export interface Attachment {
   fileUrl: string;  // ストレージURL
   fileSize: number;  // ファイルサイズ（バイト）
   uploadedBy: string;  // アップロード者のユーザーID
-  uploadedAt: Date;  // アップロード日時
+  uploadedAt: Date | null;  // アップロード日時
+  storagePath?: string;  // Firebase Storage 上の実ファイルパス
+  projectId?: string;  // 所属プロジェクトID（一覧表示用）
+  projectName?: string | null;  // 所属プロジェクト名（スナップショット）
+  issueId?: string;  // 所属課題ID
+  issueName?: string | null;  // 所属課題名（スナップショット）
+  taskId?: string;  // 所属タスクID
+  taskTitle?: string | null;  // 添付時点のタスク名
 }
 
 /**

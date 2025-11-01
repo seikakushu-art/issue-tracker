@@ -409,9 +409,98 @@
       </ul>
     </section>
 
-    <section class="detail-section">
-      <h3>添付</h3>
-      <p class="placeholder-text">添付ファイルの管理機能は現在準備中です。</p>
+    <section class="detail-section attachments-section">
+      <div class="section-header">
+        <h3>添付</h3>
+        <div class="attachment-actions" *ngIf="canUploadAttachment(selectedTask)">
+          <label class="btn btn-secondary btn-sm attachment-upload-button">
+            <input
+              type="file"
+              multiple
+              (change)="onAttachmentSelected($event)"
+              [disabled]="attachmentUploading || attachmentLimitReached"
+            >
+            {{ attachmentUploading ? 'アップロード中...' : '添付を追加' }}
+          </label>
+          <p class="attachment-limit-message" *ngIf="attachmentLimitReached">
+            添付ファイルは最大{{ attachmentLimit }}件までです。
+          </p>
+        </div>
+      </div>
+
+      <p *ngIf="attachmentsLoading" class="placeholder-text">添付ファイルを読み込み中です...</p>
+
+      <div *ngIf="attachmentsError" class="feedback feedback--error">
+        <i class="icon-error" aria-hidden="true"></i>
+        {{ attachmentsError }}
+      </div>
+
+      <div *ngIf="attachmentUploadMessage" class="feedback feedback--success">
+        <i class="icon-success" aria-hidden="true"></i>
+        {{ attachmentUploadMessage }}
+      </div>
+
+      <div *ngIf="attachmentUploadError" class="feedback feedback--error">
+        <i class="icon-error" aria-hidden="true"></i>
+        {{ attachmentUploadError }}
+      </div>
+
+      <ul
+        class="attachment-list"
+        *ngIf="!attachmentsLoading && attachments.length > 0; else noAttachments"
+      >
+        <li
+          class="attachment-item"
+          *ngFor="let attachment of attachments; trackBy: trackAttachmentById"
+        >
+          <div class="attachment-main">
+            <a
+              class="attachment-name"
+              [href]="attachment.fileUrl"
+              target="_blank"
+              rel="noopener"
+            >
+              {{ attachment.fileName }}
+            </a>
+            <span class="attachment-size">{{ formatFileSize(attachment.fileSize) }}</span>
+          </div>
+          <div class="attachment-meta">
+            <span class="attachment-uploader">
+              <ng-container *ngIf="attachment.uploaderPhotoUrl; else uploaderFallback">
+                <img [src]="attachment.uploaderPhotoUrl" [alt]="attachment.uploaderLabel + 'のアイコン'">
+              </ng-container>
+              <ng-template #uploaderFallback>
+                <span
+                  class="attachment-uploader-fallback"
+                  [style.backgroundColor]="getMemberAvatarColor(attachment.uploadedBy)"
+                >
+                  {{ getAttachmentInitial(attachment) }}
+                </span>
+              </ng-template>
+              <span class="attachment-uploader-name">{{ attachment.uploaderLabel }}</span>
+            </span>
+            <time class="attachment-time">
+              {{ attachment.uploadedAt ? (attachment.uploadedAt | date:'yyyy/MM/dd HH:mm') : '---' }}
+            </time>
+          </div>
+          <button
+            type="button"
+            class="btn-icon btn-icon--labeled attachment-delete"
+            *ngIf="canDeleteAttachment(attachment)"
+            (click)="deleteAttachment(attachment)"
+            [disabled]="attachmentDeletingId === attachment.id"
+          >
+            <i class="icon-delete" aria-hidden="true"></i>
+            <span class="btn-label">{{ attachmentDeletingId === attachment.id ? '削除中...' : '削除' }}</span>
+          </button>
+        </li>
+      </ul>
+
+      <ng-template #noAttachments>
+        <p *ngIf="!attachmentsLoading && attachments.length === 0 && !attachmentsError" class="placeholder-text">
+          添付ファイルはまだありません。
+        </p>
+      </ng-template>
     </section>
 
     <section class="detail-section comments-section">

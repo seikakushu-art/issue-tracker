@@ -42,6 +42,7 @@ import { Project, Issue, Task } from './models/schema';
           <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">ダッシュボード</a>
           <a routerLink="/projects" routerLinkActive="active">プロジェクト一覧</a>
           <a routerLink="/board" routerLinkActive="active">掲示板</a>
+          <a routerLink="/attachments" routerLinkActive="active">添付ファイル一覧</a>
         </nav>
     </header>
 
@@ -220,18 +221,41 @@ export class AppComponent implements OnInit, OnDestroy {
     const url = this.router.url;
     this.breadcrumbs = [];
 
-    if (url === '/') {
-      return; // ホームページではパンくずリストを表示しない
+     // URLからパラメータを抽出
+     const urlParts = url.split('/').filter(part => part);
+
+     if (urlParts.length === 0) {
+       return; // ホーム画面など
+     }
+ 
+     if (urlParts.length === 1 && urlParts[0] === 'attachments') {
+       this.breadcrumbs.push({
+         label: '添付ファイル一覧',
+         path: '/attachments'
+       });
+       return;
+     }
+ 
+     if (urlParts.length === 1 && urlParts[0] === 'board') {
+       this.breadcrumbs.push({
+         label: '掲示板',
+         path: '/board'
+       });
+       return;
+     }
+ 
+     if (urlParts[0] !== 'projects') {
+       return;
     }
 
-    // プロジェクト一覧
     this.breadcrumbs.push({
       label: 'プロジェクト一覧',
-      path: '/'
+      path: '//projects'
     });
 
-    // URLからパラメータを抽出
-    const urlParts = url.split('/').filter(part => part);
+    if (urlParts.length === 1) {
+      return;
+    }
     
     if (urlParts.length >= 2 && urlParts[0] === 'projects') {
       const projectId = urlParts[1];
