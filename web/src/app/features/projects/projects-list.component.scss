@@ -123,6 +123,14 @@
   color: #333;
 }
 
+// テンプレート保存ボタン用の星アイコンを表示
+.icon-template::before {
+  content: '★';
+  display: inline-block;
+  transform: translateY(-1px);
+}
+
+
 .description {
   color: #666;
   margin-bottom: 16px;

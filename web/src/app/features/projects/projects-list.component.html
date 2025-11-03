@@ -61,6 +61,10 @@
             <i class="icon-archive" aria-hidden="true"></i>
             <span class="action-label">{{ project.archived ? '復元' : 'アーカイブ' }}</span>
           </button>
+          <button class="btn-action" (click)="saveAsTemplate(project, $event)" title="テンプレートとして保存">
+            <i class="icon-template" aria-hidden="true"></i>
+            <span class="action-label">テンプレート</span>
+          </button>
           <button class="btn-action" (click)="openInviteModal(project, $event)" title="招待リンク">
             <i class="icon-link" aria-hidden="true"></i>
             <span class="action-label">招待</span>
