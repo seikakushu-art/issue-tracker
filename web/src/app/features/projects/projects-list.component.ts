@@ -415,13 +415,29 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const confirmed = confirm(`プロジェクト「${project.name}」をテンプレートとして保存しますか？`);
+    // テンプレート名をユーザーに入力させる（初期値はプロジェクト名）
+    const templateName = prompt('テンプレート名を入力してください', project.name);
+    if (templateName === null) {
+      // キャンセル時は何もしない
+      return;
+    }
+
+    const normalizedName = templateName.trim();
+    if (!normalizedName) {
+      alert('テンプレート名を入力してください');
+      return;
+    }
+
+    const confirmed = confirm(
+      `プロジェクト「${project.name}」をテンプレート名「${normalizedName}」で保存しますか？`,
+    );
     if (!confirmed) {
       return;
     }
 
     try {
-      await this.projectTemplatesService.saveFromProject(project.id);
+       // 入力されたテンプレート名をサービスへ引き渡して保存
+      await this.projectTemplatesService.saveFromProject(project.id, normalizedName);
       await this.loadTemplates();
       alert('テンプレートを保存しました。');
     } catch (error) {

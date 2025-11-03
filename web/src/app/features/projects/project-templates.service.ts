@@ -72,11 +72,13 @@ export class ProjectTemplatesService {
    * 指定したプロジェクトからテンプレートを生成
    * 期間・担当者・進捗など、個別プロジェクトに紐づく情報は保存しない
    */
-  async saveFromProject(projectId: string): Promise<string> {
+  async saveFromProject(projectId: string, templateName?: string): Promise<string> {
     const { project, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin']);
-
+// プロンプトなどで入力されたテンプレート名を優先し、なければプロジェクト名を利用
+    const normalizedName = templateName?.trim() ? templateName.trim() : project.name;
     const payload: Record<string, unknown> = {
-      name: project.name,
+      // Firestore上に保存するテンプレート名
+      name: normalizedName,
       description: project.description ?? null,
       goal: project.goal ?? null,
       sourceProjectId: projectId,
