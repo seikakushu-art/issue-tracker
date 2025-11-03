@@ -1,0 +1,149 @@
+<div class="gantt-wrapper">
+    <header class="gantt-header">
+      <div class="gantt-header__titles">
+        <h1>進行状況（ガントチャート）</h1>
+        <p class="gantt-header__caption">課題とタスクの進捗を時系列で確認できます。週の開始は月曜日・タイムゾーンは東京で揃えています。</p>
+      </div>
+      <button class="gantt-header__refresh" type="button" (click)="loadData()" [disabled]="loading">
+        <i class="icon-rotate"></i>
+        <span>最新の状態を取得</span>
+      </button>
+    </header>
+  
+    <section *ngIf="loadError" class="gantt-error" role="alert">
+      <i class="icon-alert"></i>
+      {{ loadError }}
+    </section>
+  
+    <section *ngIf="loading" class="gantt-loading">
+      <div class="spinner"></div>
+      <span>読み込み中...</span>
+    </section>
+  
+    <section *ngIf="!loading && !loadError" class="gantt-content">
+      <div class="gantt-grid__header" [style.gridTemplateColumns]="'280px ' + getGridTemplate()">
+        <div class="gantt-grid__header-label">課題 / タスク</div>
+        <div class="gantt-grid__header-dates" [style.gridTemplateColumns]="getGridTemplate()">
+          <div *ngFor="let day of timeline" class="gantt-grid__header-date" [class.weekend]="day.isWeekend">
+            {{ getTimelineLabel(day) }}
+          </div>
+        </div>
+      </div>
+  
+      <div class="gantt-grid__body">
+        <ng-container *ngIf="ganttIssues.length > 0; else emptyState">
+          <ng-container *ngFor="let group of ganttIssues">
+            <div class="gantt-row-line issue" [style.gridTemplateColumns]="'280px ' + getGridTemplate()">
+              <div class="gantt-row__label issue" [style.borderLeftColor]="getIssueTheme(group.issue)">
+                <button class="issue-toggle" type="button" (click)="toggleIssue(group)" [attr.aria-expanded]="!group.collapsed">
+                  <i class="icon-chevron" [class.collapsed]="group.collapsed"></i>
+                  <span class="issue-name">{{ group.issue.name }}</span>
+                </button>
+                <p class="issue-meta">{{ group.project.name }} / タスク {{ group.tasks.length }} 件</p>
+              </div>
+              <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
+                <div *ngFor="let day of timeline" class="gantt-cell" [class.weekend]="day.isWeekend"></div>
+              </div>
+            </div>
+  
+            <div
+              class="gantt-row-line task"
+              *ngFor="let task of group.tasks"
+              [class.collapsed]="group.collapsed"
+              [style.gridTemplateColumns]="'280px ' + getGridTemplate()"
+            >
+              <div
+                class="gantt-row__label"
+                role="button"
+                tabindex="0"
+                (click)="selectTask(group, task)"
+                (keydown.enter)="selectTask(group, task)"
+                (keydown.space)="selectTask(group, task)"
+              >
+                <span class="task-title">{{ task.title }}</span>
+                <span class="task-meta">{{ getTaskStatusLabel(task) }} / {{ getImportanceLabel(task) }}</span>
+              </div>
+              <div class="gantt-row__chart" [style.gridTemplateColumns]="getGridTemplate()">
+                <div *ngFor="let day of timeline" class="gantt-cell" [class.weekend]="day.isWeekend"></div>
+                <button
+                  type="button"
+                  class="gantt-bar"
+                  [style.backgroundColor]="getIssueTheme(group.issue)"
+                  [style.left]="getTaskOffset(task)"
+                  [style.width]="getTaskWidth(task)"
+                  (click)="selectTask(group, task)"
+                >
+                  <span class="gantt-bar__label">{{ task.title }}</span>
+                </button>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+        <ng-template #emptyState>
+          <div class="gantt-empty">
+            <i class="icon-calendar"></i>
+            <p>表示できるタスクがありません。プロジェクトの課題とタスクを作成するとガントチャートに表示されます。</p>
+          </div>
+        </ng-template>
+      </div>
+    </section>
+  
+    <aside *ngIf="selectedTask as task" class="task-detail-panel" role="dialog" aria-modal="true">
+      <div
+        class="task-detail__backdrop"
+        role="button"
+        tabindex="0"
+        aria-label="詳細を閉じる"
+        (click)="closeDetailPanel()"
+        (keydown.enter)="closeDetailPanel()"
+        (keydown.space)="closeDetailPanel()"
+      ></div>
+      <div class="task-detail__body">
+        <header class="task-detail__header">
+          <h2>{{ task.title }}</h2>
+          <button type="button" class="btn-close" (click)="closeDetailPanel()" aria-label="閉じる">
+            <i class="icon-close"></i>
+          </button>
+        </header>
+        <section class="task-detail__section">
+          <h3>基本情報</h3>
+          <dl>
+            <div>
+              <dt>所属</dt>
+              <dd>{{ selectedProject?.name || '未設定のプロジェクト' }} / {{ selectedIssue?.name || '未設定の課題' }}</dd>
+            </div>
+            <div>
+              <dt>ステータス</dt>
+              <dd>{{ getTaskStatusLabel(task) }}</dd>
+            </div>
+            <div>
+              <dt>重要度</dt>
+              <dd>{{ getImportanceLabel(task) }}</dd>
+            </div>
+            <div *ngIf="task.startDate">
+              <dt>開始日</dt>
+              <dd>{{ task.startDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</dd>
+            </div>
+            <div *ngIf="task.endDate">
+              <dt>終了日</dt>
+              <dd>{{ task.endDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="task-detail__section" *ngIf="task.goal">
+          <h3>達成目標</h3>
+          <p>{{ task.goal }}</p>
+        </section>
+        <section class="task-detail__section" *ngIf="task.description">
+          <h3>説明</h3>
+          <p class="task-detail__description">{{ task.description }}</p>
+        </section>
+        <div class="task-detail__actions">
+          <button type="button" class="btn-primary" (click)="goToTaskDetail()">
+            <i class="icon-open"></i>
+            <span>タスク詳細で開く</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>

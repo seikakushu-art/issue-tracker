@@ -10,6 +10,7 @@ import { UserSettingsComponent } from './features/user-settings/user-settings.co
 import { BoardListComponent } from './features/board/board-list.component';
 import { AttachmentsListComponent } from './features/attachments/attachments-list.component';
 import { GlobalSearchComponent } from './features/search/global-search.component';
+import { ProgressGanttComponent } from './features/progress/progress-gantt.component';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -51,6 +52,11 @@ export const routes: Routes = [
     path: 'attachments',
     component: AttachmentsListComponent,
     title: '添付ファイル一覧'
+  },
+  {
+    path: 'gantt',
+    component: ProgressGanttComponent,
+    title: 'ガントチャート'
   },
   // ダッシュボード: トップと明示的な /dashboard の両方で表示
   {
