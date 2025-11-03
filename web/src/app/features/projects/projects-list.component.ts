@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router'; // 画面遷移用ディレクティブを明示的に追加
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ProjectsService } from './projects.service';
@@ -34,7 +34,12 @@ import {
 @Component({
   selector: 'app-projects-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, SmartFilterPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SmartFilterPanelComponent,
+    RouterLink, // 検索ボタンなどの routerLink を機能させる
+  ],
   templateUrl: './projects-list.component.html',
   styleUrls: ['./projects-list.component.scss']
 })

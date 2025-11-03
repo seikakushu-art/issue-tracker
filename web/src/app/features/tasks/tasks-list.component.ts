@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute,Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router'; // routerLink 用のディレクティブを読み込む
 import { Subject, takeUntil } from 'rxjs';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
@@ -40,7 +40,13 @@ interface TaskAttachmentView extends Attachment {
 @Component({
   selector: 'app-tasks-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProjectSidebarComponent, SmartFilterPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ProjectSidebarComponent,
+    SmartFilterPanelComponent,
+    RouterLink, // 検索ボタンから検索画面へ遷移するために追加
+  ],
   templateUrl: './tasks-list.component.html',
   styleUrls: ['./tasks-list.component.scss']
 })

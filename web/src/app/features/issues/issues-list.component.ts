@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router'; // 画面遷移ボタンを有効にする
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
 import { Issue, Project, Importance, Tag, Role, Task } from '../../models/schema';
@@ -31,7 +31,13 @@ import {
 @Component({
   selector: 'app-issues-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProjectSidebarComponent, SmartFilterPanelComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ProjectSidebarComponent,
+    SmartFilterPanelComponent,
+    RouterLink, // 検索ボタンの routerLink を解決
+  ],
   templateUrl: './issues-list.component.html',
   styleUrls: ['./issues-list.component.scss']
 })
