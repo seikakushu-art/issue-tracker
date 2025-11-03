@@ -9,6 +9,7 @@ import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { UserSettingsComponent } from './features/user-settings/user-settings.component';
 import { BoardListComponent } from './features/board/board-list.component';
 import { AttachmentsListComponent } from './features/attachments/attachments-list.component';
+import { GlobalSearchComponent } from './features/search/global-search.component';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -40,6 +41,11 @@ export const routes: Routes = [
     path: 'board',
     component: BoardListComponent,
     title: '掲示板'
+  },
+  {
+    path: 'search',
+    component: GlobalSearchComponent,
+    title: '横断検索'
   },
   {
     path: 'attachments',

@@ -80,6 +80,10 @@
         <span class="smart-filter-button__icon" aria-hidden="true">⚙️</span>
         スマートフィルター
       </button>
+      <a class="search-button" routerLink="/search">
+        <span class="search-button__icon" aria-hidden="true">🔍</span>
+        検索
+      </a>
       <app-smart-filter-panel
         *ngIf="smartFilterVisible"
         [scope]="smartFilterScope"

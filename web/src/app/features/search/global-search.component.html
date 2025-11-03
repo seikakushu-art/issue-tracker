@@ -1,0 +1,43 @@
+<section class="search-page" aria-labelledby="search-heading">
+    <header class="search-header">
+      <h1 id="search-heading">横断検索</h1>
+      <p class="search-caption">プロジェクト・課題・タスク・掲示板をまとめて検索できます。部分一致・大文字小文字を気にせず探せます。</p>
+      <div class="search-input">
+        <input
+          type="search"
+          placeholder="キーワードを入力..."
+          [value]="query()"
+          (input)="onQueryChange($any($event.target).value ?? '')"
+          aria-label="検索キーワード"
+        />
+      </div>
+    </header>
+  
+    <section class="search-status" aria-live="polite">
+      <div *ngIf="loading()" class="search-status__message">読み込み中...</div>
+      <div *ngIf="!loading() && error()" class="search-status__message search-status__message--error">{{ error() }}</div>
+      <div *ngIf="!loading() && !error()" class="search-status__summary">
+        <span class="search-status__total">{{ totalCount() }} 件ヒット</span>
+        <ul class="search-status__breakdown">
+          <li *ngFor="let type of typeOrder">
+            <span class="type-chip type-chip--{{ type }}">{{ labelFor(type) }}</span>
+            <span class="type-count">{{ countsByType()[type] }}</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+  
+    <ul class="search-results">
+      <li *ngFor="let item of filteredResults(); trackBy: trackById" class="search-results__item">
+        <a [routerLink]="item.routerLink" [fragment]="item.fragment" class="result-card">
+          <span class="result-card__type type-chip type-chip--{{ item.type }}">{{ labelFor(item.type) }}</span>
+          <span class="result-card__title" [innerHTML]="highlight(item.title)"></span>
+          <span class="result-card__context" *ngIf="item.context" [innerHTML]="highlight(item.context)"></span>
+        </a>
+      </li>
+    </ul>
+  
+    <p *ngIf="!loading() && !error() && filteredResults().length === 0" class="search-empty">
+      条件に一致する結果が見つかりませんでした。別のキーワードをお試しください。
+    </p>
+  </section>

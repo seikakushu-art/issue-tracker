@@ -198,6 +198,30 @@
   position: relative;
 }
 
+.search-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+
+  &:hover,
+  &:focus {
+    background: #1e293b;
+    color: #ffffff;
+  }
+}
+
+.search-button__icon {
+  font-size: 1rem;
+}
+
 .smart-filter-button {
   display: inline-flex;
   align-items: center;
