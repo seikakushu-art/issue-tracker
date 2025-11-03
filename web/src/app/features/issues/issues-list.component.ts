@@ -11,6 +11,7 @@ import { TasksService, TaskSummary } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
+import { ProjectSidebarComponent } from '../../shared/project-sidebar/project-sidebar.component';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -18,7 +19,7 @@ import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-dire
 @Component({
   selector: 'app-issues-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ProjectSidebarComponent],
   templateUrl: './issues-list.component.html',
   styleUrls: ['./issues-list.component.scss']
 })

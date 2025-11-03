@@ -1,8 +1,9 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { ProjectsService } from './projects.service';
 import { InviteStatus, Project, ProjectInvite, ProjectTemplate, Role } from '../../models/schema';
 import { IssuesService } from '../issues/issues.service';
@@ -31,6 +32,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   private userDirectoryService = inject(UserDirectoryService);
   private projectTemplatesService = inject(ProjectTemplatesService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
 
   projects: Project[] = [];
@@ -84,12 +86,32 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadProjects();
     this.loadTemplates();
+    this.observeCreateQuery();
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
   }
+
+  /**
+   * クエリパラメータ ?create=true が付与された場合に自動でモーダルを開く。
+   */
+  private observeCreateQuery(): void {
+    this.route.queryParamMap
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(params => {
+        if (params.get('create') === 'true') {
+          this.openCreateModal();
+          void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { create: null },
+            queryParamsHandling: 'merge',
+          });
+        }
+      });
+  }
+
 
   /**
    * プロジェクト一覧を読み込む

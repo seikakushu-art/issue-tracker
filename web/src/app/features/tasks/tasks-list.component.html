@@ -1,4 +1,9 @@
-<div class="tasks-container">
+<div class="tasks-layout">
+  <!-- 左側固定のプロジェクトサイドバーを共通化 -->
+  <app-project-sidebar [currentProjectId]="projectId"></app-project-sidebar>
+
+  <!-- タスク画面本体を右側に配置 -->
+  <div class="tasks-container">
   <!-- ヘッダー -->
   <div class="header">
     <div class="header-left">
@@ -258,6 +263,7 @@
       タスクを作成
     </button>
   </div>
+</div>
 </div>
 
  <!-- タスク詳細パネル -->

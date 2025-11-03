@@ -1,0 +1,117 @@
+.project-sidebar {
+    width: 260px;
+    min-width: 260px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px 20px;
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    box-shadow: inset -1px 0 0 rgba(15, 23, 42, 0.04);
+    overflow-y: auto;
+  }
+  
+  .sidebar-header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .sidebar-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #1f2937;
+  }
+  
+  .create-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    background: #e5f2ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+  
+  .create-button:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+  }
+  
+  .sidebar-message {
+    padding: 12px;
+    font-size: 13px;
+    color: #4b5563;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  
+  .sidebar-message--error {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fecaca;
+  }
+  
+  .project-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .project-item {
+    display: block;
+  }
+  
+  .project-link {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #1f2937;
+    background: #f9fafb;
+    border: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .project-link:hover {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.08);
+  }
+  
+  .project-link.active {
+    background: #1d4ed8;
+    color: #ffffff;
+    border-color: #1d4ed8;
+    box-shadow: 0 8px 16px rgba(29, 78, 216, 0.2);
+  }
+  
+  .project-link.active .project-meta {
+    color: rgba(255, 255, 255, 0.85);
+  }
+  
+  .project-name {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  
+  .project-meta {
+    font-size: 12px;
+    color: #6b7280;
+  }

@@ -1,4 +1,9 @@
-<div class="issues-container">
+<div class="issues-layout">
+  <!-- 左側固定のプロジェクトサイドバー -->
+  <app-project-sidebar [currentProjectId]="projectId"></app-project-sidebar>
+
+  <!-- 右側メインカラム（既存の課題一覧UI） -->
+  <div class="issues-container">
   <!-- ヘッダー -->
   <div class="header">
     <div class="header-left">
@@ -213,6 +218,7 @@
       課題を作成
     </button>
   </div>
+</div>
 </div>
 
 <!-- 課題作成・編集モーダル -->

@@ -11,6 +11,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { UserDirectoryService, UserDirectoryProfile } from '../../core/user-directory.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { Auth,User } from '@angular/fire/auth';
+import { ProjectSidebarComponent } from '../../shared/project-sidebar/project-sidebar.component';
 
 interface TaskCommentView extends Comment {
   authorUsername: string;
@@ -28,7 +29,7 @@ interface TaskAttachmentView extends Attachment {
 @Component({
   selector: 'app-tasks-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ProjectSidebarComponent],
   templateUrl: './tasks-list.component.html',
   styleUrls: ['./tasks-list.component.scss']
 })

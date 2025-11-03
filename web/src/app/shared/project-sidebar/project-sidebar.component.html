@@ -1,0 +1,36 @@
+<nav class="project-sidebar" aria-label="プロジェクト一覧">
+    <!-- 見出しと作成ボタンをまとめる -->
+    <div class="sidebar-header">
+      <h2>プロジェクト一覧</h2>
+      <button class="create-button" type="button" (click)="openCreateProject()">
+        ＋ 新しいプロジェクトを作成
+      </button>
+    </div>
+  
+    <!-- ローディング・エラー表示をこまめに切り替え -->
+    <div *ngIf="loading" class="sidebar-message">読み込み中...</div>
+    <div *ngIf="!loading && loadError" class="sidebar-message sidebar-message--error">{{ loadError }}</div>
+    <div *ngIf="!loading && !loadError && projects.length === 0" class="sidebar-message">
+      まだ参加中のプロジェクトがありません
+    </div>
+  
+    <!-- プロジェクト一覧本体 -->
+    <ul *ngIf="!loading && !loadError && projects.length > 0" class="project-list">
+      <li
+        *ngFor="let project of projects; trackBy: trackByProjectId"
+        class="project-item"
+      >
+        <a
+          class="project-link"
+          [routerLink]="['/projects', project.id]"
+          [class.active]="project.id === currentProjectId"
+          [attr.aria-current]="project.id === currentProjectId ? 'page' : null"
+        >
+          <span class="project-name">{{ project.name }}</span>
+          <span class="project-meta" *ngIf="project.progress !== undefined">
+            進捗: {{ project.progress || 0 }}%
+          </span>
+        </a>
+      </li>
+    </ul>
+  </nav>

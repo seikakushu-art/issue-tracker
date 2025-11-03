@@ -1,5 +1,14 @@
+.tasks-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+  background: #f3f4f6;
+}
+
 .tasks-container {
-  padding: 20px;
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
 }
 
 .header {
