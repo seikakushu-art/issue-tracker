@@ -395,9 +395,19 @@
   grid-column: span 8;
 }
 
-/* 通知ウィジェット */
-.widget--notifications {
-  grid-column: span 12;
+/* 通知リスト */
+.dashboard__notification-list {
+  gap: 24px;
+}
+
+.notification-list__header {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.notification-list__summary {
+  font-size: 15px;
+  color: #475569;
 }
 
 .widget__content--notifications {
