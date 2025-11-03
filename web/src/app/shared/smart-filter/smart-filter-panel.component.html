@@ -1,0 +1,137 @@
+<div class="smart-filter-panel">
+    <header class="panel-header">
+      <h3>スマートフィルター</h3>
+      <button type="button" class="btn-close" (click)="closePanel()" aria-label="フィルターを閉じる">×</button>
+    </header>
+  
+    <div class="panel-content">
+      <section class="filter-section" *ngIf="tags.length > 0">
+        <h4>タグ</h4>
+        <div class="option-grid">
+          <label *ngFor="let tag of tags" class="option-item">
+            <input
+              #tagCheckbox
+              type="checkbox"
+              [checked]="localCriteria.tagIds.includes(tag.id)"
+              (change)="toggleTag(tag.id, tagCheckbox.checked)"
+            >
+            <span class="tag-chip" [style.background-color]="tag.color || '#ececec'">
+              {{ tag.name }}
+            </span>
+          </label>
+        </div>
+      </section>
+  
+      <section class="filter-section" *ngIf="assignees.length > 0">
+        <h4>担当者</h4>
+        <div class="option-grid">
+          <label *ngFor="let member of assignees" class="option-item">
+            <input
+              #assigneeCheckbox
+              type="checkbox"
+              [checked]="localCriteria.assigneeIds.includes(member.id)"
+              (change)="toggleAssignee(member.id, assigneeCheckbox.checked)"
+            >
+            <span class="assignee-label">{{ member.displayName }}</span>
+          </label>
+        </div>
+      </section>
+  
+      <section class="filter-section">
+        <h4>重要度</h4>
+        <div class="option-grid">
+          <label *ngFor="let option of importanceOptions" class="option-item">
+            <input
+              #importanceCheckbox
+              type="checkbox"
+              [checked]="isImportanceSelected(option.value)"
+              (change)="toggleImportance(option.value, importanceCheckbox.checked)"
+            >
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+      </section>
+  
+      <section class="filter-section">
+        <h4>ステータス</h4>
+        <div class="option-grid">
+          <label *ngFor="let option of statusOptions" class="option-item">
+            <input
+              #statusCheckbox
+              type="checkbox"
+              [checked]="isStatusSelected(option.value)"
+              (change)="toggleStatus(option.value, statusCheckbox.checked)"
+            >
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+      </section>
+  
+      <section class="filter-section">
+        <h4>期限</h4>
+        <div class="due-options">
+          <label *ngFor="let option of dueOptions" class="option-item">
+            <input
+              type="radio"
+              name="due"
+              [value]="option.value"
+              [checked]="localCriteria.due === option.value"
+              (change)="updateDue(option.value)"
+            >
+            <span>{{ option.label }}</span>
+          </label>
+          <label class="option-item option-item--clear">
+            <input
+              type="radio"
+              name="due"
+              value=""
+              [checked]="localCriteria.due === ''"
+              (change)="updateDue('')"
+            >
+            <span>未指定</span>
+          </label>
+        </div>
+      </section>
+  
+      <section class="filter-section presets-section">
+        <h4>スマートフィルターを保存</h4>
+        <div class="preset-form">
+          <input
+            type="text"
+            [(ngModel)]="newPresetName"
+            placeholder="フィルター名を入力"
+            aria-label="新規フィルター名"
+          >
+            <button type="button" class="btn" (click)="savePreset()">
+            保存
+          </button>
+        </div>
+  
+        <ul class="preset-list">
+          <li *ngFor="let preset of presets" class="preset-item">
+            <div class="preset-main" *ngIf="editingPresetId !== preset.id">
+              <button type="button" class="link-button" (click)="applyPreset(preset)">
+                {{ preset.name }}
+              </button>
+              <div class="preset-actions">
+                <button type="button" class="link-button" (click)="startEditPreset(preset)">名称変更</button>
+                <button type="button" class="link-button danger" (click)="deletePreset(preset)">削除</button>
+              </div>
+            </div>
+            <div class="preset-edit" *ngIf="editingPresetId === preset.id">
+              <input type="text" [(ngModel)]="editingName" aria-label="プリセット名編集">
+              <button type="button" class="btn" (click)="submitPresetName(preset)">保存</button>
+            </div>
+          </li>
+          <li *ngIf="presets.length === 0" class="preset-item preset-item--empty">
+            まだ保存されたスマートフィルターはありません。
+          </li>
+        </ul>
+      </section>
+    </div>
+  
+    <footer class="panel-footer">
+      <button type="button" class="btn btn-secondary" (click)="reset()">条件をクリア</button>
+      <button type="button" class="btn btn-primary" (click)="apply()">この条件で絞り込む</button>
+    </footer>
+  </div>

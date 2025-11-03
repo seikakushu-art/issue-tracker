@@ -187,6 +187,7 @@
 
 
 .filters {
+  position: relative;
   display: flex;
   gap: 24px;
   margin-bottom: 24px;
@@ -223,6 +224,34 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.filter-group--smart {
+  position: relative;
+}
+
+.smart-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #2563eb;
+  background: #ffffff;
+  color: #1d4ed8;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover,
+  &:focus {
+    background: #2563eb;
+    color: #ffffff;
+  }
+}
+
+.smart-filter-button__icon {
+  font-size: 1rem;
 }
 
 .filter-group label {

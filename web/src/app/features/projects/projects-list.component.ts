@@ -5,14 +5,27 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ProjectsService } from './projects.service';
-import { InviteStatus, Project, ProjectInvite, ProjectTemplate, Role } from '../../models/schema';
+import { InviteStatus, Project, ProjectInvite, ProjectTemplate, Role, Task, Tag } from '../../models/schema';
 import { IssuesService } from '../issues/issues.service';
 import { FirebaseError } from '@angular/fire/app';
 import { ProjectInviteService } from './project-invite.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 import { ProjectTemplatesService } from './project-templates.service';
-
+import { TasksService } from '../tasks/tasks.service';
+import { TagsService } from '../tags/tags.service';
+import { SmartFilterPanelComponent } from '../../shared/smart-filter/smart-filter-panel.component';
+import {
+  SmartFilterCriteria,
+  SmartFilterTagOption,
+  SmartFilterAssigneeOption,
+  SMART_FILTER_STATUS_OPTIONS,
+  SMART_FILTER_IMPORTANCE_OPTIONS,
+  createEmptySmartFilterCriteria,
+  matchesSmartFilterTask,
+  isSmartFilterEmpty,
+  doesDateMatchDue,
+} from '../../shared/smart-filter/smart-filter.model';
 
 /**
  * プロジェクト一覧コンポーネント
@@ -21,7 +34,7 @@ import { ProjectTemplatesService } from './project-templates.service';
 @Component({
   selector: 'app-projects-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SmartFilterPanelComponent],
   templateUrl: './projects-list.component.html',
   styleUrls: ['./projects-list.component.scss']
 })
@@ -31,6 +44,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   private inviteService = inject(ProjectInviteService);
   private userDirectoryService = inject(UserDirectoryService);
   private projectTemplatesService = inject(ProjectTemplatesService);
+  private tasksService = inject(TasksService);
+  private tagsService = inject(TagsService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroy$ = new Subject<void>();
@@ -44,6 +59,16 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   currentUid: string | null = null;
   readonly maxVisibleMembers = 4;
 
+  // スマートフィルターとタスクキャッシュ
+  private projectTasksMap: Record<string, Task[]> = {};
+  smartFilterVisible = false;
+  smartFilterCriteria: SmartFilterCriteria = createEmptySmartFilterCriteria();
+  smartFilterTagOptions: SmartFilterTagOption[] = [];
+  smartFilterAssigneeOptions: SmartFilterAssigneeOption[] = [];
+  readonly smartFilterStatusOptions = SMART_FILTER_STATUS_OPTIONS;
+  readonly smartFilterImportanceOptions = SMART_FILTER_IMPORTANCE_OPTIONS;
+  readonly smartFilterScope = 'projects';
+  availableTags: Tag[] = [];
   // テンプレート関連
   templates: ProjectTemplate[] = [];
   templatesLoading = false;
@@ -86,6 +111,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadProjects();
     this.loadTemplates();
+    void this.loadTags();
     this.observeCreateQuery();
   }
 
@@ -122,6 +148,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       this.projects = await this.projectsService.listMyProjects();
       await this.loadIssueCounts();
       await this.loadMemberProfiles(this.projects);
+      await this.loadProjectTasks();
       this.filterProjects();
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
@@ -139,6 +166,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
 
     if (memberIdSet.size === 0) {
       this.memberProfiles = {};
+      this.updateSmartFilterAssignees();
       return;
     }
 
@@ -152,6 +180,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       console.error('プロジェクトメンバーの取得に失敗しました:', error);
       this.memberProfiles = {};
     }
+    this.updateSmartFilterAssignees();
   }
 
   getRole(project: Project): Role | null {
@@ -176,10 +205,59 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    * プロジェクトをフィルタリング
    */
   filterProjects() {
-    this.filteredProjects = this.projects.filter(project => 
+    this.filteredProjects = this.projects.filter(project =>
       this.showArchived || !project.archived
-    );
+    ).filter(project => this.isProjectMatchingSmartFilter(project));
     this.sortProjects();
+  }
+
+  /** スマートフィルターパネルの開閉 */
+  toggleSmartFilterPanel(): void {
+    this.smartFilterVisible = !this.smartFilterVisible;
+  }
+
+  /** スマートフィルター適用時 */
+  onSmartFilterApply(criteria: SmartFilterCriteria): void {
+    this.smartFilterCriteria = criteria;
+    this.smartFilterVisible = false;
+    this.filterProjects();
+  }
+
+  /** プロジェクトがスマートフィルター条件に合致するか判定 */
+  private isProjectMatchingSmartFilter(project: Project): boolean {
+    if (isSmartFilterEmpty(this.smartFilterCriteria)) {
+      return true;
+    }
+    if (!project.id) {
+      return false;
+    }
+
+    const tasks = this.projectTasksMap[project.id] ?? [];
+    const relevantTasks = this.showArchived ? tasks : tasks.filter(task => !task.archived);
+    const hasMatchingTask = relevantTasks.some(task => matchesSmartFilterTask(task, this.smartFilterCriteria));
+
+    const onlyDueFilter =
+      this.smartFilterCriteria.due !== '' &&
+      this.smartFilterCriteria.tagIds.length === 0 &&
+      this.smartFilterCriteria.assigneeIds.length === 0 &&
+      this.smartFilterCriteria.importanceLevels.length === 0 &&
+      this.smartFilterCriteria.statuses.length === 0;
+
+    const dueMatchesProject = onlyDueFilter && doesDateMatchDue(project.endDate ?? null, this.smartFilterCriteria.due);
+
+    return hasMatchingTask || dueMatchesProject;
+  }
+
+  /** スマートフィルター用に担当者一覧を生成 */
+  private updateSmartFilterAssignees(): void {
+    const options: SmartFilterAssigneeOption[] = Object.values(this.memberProfiles ?? {})
+      .filter((profile): profile is UserDirectoryProfile & { uid: string } => Boolean(profile?.uid))
+      .map((profile) => ({
+        id: profile.uid,
+        displayName: profile.username && profile.username.trim().length > 0 ? profile.username : profile.uid,
+        photoUrl: profile.photoURL ?? null,
+      }));
+    this.smartFilterAssigneeOptions = options;
   }
 
   /**
@@ -718,4 +796,43 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       return acc;
     }, {});
   }
+ /** プロジェクト配下のタスクを取得し、スマートフィルター用にキャッシュ */
+ private async loadProjectTasks(): Promise<void> {
+  try {
+    const pairs = await Promise.all(
+      this.projects
+        .filter((project): project is Project & { id: string } => Boolean(project.id))
+        .map(async (project) => {
+          const tasks = await this.tasksService.listTasksByProject(project.id!, true);
+          return { projectId: project.id!, tasks };
+        })
+    );
+
+    this.projectTasksMap = pairs.reduce<Record<string, Task[]>>((acc, item) => {
+      acc[item.projectId] = item.tasks;
+      return acc;
+    }, {});
+  } catch (error) {
+    console.error('プロジェクトのタスク取得に失敗しました:', error);
+    this.projectTasksMap = {};
+  }
+}
+
+/** タグ一覧を取得してスマートフィルターに反映 */
+private async loadTags(): Promise<void> {
+  try {
+    this.availableTags = await this.tagsService.listTags();
+    this.smartFilterTagOptions = this.availableTags
+      .filter((tag): tag is Tag & { id: string } => Boolean(tag.id))
+      .map((tag) => ({
+        id: tag.id!,
+        name: tag.name,
+        color: tag.color ?? null,
+      }));
+  } catch (error) {
+    console.error('タグ一覧の取得に失敗しました:', error);
+    this.availableTags = [];
+    this.smartFilterTagOptions = [];
+  }
+}
 }

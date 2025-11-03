@@ -12,6 +12,17 @@ import { UserDirectoryService, UserDirectoryProfile } from '../../core/user-dire
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { Auth,User } from '@angular/fire/auth';
 import { ProjectSidebarComponent } from '../../shared/project-sidebar/project-sidebar.component';
+import { SmartFilterPanelComponent } from '../../shared/smart-filter/smart-filter-panel.component';
+import {
+  SmartFilterCriteria,
+  SmartFilterTagOption,
+  SmartFilterAssigneeOption,
+  SMART_FILTER_STATUS_OPTIONS,
+  SMART_FILTER_IMPORTANCE_OPTIONS,
+  createEmptySmartFilterCriteria,
+  matchesSmartFilterTask,
+  isSmartFilterEmpty,
+} from '../../shared/smart-filter/smart-filter.model';
 
 interface TaskCommentView extends Comment {
   authorUsername: string;
@@ -29,7 +40,7 @@ interface TaskAttachmentView extends Attachment {
 @Component({
   selector: 'app-tasks-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProjectSidebarComponent],
+  imports: [CommonModule, FormsModule, ProjectSidebarComponent, SmartFilterPanelComponent],
   templateUrl: './tasks-list.component.html',
   styleUrls: ['./tasks-list.component.scss']
 })
@@ -77,6 +88,15 @@ export class TasksListComponent implements OnInit, OnDestroy {
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
   importanceFilter: Importance | '' = '';
+
+   // スマートフィルター関連
+   smartFilterVisible = false;
+   smartFilterCriteria: SmartFilterCriteria = createEmptySmartFilterCriteria();
+   smartFilterTagOptions: SmartFilterTagOption[] = [];
+   smartFilterAssigneeOptions: SmartFilterAssigneeOption[] = [];
+   readonly smartFilterStatusOptions = SMART_FILTER_STATUS_OPTIONS;
+   readonly smartFilterImportanceOptions = SMART_FILTER_IMPORTANCE_OPTIONS;
+   readonly smartFilterScope = 'tasks';
 
   // 並び替え設定
   sortBy: 'title' | 'startDate' | 'endDate' | 'progress' | 'importance' | 'createdAt' = 'title';
@@ -196,6 +216,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private async loadTags() {
     try {
       this.availableTags = await this.tagsService.listTags();
+      this.refreshSmartFilterTags();
     } catch (error) {
       console.error('タグの読み込みに失敗しました:', error);
     }
@@ -253,14 +274,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
       filtered = filtered.filter(task => !task.archived);
     }
 
-    // ステータスフィルター
+    // 既存のステータス・重要度フィルター
     if (this.statusFilter) {
       filtered = filtered.filter(task => task.status === this.statusFilter);
     }
-
-    // 重要度フィルター
     if (this.importanceFilter) {
       filtered = filtered.filter(task => task.importance === this.importanceFilter);
+    }
+
+    // スマートフィルター（複合条件）
+    if (!isSmartFilterEmpty(this.smartFilterCriteria)) {
+      filtered = filtered.filter(task => matchesSmartFilterTask(task, this.smartFilterCriteria));
     }
 
     this.filteredTasks = filtered;
@@ -313,6 +337,41 @@ export class TasksListComponent implements OnInit, OnDestroy {
     });
 
     this.filteredTasks = sorted;
+  }
+
+  /** スマートフィルターパネルの開閉 */
+  toggleSmartFilterPanel(): void {
+    this.smartFilterVisible = !this.smartFilterVisible;
+  }
+
+  /** スマートフィルター適用時のハンドラ */
+  onSmartFilterApply(criteria: SmartFilterCriteria): void {
+    this.smartFilterCriteria = criteria;
+    this.smartFilterVisible = false;
+    this.filterTasks();
+  }
+
+  /** タグ一覧からスマートフィルター用オプションを生成 */
+  private refreshSmartFilterTags(): void {
+    this.smartFilterTagOptions = this.availableTags
+      .filter((tag): tag is Tag & { id: string } => Boolean(tag.id))
+      .map((tag) => ({
+        id: tag.id!,
+        name: tag.name,
+        color: tag.color ?? null,
+      }));
+  }
+
+  /** メンバー一覧からスマートフィルター用担当者リストを整形 */
+  private updateSmartFilterAssignees(): void {
+    const options: SmartFilterAssigneeOption[] = Object.values(this.projectMemberProfiles ?? {})
+      .filter((profile): profile is UserDirectoryProfile & { uid: string } => Boolean(profile?.uid))
+      .map((profile) => ({
+        id: profile.uid,
+        displayName: profile.username && profile.username.trim().length > 0 ? profile.username : profile.uid,
+        photoUrl: profile.photoURL ?? null,
+      }));
+    this.smartFilterAssigneeOptions = options;
   }
 
   /** 日付を正規化 */
@@ -385,6 +444,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
       this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid)  : null;
+      this.updateSmartFilterAssignees();
       return;
     }
 
@@ -409,12 +469,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
       }
 
       this.attachments = this.attachments.map(attachment => this.composeAttachmentView(attachment));
+      this.updateSmartFilterAssignees();
     } catch (error) {
       console.error('メンバー情報の取得に失敗しました:', error);
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
       this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid) : null;
       this.attachments = this.attachments.map(attachment => this.composeAttachmentView(attachment));
+      this.updateSmartFilterAssignees();
     }
   }
 

@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { IssuesService } from '../issues/issues.service';
-import { Issue, Project,Importance,Tag, Role } from '../../models/schema';
+import { Issue, Project, Importance, Tag, Role, Task } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { FirebaseError } from 'firebase/app';
 import { TasksService, TaskSummary } from '../tasks/tasks.service';
@@ -12,6 +12,18 @@ import { TagsService } from '../tags/tags.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 import { ProjectSidebarComponent } from '../../shared/project-sidebar/project-sidebar.component';
+import { SmartFilterPanelComponent } from '../../shared/smart-filter/smart-filter-panel.component';
+import {
+  SmartFilterCriteria,
+  SmartFilterTagOption,
+  SmartFilterAssigneeOption,
+  SMART_FILTER_STATUS_OPTIONS,
+  SMART_FILTER_IMPORTANCE_OPTIONS,
+  createEmptySmartFilterCriteria,
+  matchesSmartFilterTask,
+  isSmartFilterEmpty,
+  doesDateMatchDue,
+} from '../../shared/smart-filter/smart-filter.model';
 /**
  * 課題一覧コンポーネント
  * プロジェクト配下の課題一覧表示、作成、編集、アーカイブ機能を提供
@@ -19,7 +31,7 @@ import { ProjectSidebarComponent } from '../../shared/project-sidebar/project-si
 @Component({
   selector: 'app-issues-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProjectSidebarComponent],
+  imports: [CommonModule, FormsModule, ProjectSidebarComponent, SmartFilterPanelComponent],
   templateUrl: './issues-list.component.html',
   styleUrls: ['./issues-list.component.scss']
 })
@@ -63,6 +75,16 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 
   // 所属プロジェクトの選択肢を保持
   availableProjects: Project[] = [];
+
+  // スマートフィルターとタスクキャッシュ
+  private issueTasksMap: Record<string, Task[]> = {};
+  smartFilterVisible = false;
+  smartFilterCriteria: SmartFilterCriteria = createEmptySmartFilterCriteria();
+  smartFilterTagOptions: SmartFilterTagOption[] = [];
+  smartFilterAssigneeOptions: SmartFilterAssigneeOption[] = [];
+  readonly smartFilterStatusOptions = SMART_FILTER_STATUS_OPTIONS;
+  readonly smartFilterImportanceOptions = SMART_FILTER_IMPORTANCE_OPTIONS;
+  readonly smartFilterScope = 'issues';
 
   // 並び替え設定
   sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' = 'name';
@@ -123,6 +145,8 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       this.currentUid = uid;
       this.currentRole = project?.roles?.[uid] ?? null;
       await this.loadMemberProfiles(project?.memberIds ?? []);
+      this.updateSmartFilterAssignees();
+      await this.loadIssueTasks();
       this.filterIssues();
       await this.refreshTaskSummaries();
       void this.loadTags(); // 直近で作成されたタグも反映
@@ -161,9 +185,17 @@ private async loadTags(): Promise<void> {
       }
       return acc;
     }, {});
+    this.smartFilterTagOptions = tags
+      .filter((tag): tag is Tag & { id: string } => Boolean(tag.id))
+      .map((tag) => ({
+        id: tag.id!,
+        name: tag.name,
+        color: tag.color ?? null,
+      }));
   } catch (error) {
     console.error('タグの取得に失敗しました:', error);
     this.tagMap = {};
+    this.smartFilterTagOptions = [];
   }
 }
 
@@ -180,9 +212,11 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
       acc[profile.uid] = profile;
       return acc;
     }, {});
+    this.updateSmartFilterAssignees();
   } catch (error) {
     console.error('メンバー情報の取得に失敗しました:', error);
     this.memberProfiles = {};
+    this.updateSmartFilterAssignees();
   }
   }
 
@@ -190,9 +224,32 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    * 課題をフィルタリング
    */
   filterIssues() {
-    this.filteredIssues = this.issues.filter(issue => 
-      this.showArchived || !issue.archived
-    );
+    this.filteredIssues = this.issues.filter(issue => {
+      if (!this.showArchived && issue.archived) {
+        return false;
+      }
+
+      if (!isSmartFilterEmpty(this.smartFilterCriteria)) {
+        const tasks = this.issueTasksMap[issue.id ?? ''] ?? [];
+        const effectiveTasks = this.showArchived ? tasks : tasks.filter(task => !task.archived);
+        const hasMatchingTask = effectiveTasks.some(task => matchesSmartFilterTask(task, this.smartFilterCriteria));
+
+        const onlyDueFilter =
+          this.smartFilterCriteria.due !== '' &&
+          this.smartFilterCriteria.tagIds.length === 0 &&
+          this.smartFilterCriteria.assigneeIds.length === 0 &&
+          this.smartFilterCriteria.importanceLevels.length === 0 &&
+          this.smartFilterCriteria.statuses.length === 0;
+
+        const dueMatchesIssue = onlyDueFilter && doesDateMatchDue(issue.endDate ?? null, this.smartFilterCriteria.due);
+
+        if (!hasMatchingTask && !dueMatchesIssue) {
+          return false;
+        }
+      }
+
+      return true;
+    });
     this.sortIssues();
   }
 
@@ -200,8 +257,63 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     void this.router.navigate(['/dashboard']);
   }
 
+  /** スマートフィルターの開閉をトグル */
+  toggleSmartFilterPanel(): void {
+    this.smartFilterVisible = !this.smartFilterVisible;
+  }
+
+  /** スマートフィルター適用時の処理 */
+  onSmartFilterApply(criteria: SmartFilterCriteria): void {
+    this.smartFilterCriteria = criteria;
+    this.smartFilterVisible = false;
+    this.filterIssues();
+  }
+
   getVisibleMemberIds(memberIds: string[]): string[] {
     return memberIds.slice(0, this.maxVisibleMembers);
+  }
+
+   /** スマートフィルター用に課題配下のタスクを取得してキャッシュ */
+   private async loadIssueTasks(): Promise<void> {
+    if (!this.projectId) {
+      this.issueTasksMap = {};
+      return;
+    }
+
+    try {
+      const pairs = await Promise.all(
+        this.issues
+          .filter((issue): issue is Issue & { id: string } => Boolean(issue.id))
+          .map(async (issue) => {
+            const tasks = await this.tasksService.listTasks(this.projectId, issue.id!, true);
+            return { issueId: issue.id!, tasks };
+          })
+      );
+
+      const map = pairs.reduce<Record<string, Task[]>>((acc, item) => {
+        acc[item.issueId] = item.tasks;
+        return acc;
+      }, {});
+
+      if (!this.destroy$.closed) {
+        this.issueTasksMap = map;
+      }
+    } catch (error) {
+      console.error('課題配下のタスク取得に失敗しました:', error);
+      this.issueTasksMap = {};
+    }
+  }
+
+  /** プロジェクトメンバーからスマートフィルター用担当者リストを生成 */
+  private updateSmartFilterAssignees(): void {
+    const options: SmartFilterAssigneeOption[] = Object.values(this.memberProfiles ?? {})
+      .filter((profile): profile is UserDirectoryProfile & { uid: string } => Boolean(profile?.uid))
+      .map((profile) => ({
+        id: profile.uid,
+        displayName: profile.username && profile.username.trim().length > 0 ? profile.username : profile.uid,
+        photoUrl: profile.photoURL ?? null,
+      }));
+    this.smartFilterAssigneeOptions = options;
   }
 
   getMemberInitial(memberId: string): string {

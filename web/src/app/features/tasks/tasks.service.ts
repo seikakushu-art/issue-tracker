@@ -291,30 +291,71 @@ export class TasksService {
    * 課題配下のタスク一覧を取得する
    * @param projectId プロジェクトID
    * @param issueId 課題ID
+   * @param includeArchived アーカイブ済みタスクも含めるか
    * @returns タスクの配列
    */
-  async listTasks(projectId: string, issueId: string): Promise<Task[]> {
+  async listTasks(projectId: string, issueId: string, includeArchived = true): Promise<Task[]> {
     try {
-      const q = query(
-        collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`)
-      );
+      const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
       const snap = await getDocs(q);
-      return snap.docs.map((d) => {
-        const data = d.data() as Task;
-        return {
-          id: d.id,
-          ...data,
-          assigneeIds: data.assigneeIds ?? [],
-          tagIds: data.tagIds ?? [],
-          checklist: data.checklist ?? [],
-          archived: data.archived ?? false,
-        };
-      });
+      const tasks = snap.docs.map((docSnap) => this.hydrateTask(docSnap.id, docSnap.data() as Task));
+      return includeArchived ? tasks : tasks.filter((task) => !task.archived);
     } catch (error) {
       console.error('Error in listTasks:', error);
       return [];
     }
   }
+
+  /**
+   * プロジェクト全体のタスクを横断的に取得する（スマートフィルター用）
+   * @param projectId プロジェクトID
+   * @param includeArchived アーカイブ済みタスクを含めるかどうか
+   */
+  async listTasksByProject(projectId: string, includeArchived = true): Promise<Task[]> {
+    try {
+      const constraints = [where('projectId', '==', projectId)];
+      if (!includeArchived) {
+        constraints.push(where('archived', '==', false));
+      }
+
+      const q = query(collectionGroup(this.db, 'tasks'), ...constraints);
+      const snap = await getDocs(q);
+      return snap.docs.map((docSnap) => this.hydrateTask(docSnap.id, docSnap.data() as Task));
+    } catch (error) {
+      console.error('Error in listTasksByProject:', error);
+      return [];
+    }
+  }
+
+  /**
+   * タスクドキュメントをUIで扱いやすい形に整形する
+   * @param id タスクID
+   * @param data Firestoreから取得した生データ
+   */
+  private hydrateTask(id: string, data: Task): Task {
+    const record = data as unknown as Record<string, unknown>;
+    const normalized: Task = {
+      ...data,
+      id,
+      assigneeIds: Array.isArray(record['assigneeIds']) ? (record['assigneeIds'] as string[]) : [],
+      tagIds: Array.isArray(record['tagIds']) ? (record['tagIds'] as string[]) : [],
+      checklist: Array.isArray(record['checklist']) ? (record['checklist'] as ChecklistItem[]) : [],
+      archived: typeof record['archived'] === 'boolean' ? (record['archived'] as boolean) : false,
+    };
+
+    if (record['startDate']) {
+      normalized.startDate = this.normalizeDate(record['startDate']);
+    }
+    if (record['endDate']) {
+      normalized.endDate = this.normalizeDate(record['endDate']);
+    }
+    if (record['createdAt']) {
+      normalized.createdAt = this.normalizeDate(record['createdAt']);
+    }
+
+    return normalized;
+  }
+
 
   /**
    * 課題配下のタスク数を取得する

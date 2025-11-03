@@ -81,6 +81,23 @@
   </section>
 
   <div class="filters">
+    <div class="filter-group filter-group--smart">
+      <button type="button" class="smart-filter-button" (click)="toggleSmartFilterPanel()">
+        <span class="smart-filter-button__icon" aria-hidden="true">⚙️</span>
+        スマートフィルター
+      </button>
+      <app-smart-filter-panel
+        *ngIf="smartFilterVisible"
+        [scope]="smartFilterScope"
+        [criteria]="smartFilterCriteria"
+        [tags]="smartFilterTagOptions"
+        [assignees]="smartFilterAssigneeOptions"
+        [statusOptions]="smartFilterStatusOptions"
+        [importanceOptions]="smartFilterImportanceOptions"
+        (applyCriteria)="onSmartFilterApply($event)"
+        (panelClosed)="smartFilterVisible = false"
+      ></app-smart-filter-panel>
+    </div>
     <div class="filter-group">
       <span>並び替え:</span>
       <select [(ngModel)]="sortBy" (change)="sortIssues()">
