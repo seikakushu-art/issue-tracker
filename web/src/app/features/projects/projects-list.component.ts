@@ -4,12 +4,14 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { ProjectsService } from './projects.service';
-import { InviteStatus, Project, ProjectInvite, Role } from '../../models/schema';
+import { InviteStatus, Project, ProjectInvite, ProjectTemplate, Role } from '../../models/schema';
 import { IssuesService } from '../issues/issues.service';
 import { FirebaseError } from '@angular/fire/app';
 import { ProjectInviteService } from './project-invite.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
+import { ProjectTemplatesService } from './project-templates.service';
+
 
 /**
  * プロジェクト一覧コンポーネント
@@ -27,6 +29,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   private issuesService = inject(IssuesService);
   private inviteService = inject(ProjectInviteService);
   private userDirectoryService = inject(UserDirectoryService);
+  private projectTemplatesService = inject(ProjectTemplatesService);
   private router = inject(Router);
   private destroy$ = new Subject<void>();
 
@@ -38,6 +41,13 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   showArchived = false;
   currentUid: string | null = null;
   readonly maxVisibleMembers = 4;
+
+  // テンプレート関連
+  templates: ProjectTemplate[] = [];
+  templatesLoading = false;
+  templateLoadError = '';
+  selectedTemplateId: string | null = null;
+  templateNotice = '';
 
   // 招待リンク関連
   showInviteModal = false;
@@ -73,6 +83,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadProjects();
+    this.loadTemplates();
   }
 
   ngOnDestroy() {
@@ -262,6 +273,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       endDate: '',
       goal: ''
     };
+    this.selectedTemplateId = null;
+    this.templateNotice = '';
     this.showModal = true;
   }
 
@@ -282,6 +295,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       endDate: project.endDate ? this.formatDateForInput(project.endDate) : '',
       goal: project.goal || ''
     };
+    this.selectedTemplateId = null;
+    this.templateNotice = '';
     this.showModal = true;
   }
 
@@ -346,6 +361,75 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       this.inviteLoading = false;
     }
   }
+
+  /**
+   * プロジェクトテンプレート一覧を取得
+   */
+  async loadTemplates() {
+    this.templatesLoading = true;
+    this.templateLoadError = '';
+    try {
+      this.templates = await this.projectTemplatesService.listTemplates();
+    } catch (error) {
+      console.error('テンプレートの取得に失敗しました:', error);
+      this.templateLoadError = 'テンプレートの取得に失敗しました';
+    } finally {
+      this.templatesLoading = false;
+    }
+  }
+
+  /**
+   * テンプレートを適用してフォームを初期化
+   */
+  applyTemplate(templateId: string) {
+    if (!templateId) {
+      this.selectedTemplateId = null;
+      this.templateNotice = '';
+      return;
+    }
+    this.selectedTemplateId = templateId;
+    const template = this.templates.find((item) => item.id === templateId);
+    if (!template) {
+      this.templateNotice = '';
+      return;
+    }
+
+    this.projectForm.name = template.name;
+    this.projectForm.description = template.description ?? '';
+    this.projectForm.goal = template.goal ?? '';
+    this.projectForm.startDate = '';
+    this.projectForm.endDate = '';
+    this.templateNotice = 'テンプレートを適用しました。期間・担当者・ステータス・添付ファイルは空の状態で作成されます。';
+  }
+
+  /**
+   * プロジェクトをテンプレートとして保存
+   */
+  async saveAsTemplate(project: Project, event: Event) {
+    event.stopPropagation();
+    if (!this.isAdmin(project)) {
+      alert('この操作を行う権限がありません');
+      return;
+    }
+    if (!project.id) {
+      return;
+    }
+
+    const confirmed = confirm(`プロジェクト「${project.name}」をテンプレートとして保存しますか？`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await this.projectTemplatesService.saveFromProject(project.id);
+      await this.loadTemplates();
+      alert('テンプレートを保存しました。');
+    } catch (error) {
+      console.error('テンプレートの保存に失敗しました:', error);
+      alert('テンプレートの保存に失敗しました');
+    }
+  }
+
 
   async openInviteModal(project: Project, event: Event) {
     event.stopPropagation();
@@ -522,6 +606,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.showModal = false;
     this.editingProject = null;
     this.saving = false;
+    this.selectedTemplateId = null;
+    this.templateNotice = '';
   }
 
   /**

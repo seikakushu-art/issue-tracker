@@ -44,6 +44,20 @@ export interface Project {
 }
 
 /**
+ * プロジェクトテンプレート
+ * 既存プロジェクトを再利用する際に、共通のメタ情報だけを保持する
+ */
+export interface ProjectTemplate {
+  id?: string;
+  name: string;  // テンプレート表示名
+  description?: string | null;
+  goal?: string | null;
+  sourceProjectId?: string | null;  // 元になったプロジェクトIDを記録（任意）
+  createdBy: string;  // 作成者UID
+  createdAt?: Date | null;
+}
+
+/**
  * プロジェクトの招待情報
  */
 export interface ProjectInvite {

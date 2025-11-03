@@ -393,6 +393,54 @@
   border-top: 1px solid #e1e5e9;
 }
 
+.template-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f3f5f8;
+  border-radius: 8px;
+}
+
+.template-select-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.template-select-row select {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #cfd6de;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.template-loading {
+  font-size: 13px;
+  color: #666;
+}
+
+.template-error {
+  color: #d14343;
+  font-size: 13px;
+  margin: 0;
+}
+
+.template-info {
+  color: #4b5563;
+  font-size: 12px;
+  margin: 0;
+}
+
+.template-notice {
+  color: #4a5a72;
+  font-size: 12px;
+  margin: 0;
+}
+
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
