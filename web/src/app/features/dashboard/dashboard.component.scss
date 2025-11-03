@@ -395,6 +395,161 @@
   grid-column: span 8;
 }
 
+/* 通知ウィジェット */
+.widget--notifications {
+  grid-column: span 12;
+}
+
+.widget__content--notifications {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.notifications-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.notification-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: linear-gradient(180deg, rgba(241, 245, 249, 0.8), #ffffff 70%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.notification-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.notification-panel__header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.notification-panel__count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.notification-panel__empty {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.notification-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-group__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notification-item {
+  list-style: none;
+}
+
+.notification-card {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 18px;
+  padding: 16px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.notification-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.notification-card__project {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.notification-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.notification-card__issue {
+  font-size: 13px;
+  color: #475569;
+}
+
+.notification-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #475569;
+}
+
+.notification-card__importance {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.notification-card__due {
+  font-weight: 600;
+}
+
+.notification-card__author {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.notification-card__excerpt {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.notification-card--mention {
+  border-color: rgba(37, 99, 235, 0.3);
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.35), #ffffff 75%);
+}
+
 .project-list {
   list-style: none;
   margin: 0;

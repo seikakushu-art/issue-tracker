@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import {
+  DocumentData,
   Firestore,
   collection,
   collectionGroup,
@@ -60,6 +61,58 @@ export interface ActionableTaskCard {
   mentions: MentionSummary[];
   latestMentionAt: Date | null;
 }
+
+/**
+ * 当日終了タスクの通知情報
+ */
+export interface DueTodayNotification {
+  taskId: string;
+  projectId: string;
+  issueId: string;
+  projectName: string;
+  issueName: string | null;
+  title: string;
+  importance: Importance | null;
+  dueDate: Date | null;
+  assigneeIds: string[];
+}
+
+/**
+ * メンション通知のDTO
+ */
+export interface MentionNotification {
+  id: string;
+  projectId: string;
+  issueId: string;
+  taskId: string;
+  projectName: string;
+  issueName: string | null;
+  taskTitle: string;
+  commentText: string;
+  createdAt: Date | null;
+  createdBy: string;
+}
+
+interface MentionEntry {
+  id: string;
+  projectId: string;
+  issueId: string;
+  taskId: string;
+  commentText: string;
+  createdBy: string;
+  createdAt: Date | null;
+  projectName: string;
+  issueName: string | null;
+}
+
+/**
+ * アプリ起動時にまとめて表示する通知セット
+ */
+export interface StartupNotifications {
+  dueTodayTasks: DueTodayNotification[];
+  mentions: MentionNotification[];
+}
+
 
 /**
  * 通知/ダッシュボード用のタスク抽出を行うサービス
@@ -357,5 +410,314 @@ export class NotificationService {
     });
 
     return cards.slice(0, take);
+  }
+
+  /**
+   * アプリ起動時に提示する通知群を取得する
+   */
+  async getStartupNotifications(options: { dueLimit?: number; mentionLimit?: number } = {}): Promise<StartupNotifications> {
+    const dueLimit = options.dueLimit ?? 50;
+    const mentionLimit = options.mentionLimit ?? 20;
+
+    // 当日終了タスクの抽出
+    const dueTodayTasks = await this.fetchDueTodayNotifications(dueLimit);
+
+    // メンション通知はログインユーザーが存在する場合のみ取得する
+    const uid = this.auth.currentUser?.uid;
+    const mentionNotifications = uid
+      ? await this.fetchMentionNotifications(uid, mentionLimit)
+      : [];
+
+    return {
+      dueTodayTasks,
+      mentions: mentionNotifications,
+    } satisfies StartupNotifications;
+  }
+
+  /**
+   * 当日終了タスクを抽出し通知形式に整形する
+   */
+  private async fetchDueTodayNotifications(limitSize: number): Promise<DueTodayNotification[]> {
+    const tasksRef = collectionGroup(this.db, 'tasks');
+    const snapshot = await getDocs(
+      query(
+        tasksRef,
+        where('archived', '==', false),
+        where('status', 'in', ['incomplete', 'in_progress', 'on_hold'])
+      ),
+    );
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    const candidateTasks = snapshot.docs
+      .map((docSnap) => ({
+        id: docSnap.id,
+        data: docSnap.data() as Task,
+      }))
+      .filter((entry) => {
+        const data = entry.data;
+        const dueDate = this.normalizeDate((data as unknown as Record<string, unknown>)['endDate']);
+        return (
+          Boolean(data.projectId) &&
+          Boolean(data.issueId) &&
+          dueDate !== null &&
+          dueDate >= startOfToday &&
+          dueDate <= endOfToday
+        );
+      });
+
+    if (candidateTasks.length === 0) {
+      return [];
+    }
+
+    const projectIds = new Set<string>();
+    const issueRefs = new Map<string, { projectId: string; issueId: string }>();
+
+    const tasks: DueTodayNotification[] = candidateTasks.map((entry) => {
+      const task = entry.data;
+      const dueDate = this.normalizeDate((task as unknown as Record<string, unknown>)['endDate']);
+      const projectId = task.projectId;
+      const issueId = task.issueId;
+      projectIds.add(projectId);
+      issueRefs.set(`${projectId}/${issueId}`, { projectId, issueId });
+      return {
+        taskId: entry.id,
+        projectId,
+        issueId,
+        projectName: 'loading',
+        issueName: null,
+        title: task.title,
+        importance: task.importance ?? null,
+        dueDate: dueDate ?? endOfToday,
+        assigneeIds: Array.isArray(task.assigneeIds) ? task.assigneeIds : [],
+      } satisfies DueTodayNotification;
+    });
+
+    const projectMap = await this.fetchProjectNames(projectIds);
+    const issueMap = await this.fetchIssueNames(issueRefs);
+    for (const task of tasks) {
+      task.projectName = projectMap.get(task.projectId) ?? '不明なプロジェクト';
+      task.issueName = issueMap.get(`${task.projectId}/${task.issueId}`) ?? null;
+    }
+
+    tasks.sort((a, b) => {
+      const importanceA = a.importance ? this.importanceRank[a.importance] : Number.MAX_SAFE_INTEGER;
+      const importanceB = b.importance ? this.importanceRank[b.importance] : Number.MAX_SAFE_INTEGER;
+      if (importanceA !== importanceB) {
+        return importanceA - importanceB;
+      }
+      const dueA = a.dueDate ? a.dueDate.getTime() : Number.POSITIVE_INFINITY;
+      const dueB = b.dueDate ? b.dueDate.getTime() : Number.POSITIVE_INFINITY;
+      if (dueA !== dueB) {
+        return dueA - dueB;
+      }
+      return a.title.localeCompare(b.title);
+    });
+
+    return tasks.slice(0, limitSize);
+  }
+
+  /**
+   * メンション通知を抽出して整形する
+   */
+  private async fetchMentionNotifications(uid: string, limitSize: number): Promise<MentionNotification[]> {
+    const commentsRef = collectionGroup(this.db, 'comments');
+    const commentQuery = query(
+      commentsRef,
+      where('mentions', 'array-contains', uid),
+      orderBy('createdAt', 'desc'),
+      limit(limitSize),
+    );
+    const snapshot = await getDocs(commentQuery);
+
+    if (snapshot.empty) {
+      return [];
+    }
+
+    const projectIds = new Set<string>();
+    const issueRefs = new Map<string, { projectId: string; issueId: string }>();
+    const taskRefs = new Map<string, { projectId: string; issueId: string; taskId: string }>();
+
+    const commentEntries: MentionEntry[] = [];
+    for (const docSnap of snapshot.docs) {
+      const pathSegments = docSnap.ref.path.split('/');
+      if (pathSegments.length < 8) {
+        continue;
+      }
+      const projectId = pathSegments[1];
+      const issueId = pathSegments[3];
+      const taskId = pathSegments[5];
+      projectIds.add(projectId);
+      issueRefs.set(`${projectId}/${issueId}`, { projectId, issueId });
+      taskRefs.set(`${projectId}/${issueId}/${taskId}`, { projectId, issueId, taskId });
+      const data = docSnap.data() as Record<string, unknown>;
+      commentEntries.push({
+        id: docSnap.id,
+        projectId,
+        issueId,
+        taskId,
+        commentText: typeof data['text'] === 'string' ? data['text'] : '',
+        createdBy: typeof data['createdBy'] === 'string' ? data['createdBy'] : '',
+        createdAt: this.normalizeDate(data['createdAt']),
+        projectName: 'loading',
+        issueName: null,
+      });
+    }
+
+    if (commentEntries.length === 0) {
+      return [];
+    }
+
+    const taskDetails = await this.fetchTaskSnapshots(taskRefs);
+    const projectMap = await this.fetchProjectNames(projectIds);
+    const issueMap = await this.fetchIssueNames(issueRefs);
+
+    for (const entry of commentEntries) {
+      entry.projectName = projectMap.get(entry.projectId) ?? '不明なプロジェクト';
+      entry.issueName = issueMap.get(`${entry.projectId}/${entry.issueId}`) ?? null;
+    }
+
+    return commentEntries
+      .map((entry) => {
+        const taskKey = `${entry.projectId}/${entry.issueId}/${entry.taskId}`;
+        const task = taskDetails.get(taskKey);
+        const title = task?.title ?? '不明なタスク';
+        return {
+          id: entry.id,
+          projectId: entry.projectId,
+          issueId: entry.issueId,
+          taskId: entry.taskId,
+          taskTitle: title,
+          projectName: entry.projectName,
+          issueName: entry.issueName,
+          commentText: entry.commentText,
+          createdAt: entry.createdAt ?? null,
+          createdBy: entry.createdBy,
+        } satisfies MentionNotification;
+      })
+      .sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeB - timeA;
+      });
+  }
+
+  /**
+   * タスクのスナップショットを取得する
+   */
+  private async fetchTaskSnapshots(
+    taskRefs: Map<string, { projectId: string; issueId: string; taskId: string }>,
+  ): Promise<Map<string, Task & { title: string }>> {
+    const entries = Array.from(taskRefs.values());
+    if (entries.length === 0) {
+      return new Map();
+    }
+
+    const results = await Promise.all(
+      entries.map(async ({ projectId, issueId, taskId }) => {
+        try {
+          const taskDoc = await getDoc(
+            doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`),
+          );
+          if (!taskDoc.exists()) {
+            return null;
+          }
+          return {
+            key: `${projectId}/${issueId}/${taskId}`,
+            data: taskDoc.data() as Task,
+          };
+        } catch (error) {
+          console.error('Failed to fetch task snapshot for notification:', { projectId, issueId, taskId }, error);
+          return null;
+        }
+      }),
+    );
+
+    const map = new Map<string, Task & { title: string }>();
+    for (const result of results) {
+      if (!result) {
+        continue;
+      }
+      map.set(result.key, result.data as Task & { title: string });
+    }
+    return map;
+  }
+
+  /**
+   * プロジェクト名をまとめて取得する
+   */
+  private async fetchProjectNames(projectIds: Set<string>): Promise<Map<string, string>> {
+    const ids = Array.from(projectIds);
+    if (ids.length === 0) {
+      return new Map();
+    }
+
+    const entries = await Promise.all(
+      ids.map(async (projectId) => {
+        try {
+          const snapshot = await getDoc(doc(this.db, 'projects', projectId));
+          if (!snapshot.exists()) {
+            return null;
+          }
+          const data = snapshot.data() as Project;
+          const name = typeof data.name === 'string' && data.name.trim().length > 0
+            ? data.name.trim()
+            : '名称未設定プロジェクト';
+          return { projectId, name };
+        } catch (error) {
+          console.error('Failed to fetch project name for notification:', projectId, error);
+          return null;
+        }
+      }),
+    );
+
+    const map = new Map<string, string>();
+    for (const entry of entries) {
+      if (entry) {
+        map.set(entry.projectId, entry.name);
+      }
+    }
+    return map;
+  }
+
+  /**
+   * 課題名をまとめて取得する
+   */
+  private async fetchIssueNames(
+    issueRefs: Map<string, { projectId: string; issueId: string }>,
+  ): Promise<Map<string, string | null>> {
+    const entries = Array.from(issueRefs.values());
+    if (entries.length === 0) {
+      return new Map();
+    }
+
+    const results = await Promise.all(
+      entries.map(async ({ projectId, issueId }) => {
+        try {
+          const snapshot = await getDoc(doc(this.db, `projects/${projectId}/issues/${issueId}`));
+          if (!snapshot.exists()) {
+            return null;
+          }
+          const data = snapshot.data() as DocumentData;
+          const rawName = typeof data['name'] === 'string' ? data['name'].trim() : '';
+          const name = rawName.length > 0 ? rawName : null;
+          return { projectId, issueId, name };
+        } catch (error) {
+          console.error('Failed to fetch issue name for notification:', { projectId, issueId }, error);
+          return null;
+        }
+      }),
+    );
+
+    const map = new Map<string, string | null>();
+    for (const result of results) {
+      if (!result) {
+        continue;
+      }
+      map.set(`${result.projectId}/${result.issueId}`, result.name ?? null);
+    }
+    return map;
   }
 }

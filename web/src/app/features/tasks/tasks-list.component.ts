@@ -80,6 +80,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   showArchived = false;
   selectedTaskId: string | null = null;
   selectedTask: Task | null = null;
+  pendingFocusTaskId: string | null = null;
   newChecklistText = '';
   representativeTaskUpdatingId: string | null = null; // 代表タスク更新中のタスクID
   representativeTaskMessage = '';
@@ -162,6 +163,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.loadData();
     });
 
+    this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((params) => {
+      const focus = params.get('focus');
+      this.pendingFocusTaskId = focus;
+      if (focus) {
+        this.trySelectTaskById(focus);
+      }
+    });
+
     this.loadTags();
   }
 
@@ -201,6 +210,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.currentRole = project?.roles?.[uid] ?? null;
       this.filterTasks();
       this.updateIssueProgress();
+      if (this.pendingFocusTaskId) {
+        this.trySelectTaskById(this.pendingFocusTaskId);
+      }
       if (this.selectedTaskId) {
         const refreshed = tasks.find(task => task.id === this.selectedTaskId);
         if (refreshed && refreshed.id) {
@@ -817,6 +829,18 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.newChecklistText = '';
     this.resetCommentState();
     this.resetAttachmentState();
+  }
+
+  /** 指定IDのタスクを選択候補として適用する */
+  private trySelectTaskById(taskId: string | null): void {
+    if (!taskId) {
+      return;
+    }
+    const target = this.tasks.find((task) => task.id === taskId);
+    if (target) {
+      this.selectTask(target);
+      this.pendingFocusTaskId = null;
+    }
   }
 
   /** 新規作成モーダルを開く */

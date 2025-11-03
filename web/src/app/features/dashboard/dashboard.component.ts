@@ -3,7 +3,9 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import {
   ActionableTaskCard,
+  DueTodayNotification,
   HighlightReason,
+  MentionNotification,
   NotificationService,
 } from '../../core/notification.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -18,6 +20,7 @@ import {
 import { BoardPreviewComponent } from './components/board-preview/board-preview.component';
 import { UserProfileService } from '../../core/user-profile.service';
 import { BoardService } from '../board/board.service';
+import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 
 type ProjectSortKey = 'overdue_first' | 'progress_desc' | 'backlog_desc';
 
@@ -36,12 +39,10 @@ export class DashboardComponent implements OnInit {
   private readonly userProfileService = inject(UserProfileService);
   private readonly boardService = inject(BoardService);
   private readonly document = inject(DOCUMENT);
+  private readonly userDirectoryService = inject(UserDirectoryService);
 
   /** Mathオブジェクトをテンプレートで使用するため */
   readonly Math = Math;
-
-  /** 期間フィルター候補 */
-  readonly periodFilters = ['今週', '今月', '四半期'];
 
   /** プロジェクトカードの並び替え候補 */
   readonly projectSortOptions: { label: string; value: ProjectSortKey }[] = [
@@ -49,6 +50,22 @@ export class DashboardComponent implements OnInit {
     { label: '進捗率順', value: 'progress_desc' },
     { label: '重要タスク多い順', value: 'backlog_desc' },
   ];
+
+  /** 起動時通知の読み込み状態 */
+  readonly notificationsLoading = signal(false);
+  /** 起動時通知のエラーメッセージ */
+  readonly notificationsError = signal<string | null>(null);
+  /** 起動時通知データ本体 */
+  readonly startupNotifications = signal<{ dueTodayTasks: DueTodayNotification[]; mentions: MentionNotification[] } | null>(null);
+  /** 担当者プロフィールキャッシュ */
+  readonly assigneeProfiles = signal<Record<string, UserDirectoryProfile>>({});
+  /** 重要度の優先順位（Criticalが最優先） */
+  private readonly importanceRank: Record<Importance, number> = {
+    Critical: 0,
+    High: 1,
+    Medium: 2,
+    Low: 3,
+  } as const;
 
    /** 掲示板プレビュー */
    readonly bulletinPosts = signal<BulletinPreviewItem[]>([]);
@@ -87,6 +104,80 @@ export class DashboardComponent implements OnInit {
   /** ボトルネック検知結果 */
   readonly bottlenecks = computed(() => this.snapshot()?.bottlenecks ?? []);
 
+  /** 当日終了タスクを担当者別にまとめた配列 */
+  readonly dueTodayGroups = computed(() => {
+    const notifications = this.startupNotifications();
+    if (!notifications) {
+      return [] as { assigneeId: string | null; assigneeLabel: string; tasks: DueTodayNotification[] }[];
+    }
+    const profileMap = this.assigneeProfiles();
+
+    const sorted = [...notifications.dueTodayTasks].sort((a, b) => {
+      const rankA = a.importance ? this.importanceRank[a.importance] : Number.MAX_SAFE_INTEGER;
+      const rankB = b.importance ? this.importanceRank[b.importance] : Number.MAX_SAFE_INTEGER;
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      const dueA = a.dueDate ? a.dueDate.getTime() : Number.POSITIVE_INFINITY;
+      const dueB = b.dueDate ? b.dueDate.getTime() : Number.POSITIVE_INFINITY;
+      if (dueA !== dueB) {
+        return dueA - dueB;
+      }
+      return a.title.localeCompare(b.title);
+    });
+
+    const grouped = new Map<string | null, DueTodayNotification[]>();
+    for (const task of sorted) {
+      const assignees = task.assigneeIds.length > 0 ? task.assigneeIds : [null];
+      for (const assignee of assignees) {
+        if (!grouped.has(assignee)) {
+          grouped.set(assignee, []);
+        }
+        grouped.get(assignee)!.push(task);
+      }
+    }
+
+    return Array.from(grouped.entries())
+      .map(([assigneeId, tasks]) => {
+        const profile = assigneeId ? profileMap[assigneeId] : undefined;
+        const label = profile?.username ?? (assigneeId ?? '未担当');
+        return { assigneeId, assigneeLabel: label, tasks };
+      })
+      .sort((a, b) => a.assigneeLabel.localeCompare(b.assigneeLabel, 'ja'));
+  });
+
+  /** メンション通知一覧 */
+  readonly mentionNotifications = computed(() => this.startupNotifications()?.mentions ?? []);
+
+  /** 当日終了タスク件数 */
+  readonly dueTodayTotalCount = computed(() =>
+    this.dueTodayGroups().reduce((sum, group) => sum + group.tasks.length, 0),
+  );
+
+  /** ヘッダーに表示する通知の要約文 */
+  readonly notificationHeadline = computed(() => {
+    if (this.notificationsLoading()) {
+      return '通知を読み込み中です…';
+    }
+    if (this.notificationsError()) {
+      return this.notificationsError();
+    }
+    const total = this.totalNotificationCount();
+    if (total === 0) {
+      return 'まだ通知はありません。';
+    }
+    return `本日確認すべき通知が ${total} 件あります。`;
+  });
+
+  /** 通知総件数 */
+  readonly totalNotificationCount = computed(() => {
+    const notifications = this.startupNotifications();
+    if (!notifications) {
+      return 0;
+    }
+    return notifications.dueTodayTasks.length + notifications.mentions.length;
+  });
+
   /** アラート対象タスク */
   readonly actionableTasks = signal<ActionableTaskCard[]>([]);
   /** アラート取得の読み込み状態 */
@@ -111,6 +202,7 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     void this.refreshDashboard();
+    void this.loadStartupNotifications();
     void this.refreshActionableTasks();
     void this.loadBulletinPreview();
   }
@@ -134,6 +226,23 @@ export class DashboardComponent implements OnInit {
       this.snapshotLoading.set(false);
     }
   }
+  /** 起動時通知を取得する */
+  async loadStartupNotifications(): Promise<void> {
+    this.notificationsLoading.set(true);
+    this.notificationsError.set(null);
+    try {
+      const notifications = await this.notificationService.getStartupNotifications();
+      this.startupNotifications.set(notifications);
+      await this.populateAssigneeProfiles(notifications.dueTodayTasks);
+    } catch (error) {
+      console.error('Failed to load startup notifications', error);
+      this.notificationsError.set('通知の取得に失敗しました。時間をおいて再試行してください。');
+      this.startupNotifications.set({ dueTodayTasks: [], mentions: [] });
+    } finally {
+      this.notificationsLoading.set(false);
+    }
+  }
+
 
    /** 掲示板プレビューを読み込む */
    async loadBulletinPreview(): Promise<void> {
@@ -196,6 +305,11 @@ export class DashboardComponent implements OnInit {
   /** プロジェクトの並び替えを切り替える */
   setProjectSort(value: ProjectSortKey): void {
     this.selectedSort.set(value);
+  }
+
+  /** 通知も含めてダッシュボード全体を再読み込み */
+  async reloadDashboard(): Promise<void> {
+    await Promise.all([this.refreshDashboard(), this.loadStartupNotifications()]);
   }
 
   /** プロジェクトカードのドーナツ表示用 dasharray を計算 */
@@ -356,6 +470,7 @@ export class DashboardComponent implements OnInit {
       );
       await this.refreshActionableTasks();
       await this.refreshDashboard();
+      await this.loadStartupNotifications();
     } catch (error) {
       console.error('Failed to update task from dashboard shortcut', error);
       this.actionableError.set(
@@ -406,6 +521,48 @@ export class DashboardComponent implements OnInit {
       return normalized;
     }
     return `${normalized.slice(0, maxLength)}…`;
+  }
+   /** 通知一覧からタスクの詳細へ遷移する */
+   goToTaskDetail(task: { projectId: string; issueId: string; taskId: string }): void {
+    void this.router.navigate(['/projects', task.projectId, 'issues', task.issueId], {
+      queryParams: { focus: task.taskId },
+    });
+  }
+
+  /** 担当者IDから表示名を引き当てる */
+  getAssigneeLabel(assigneeId: string | null): string {
+    if (!assigneeId) {
+      return '未担当';
+    }
+    const profile = this.assigneeProfiles()[assigneeId];
+    return profile?.username ?? assigneeId;
+  }
+
+  /** 通知に含まれる担当者のプロフィールを一括で取得する */
+  private async populateAssigneeProfiles(tasks: DueTodayNotification[]): Promise<void> {
+    const ids = new Set<string>();
+    for (const task of tasks) {
+      for (const assignee of task.assigneeIds) {
+        if (assignee) {
+          ids.add(assignee);
+        }
+      }
+    }
+    if (ids.size === 0) {
+      this.assigneeProfiles.set({});
+      return;
+    }
+    try {
+      const profiles = await this.userDirectoryService.getProfiles(Array.from(ids));
+      const map: Record<string, UserDirectoryProfile> = {};
+      for (const profile of profiles) {
+        map[profile.uid] = profile;
+      }
+      this.assigneeProfiles.set(map);
+    } catch (error) {
+      console.error('Failed to populate assignee profiles for notifications', error);
+      this.assigneeProfiles.set({});
+    }
   }
 }
 
