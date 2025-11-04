@@ -14,7 +14,7 @@ import {
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { Project, Role } from '../../models/schema';
-import { firstValueFrom,TimeoutError} from 'rxjs';
+import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 //プロジェクトを作成する
 @Injectable({ providedIn: 'root' })
@@ -95,27 +95,7 @@ export class ProjectsService {
     return { project, role, uid };
   }
 
-
-  private async ensureAuthReady() {
-    if (!this.authReady) {
-      this.authReady = this.auth.authStateReady();
-    }
-
-    try {
-      await this.authReady;
-    } catch (error) {
-      // reset so we can try again on the next call
-      this.authReady = null;
-      throw error;
-    }
-  }
-
   private async waitForUser(): Promise<User | null> {
-    try {
-      await this.ensureAuthReady();
-    } catch (error) {
-      console.error('●●●Failed to await auth readiness:', error);
-    }
 
     const current = this.auth.currentUser;
     if (current) {
@@ -127,7 +107,7 @@ export class ProjectsService {
         authState(this.auth).pipe(
           filter((user): user is User => user !== null),
           take(1),
-          timeout(10000),
+          timeout(2000),
         ),
       );
     } catch (error) {

@@ -43,6 +43,7 @@ import { Project, Issue, Task } from './models/schema';
           <a routerLink="/projects" routerLinkActive="active">プロジェクト一覧</a>
           <a routerLink="/board" routerLinkActive="active">掲示板</a>
           <a routerLink="/gantt" routerLinkActive="active">ガントチャート</a>
+          <a routerLink="/tree" routerLinkActive="active">ツリー</a>
           <a routerLink="/attachments" routerLinkActive="active">添付ファイル一覧</a>
         </nav>
     </header>

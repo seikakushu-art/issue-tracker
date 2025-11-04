@@ -29,7 +29,6 @@ import { ProjectsService } from '../projects/projects.service';
 export class IssuesService {
   private db = inject(Firestore);
   private auth = inject(Auth);
-  private authReady: Promise<void> | null = null;
   private progressService = inject(ProgressService);
   private projectsService = inject(ProjectsService);
 
@@ -114,24 +113,7 @@ export class IssuesService {
     }
   }
 
-  private async ensureAuthReady() {
-    if (!this.authReady) {
-      this.authReady = this.auth.authStateReady();
-    }
-    try {
-      await this.authReady;
-    } catch (error) {
-      this.authReady = null;
-      throw error;
-    }
-  }
-
   private async waitForUser(): Promise<User | null> {
-    try {
-      await this.ensureAuthReady();
-    } catch (error) {
-      console.error('Failed to await auth readiness:', error);
-    }
 
     const current = this.auth.currentUser;
     if (current) {
@@ -143,7 +125,7 @@ export class IssuesService {
         authState(this.auth).pipe(
           filter((user): user is User => user !== null),
           take(1),
-          timeout(10000),
+          timeout(2000),
         ),
       );
     } catch (error) {

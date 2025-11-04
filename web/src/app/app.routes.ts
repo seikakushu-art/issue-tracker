@@ -11,6 +11,7 @@ import { BoardListComponent } from './features/board/board-list.component';
 import { AttachmentsListComponent } from './features/attachments/attachments-list.component';
 import { GlobalSearchComponent } from './features/search/global-search.component';
 import { ProgressGanttComponent } from './features/progress/progress-gantt.component';
+import { ProgressTreeComponent } from './features/progress/progress-tree.component';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -57,6 +58,11 @@ export const routes: Routes = [
     path: 'gantt',
     component: ProgressGanttComponent,
     title: 'ガントチャート'
+  },
+  {
+    path: 'tree',
+    component: ProgressTreeComponent,
+    title: 'ツリー'
   },
   // ダッシュボード: トップと明示的な /dashboard の両方で表示
   {
