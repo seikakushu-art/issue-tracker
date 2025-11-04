@@ -1306,13 +1306,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 課題のテーマカラーを取得 */
   getIssueThemeColor(): string {
-    if (this.issueDetails?.themeColor) {
-      return this.issueDetails.themeColor;
+    const explicitColor = this.issueDetails?.themeColor;
+    if (typeof explicitColor === 'string' && explicitColor.trim().length > 0) {
+      return explicitColor.trim();
     }
-    if (this.issueDetails?.id) {
-      return this.getFallbackColor(this.issueDetails.id);
-    }
-    return this.colorPalette[0];
+    const fallbackKey = this.issueDetails?.id ?? this.issueId ?? null;
+    return this.getFallbackColor(fallbackKey);
   }
   /**
    * テーマカラーを透過色に変換
@@ -1365,8 +1364,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   /** フォールバックカラーを取得 */
-  getFallbackColor(id: string): string {
-    const index = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  getFallbackColor(id: string | null | undefined): string {
+    const source = typeof id === 'string' ? id.trim() : '';
+    if (source.length === 0) {
+      return this.colorPalette[0];
+    }
+    const index = source.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return this.colorPalette[index % this.colorPalette.length];
   }
 

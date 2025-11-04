@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
+import { AuthService } from '../../core/auth.service';
 
 /**
  * ログイン画面コンポーネント
@@ -48,6 +49,19 @@ import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
               placeholder="パスワードを入力"
               [disabled]="loading"
             >
+          </div>
+
+          <div class="form-group remember-group">
+            <label class="remember-label">
+              <input
+                type="checkbox"
+                [(ngModel)]="loginForm.remember"
+                name="remember"
+                [disabled]="loading"
+              >
+              <span class="remember-text">ログイン状態を維持します</span>
+            </label>
+            <p class="remember-note">チェックすると30日間ログイン状態を維持します。</p>
           </div>
 
           <div class="form-actions">
@@ -142,6 +156,36 @@ import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
       font-weight: 500;
       color: #333;
       font-size: 14px;
+    }
+
+    .remember-group {
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .remember-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .remember-label input {
+      width: 18px;
+      height: 18px;
+    }
+
+    .remember-text {
+      font-weight: 500;
+    }
+
+    .remember-note {
+      margin: 0;
+      color: #666;
+      font-size: 12px;
     }
 
     .form-group input {
@@ -260,6 +304,7 @@ export class LoginComponent implements OnInit {
   private auth = inject(Auth);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private authService = inject(AuthService);
 
   loading = false;
   errorMessage = '';
@@ -268,7 +313,8 @@ export class LoginComponent implements OnInit {
 
   loginForm = {
     email: '',
-    password: ''
+    password: '',
+    remember: false,
   };
 
   ngOnInit() {
@@ -293,6 +339,7 @@ export class LoginComponent implements OnInit {
     this.successMessage = '';
 
     try {
+      await this.authService.applyRememberPreference(this.loginForm.remember);
       const userCredential = await signInWithEmailAndPassword(
         this.auth,
         this.loginForm.email,
@@ -305,7 +352,14 @@ export class LoginComponent implements OnInit {
         await this.auth.signOut();
         this.errorMessage = 'メールアドレスの確認が完了していません。確認メールのリンクをクリックしてメールアドレスを確認してください。';
         this.loading = false;
+        this.authService.clearRememberMarker();
         return;
+      }
+
+      if (this.loginForm.remember) {
+        this.authService.markRememberSession();
+      } else {
+        this.authService.clearRememberMarker();
       }
       
       // ログイン成功時は指定のリダイレクト先があれば遷移
@@ -341,6 +395,9 @@ export class LoginComponent implements OnInit {
       }
     } finally {
       this.loading = false;
+      if (this.errorMessage) {
+        this.authService.clearRememberMarker();
+      }
     }
   }
 

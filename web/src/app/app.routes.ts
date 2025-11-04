@@ -12,6 +12,7 @@ import { AttachmentsListComponent } from './features/attachments/attachments-lis
 import { GlobalSearchComponent } from './features/search/global-search.component';
 import { ProgressGanttComponent } from './features/progress/progress-gantt.component';
 import { ProgressTreeComponent } from './features/progress/progress-tree.component';
+import { authGuard } from './core/auth.guard';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -36,65 +37,76 @@ export const routes: Routes = [
   {
     path: 'settings',
     component: UserSettingsComponent,
-    title: 'ユーザー設定'
+    title: 'ユーザー設定',
+    canActivate: [authGuard]
   },
 
   {
     path: 'board',
     component: BoardListComponent,
-    title: '掲示板'
+    title: '掲示板',
+    canActivate: [authGuard]
   },
   {
     path: 'search',
     component: GlobalSearchComponent,
-    title: '横断検索'
+    title: '横断検索',
+    canActivate: [authGuard]
   },
   {
     path: 'attachments',
     component: AttachmentsListComponent,
-    title: '添付ファイル一覧'
+    title: '添付ファイル一覧',
+    canActivate: [authGuard]
   },
   {
     path: 'gantt',
     component: ProgressGanttComponent,
-    title: 'ガントチャート'
+    title: 'ガントチャート',
+    canActivate: [authGuard]
   },
   {
     path: 'tree',
     component: ProgressTreeComponent,
-    title: 'ツリー'
+    title: 'ツリー',
+    canActivate: [authGuard]
   },
   // ダッシュボード: トップと明示的な /dashboard の両方で表示
   {
     path: '',
     component: DashboardComponent,
-    title: 'ダッシュボード'
+    title: 'ダッシュボード',
+    canActivate: [authGuard]
   },
   {
     path: 'dashboard',
     component: DashboardComponent,
-    title: 'ダッシュボード'
+    title: 'ダッシュボード',
+    canActivate: [authGuard]
   },
 
   // プロジェクト一覧（既存画面への導線確保）
   {
     path: 'projects',
     component: ProjectsListComponent,
-    title: 'プロジェクト一覧'
+    title: 'プロジェクト一覧',
+    canActivate: [authGuard]
   },
   
   // プロジェクト詳細（課題一覧）
   {
     path: 'projects/:projectId',
     component: IssuesListComponent,
-    title: '課題一覧'
+    title: '課題一覧',
+    canActivate: [authGuard]
   },
   
   // 課題詳細（タスク一覧）
   {
     path: 'projects/:projectId/issues/:issueId',
     component: TasksListComponent,
-    title: 'タスク一覧'
+    title: 'タスク一覧',
+    canActivate: [authGuard]
   },
   
   // 404ページ

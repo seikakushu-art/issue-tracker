@@ -14,6 +14,7 @@ import {
   type ActionCodeSettings,
 } from 'firebase/auth';
 
+const REMEMBER_EXPIRES_KEY = 'issue-tracker:remember-expires-at';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private auth = inject(Auth);
@@ -22,12 +23,67 @@ export class AuthService {
     return { url: `${location.origin}/login`, handleCodeInApp: false };
   }
 
-  async setRemember(remember: boolean) {
-    // ここで選択に応じて永続化層を切替
+  async applyRememberPreference(remember: boolean) {
     await setPersistence(
       this.auth,
       remember ? browserLocalPersistence : browserSessionPersistence,
     );
+
+    if (!remember) {
+      this.clearRememberMarker();
+    }
+  }
+
+  markRememberSession(durationDays = 30) {
+    if (!this.hasStorage()) {
+      return;
+    }
+    const expiresAt = Date.now() + durationDays * 24 * 60 * 60 * 1000;
+    try {
+      window.localStorage.setItem(REMEMBER_EXPIRES_KEY, String(expiresAt));
+    } catch (error) {
+      console.warn('ログイン状態の保持情報を保存できませんでした:', error);
+    }
+  }
+
+  clearRememberMarker() {
+    if (!this.hasStorage()) {
+      return;
+    }
+    try {
+      window.localStorage.removeItem(REMEMBER_EXPIRES_KEY);
+    } catch (error) {
+      console.warn('ログイン状態の保持情報を削除できませんでした:', error);
+    }
+  }
+
+  isRememberSessionValid(): boolean {
+    if (!this.hasStorage()) {
+      return true;
+    }
+    try {
+      const raw = window.localStorage.getItem(REMEMBER_EXPIRES_KEY);
+      if (!raw) {
+        return true;
+      }
+      const expiresAt = Number.parseInt(raw, 10);
+      if (Number.isNaN(expiresAt)) {
+        this.clearRememberMarker();
+        return true;
+      }
+      if (expiresAt > Date.now()) {
+        return true;
+      }
+      this.clearRememberMarker();
+      return false;
+    } catch (error) {
+      console.warn('ログイン状態の保持情報を読み取れませんでした:', error);
+      return true;
+    }
+  }
+
+  private hasStorage(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
   }
 
   async register(email: string, password: string) {
