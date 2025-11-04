@@ -229,6 +229,42 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.setScrollPosition(target);
   }
 
+  scrollByMonths(months: number): void {
+    if (!this.timelineViewport || this.timeline.length === 0) {
+      return;
+    }
+    const viewport = this.timelineViewport.nativeElement;
+    const centerPosition = viewport.scrollLeft + viewport.clientWidth / 2;
+    const centerIndex = Math.max(
+      0,
+      Math.min(this.timeline.length - 1, Math.round(centerPosition / this.dayCellWidth)),
+    );
+    const referenceDay = this.timeline[centerIndex] ?? this.timeline[0];
+    const targetMonthStart = this.startOfMonth(this.addMonths(referenceDay.date, months));
+    let targetIndex = this.timeline.findIndex(
+      (day) =>
+        day.date.getUTCFullYear() === targetMonthStart.getUTCFullYear() &&
+        day.date.getUTCMonth() === targetMonthStart.getUTCMonth() &&
+        day.date.getUTCDate() === targetMonthStart.getUTCDate(),
+    );
+
+    if (targetIndex < 0) {
+      targetIndex = this.timeline.findIndex(
+        (day) =>
+          day.date.getUTCFullYear() === targetMonthStart.getUTCFullYear() &&
+          day.date.getUTCMonth() === targetMonthStart.getUTCMonth(),
+      );
+    }
+
+    if (targetIndex < 0) {
+      targetIndex = months < 0 ? 0 : this.timeline.length - 1;
+    }
+
+    const target = targetIndex * this.dayCellWidth;
+    this.setScrollPosition(target);
+  }
+
+
   scrollToToday(): void {
     if (typeof window === 'undefined') {
       return;
@@ -460,6 +496,16 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const result = new Date(date);
     result.setUTCFullYear(result.getUTCFullYear() + years);
     return result;
+  }
+
+  private addMonths(date: Date, months: number): Date {
+    const result = new Date(date);
+    result.setUTCMonth(result.getUTCMonth() + months);
+    return result;
+  }
+
+  private startOfMonth(date: Date): Date {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
   }
 
   private buildMonthSegments(days: TimelineDay[]): TimelineMonthSegment[] {

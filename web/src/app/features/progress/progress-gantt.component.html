@@ -2,16 +2,20 @@
   <header class="gantt-header">
     <div class="gantt-header__titles">
       <h1>進行状況（ガントチャート）</h1>
-      <p class="gantt-header__caption">課題とタスクの進捗を時系列で確認できます。週の開始は月曜日・タイムゾーンは東京で揃えています。</p>
+      <p class="gantt-header__caption">課題とタスクの進捗を時系列で確認できます。</p>
       <div class="gantt-controls">
         <div class="gantt-controls__nav" aria-label="タイムラインの移動">
           <button type="button" class="gantt-controls__nav-btn" (click)="scrollByWeeks(-4)" aria-label="4週間戻る">
             <span aria-hidden="true">‹</span>
           </button>
-          <button type="button" class="gantt-controls__today" (click)="scrollToToday()">今日</button>
           <button type="button" class="gantt-controls__nav-btn" (click)="scrollByWeeks(4)" aria-label="4週間進む">
             <span aria-hidden="true">›</span>
           </button>
+        </div>
+        <div class="gantt-controls__jump" aria-label="月単位の移動">
+          <button type="button" class="gantt-controls__jump-btn" (click)="scrollByMonths(-1)">先月</button>
+          <button type="button" class="gantt-controls__today" (click)="scrollToToday()">今日</button>
+          <button type="button" class="gantt-controls__jump-btn" (click)="scrollByMonths(1)">来月</button>
         </div>
         <div class="gantt-controls__meta">
           <span class="gantt-controls__month">{{ activeMonthLabel }}</span>
@@ -26,44 +30,6 @@
   </header>
 
   <div class="gantt-layout">
-    <aside class="gantt-sidebar" aria-label="プロジェクト一覧">
-      <div class="gantt-sidebar__header">
-        <h2>プロジェクト一覧</h2>
-        <p>プロジェクト / 課題 / タスクの階層で選択できます。</p>
-      </div>
-      <ng-container *ngIf="projectHierarchy.length > 0; else emptySidebar">
-        <ul class="gantt-sidebar__projects">
-          <li *ngFor="let projectGroup of projectHierarchy" class="gantt-sidebar__project">
-            <div class="gantt-sidebar__project-name">{{ projectGroup.project.name }}</div>
-            <ul class="gantt-sidebar__issues">
-              <li *ngFor="let issueGroup of projectGroup.issues" class="gantt-sidebar__issue">
-                <div class="gantt-sidebar__issue-name">
-                  <span class="gantt-sidebar__issue-color" [style.backgroundColor]="getIssueTheme(issueGroup.issue)"></span>
-                  {{ issueGroup.issue.name }}
-                </div>
-                <ul class="gantt-sidebar__tasks">
-                  <li *ngFor="let task of issueGroup.tasks" class="gantt-sidebar__task">
-                    <button
-                      type="button"
-                      class="gantt-sidebar__task-btn"
-                      (click)="onSidebarTaskSelect(projectGroup.project.id, issueGroup.issue.id, task)"
-                    >
-                      {{ task.title }}
-                    </button>
-                  </li>
-                </ul>
-              </li>
-            </ul>
-          </li>
-        </ul>
-      </ng-container>
-      <ng-template #emptySidebar>
-        <div class="gantt-sidebar__empty">
-          <i class="icon-calendar"></i>
-          <p>プロジェクトと課題を追加すると、ここに一覧表示されます。</p>
-        </div>
-      </ng-template>
-    </aside>
 
     <div class="gantt-main">
       <section *ngIf="loadError" class="gantt-error" role="alert">
