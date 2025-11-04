@@ -22,6 +22,16 @@ interface GanttIssue {
   collapsed: boolean;
 }
 
+interface GanttProjectIssue {
+  issue: Issue;
+  tasks: Task[];
+}
+
+interface GanttProjectGroup {
+  project: Project;
+  issues: GanttProjectIssue[];
+}
+
 interface TimelineDay {
   date: Date;
   isWeekend: boolean;
@@ -72,6 +82,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   readonly tokyoTimezone = 'Asia/Tokyo';
   readonly dayCellWidth = 48;
   readonly labelColumnWidth = 280;
+
+  projectHierarchy: GanttProjectGroup[] = [];
 
   private readonly monthFormatter = new Intl.DateTimeFormat('ja-JP', {
     year: 'numeric',
@@ -141,6 +153,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       }
 
       this.ganttIssues = ganttIssues;
+      this.buildProjectHierarchy(ganttIssues);
       this.buildTimeline(allTaskDates);
       this.cdr.markForCheck();
     } catch (error) {
@@ -171,6 +184,20 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.selectedTask = task;
     this.selectedIssue = issue.issue;
     this.selectedProject = issue.project;
+  }
+
+  onSidebarTaskSelect(projectId: string | undefined, issueId: string | undefined, task: Task): void {
+    if (!projectId || !issueId) {
+      return;
+    }
+    const group = this.ganttIssues.find(
+      (item) => item.project.id === projectId && item.issue.id === issueId,
+    );
+    if (!group) {
+      return;
+    }
+    this.selectTask(group, task);
+    this.focusTaskOnTimeline(task);
   }
 
   closeDetailPanel(): void {
@@ -334,6 +361,24 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     }
   }
 
+  private buildProjectHierarchy(groups: GanttIssue[]): void {
+    const projectMap = new Map<string, GanttProjectGroup>();
+    for (const group of groups) {
+      const projectId = group.project.id;
+      const issueId = group.issue.id;
+      if (!projectId || !issueId) {
+        continue;
+      }
+      let projectGroup = projectMap.get(projectId);
+      if (!projectGroup) {
+        projectGroup = { project: group.project, issues: [] };
+        projectMap.set(projectId, projectGroup);
+      }
+      projectGroup.issues.push({ issue: group.issue, tasks: group.tasks });
+    }
+    this.projectHierarchy = Array.from(projectMap.values());
+  }
+
   private normalizeTaskDates(task: Task): Task {
     const clone: Task = { ...task };
     if (clone.startDate instanceof Date) {
@@ -461,6 +506,20 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.updateActiveMonthLabel(viewport);
   }
 
+  private focusTaskOnTimeline(task: Task): void {
+    if (!this.timelineViewport || !this.timelineStart) {
+      return;
+    }
+    const start = this.getEffectiveStart(task);
+    if (!start) {
+      return;
+    }
+    const index = Math.max(0, Math.min(this.timeline.length - 1, this.diffInDays(start, this.timelineStart)));
+    const element = this.timelineViewport.nativeElement;
+    const target = index * this.dayCellWidth - element.clientWidth / 3;
+    this.setScrollPosition(target);
+  }
+
   private updateActiveMonthLabel(source?: HTMLElement): void {
     const viewport = source ?? this.timelineViewport?.nativeElement;
     if (!viewport || this.timeline.length === 0) {
@@ -572,6 +631,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
         collapsed: false,
       },
     ];
+
+    this.buildProjectHierarchy(this.ganttIssues);
 
     const sampleDates = normalizedTasks.flatMap((task) => {
       const dates: Date[] = [];
