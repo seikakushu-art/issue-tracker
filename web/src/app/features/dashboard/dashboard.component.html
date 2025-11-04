@@ -181,7 +181,9 @@
         <section class="widget widget--board" aria-labelledby="board-title" id="daily-work-board">
             <div class="widget__header">
                 <h2 id="board-title">掲示板プレビュー</h2>
-                <span class="widget__hint">最新5件までの投稿を表示</span>
+                <div class="widget__actions">
+                    <a routerLink="/board" class="button button--ghost">もっと見る</a>
+                  </div>
             </div>
             <div class="widget__content widget__content--board">
                 <div class="widget__loading" *ngIf="bulletinLoading()">
@@ -191,7 +193,11 @@
                 <p class="widget__error" *ngIf="!bulletinLoading() && bulletinError()">
                     {{ bulletinError() }}
                 </p>
-                <app-board-preview *ngIf="!bulletinLoading() && !bulletinError()" [posts]="bulletinPosts()" moreLink="/board" />
+                 <app-board-preview
+      *ngIf="!bulletinLoading() && !bulletinError()"
+      [posts]="bulletinPosts()"
+      [embedded]="true">
+    </app-board-preview>
             </div>
         </section>
 

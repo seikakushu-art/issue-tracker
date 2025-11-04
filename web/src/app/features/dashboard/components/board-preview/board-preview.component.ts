@@ -16,6 +16,8 @@ export class BoardPreviewComponent {
   @Input({ required: true }) posts: BulletinPreviewItem[] = [];
   /** 詳細ページへ遷移するリンク */
   @Input() moreLink = '#';
+  /** 埋め込み表示かどうか */
+  @Input() embedded = false;
 
   getAvatarInitial(author: BulletinPreviewItem): string {
     return getAvatarInitial(author.authorUsername || author.authorId, '?');

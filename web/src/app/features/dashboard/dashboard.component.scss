@@ -854,5 +854,8 @@
     width: 100%;
   }
 }
-
+.widget--board .widget__content--board {
+  /* 子のpaddingを0にしたので、必要なら微調整 */
+  padding-top: 0;
+}
   

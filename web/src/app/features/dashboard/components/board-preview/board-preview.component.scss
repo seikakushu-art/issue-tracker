@@ -103,3 +103,12 @@
     color: #475569;
     margin: 0;
   }
+  .board-preview.embedded{
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    padding: 0;
+  }
+  .board-preview.embedded .board-preview__list{
+    margin: 0;
+  }

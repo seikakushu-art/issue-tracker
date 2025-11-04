@@ -1,5 +1,8 @@
-<section class="board-preview" aria-labelledby="board-preview-title">
-    <div class="board-preview__header">
+<section
+  class="board-preview"
+  [class.embedded]="embedded"
+  [attr.aria-labelledby]="embedded ? null : 'board-preview-title'">
+    <div class="board-preview__header"*ngIf="!embedded">
       <h3 id="board-preview-title">掲示板プレビュー</h3>
       <a [routerLink]="moreLink" class="board-preview__more" *ngIf="moreLink">もっと見る</a>
     </div>
