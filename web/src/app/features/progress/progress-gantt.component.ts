@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  OnInit,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Issue, Project, Task } from '../../models/schema';
@@ -16,6 +25,14 @@ interface GanttIssue {
 interface TimelineDay {
   date: Date;
   isWeekend: boolean;
+  isToday: boolean;
+  dayLabel: string;
+  weekdayLabel: string;
+}
+
+interface TimelineMonthSegment {
+  label: string;
+  span: number;
 }
 
 @Component({
@@ -26,30 +43,65 @@ interface TimelineDay {
   styleUrls: ['./progress-gantt.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProgressGanttComponent implements OnInit {
+export class ProgressGanttComponent implements OnInit, AfterViewInit {
   private projectsService = inject(ProjectsService);
   private issuesService = inject(IssuesService);
   private tasksService = inject(TasksService);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
 
+  @ViewChild('timelineViewport') timelineViewport?: ElementRef<HTMLDivElement>;
+
   loading = false;
   loadError: string | null = null;
 
   ganttIssues: GanttIssue[] = [];
   timeline: TimelineDay[] = [];
+  timelineMonths: TimelineMonthSegment[] = [];
   totalDays = 0;
   timelineStart!: Date;
   timelineEnd!: Date;
+  timelineWidth = 0;
+  activeMonthLabel = '';
+  currentScrollLeft = 0;
 
   selectedTask: Task | null = null;
   selectedIssue: Issue | null = null;
   selectedProject: Project | null = null;
 
   readonly tokyoTimezone = 'Asia/Tokyo';
+  readonly dayCellWidth = 48;
+  readonly labelColumnWidth = 280;
+
+  private readonly monthFormatter = new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    timeZone: this.tokyoTimezone,
+  });
+
+  private readonly weekdayFormatter = new Intl.DateTimeFormat('ja-JP', {
+    weekday: 'short',
+    timeZone: this.tokyoTimezone,
+  });
+
+  private readonly dayFormatter = new Intl.DateTimeFormat('ja-JP', {
+    day: '2-digit',
+    timeZone: this.tokyoTimezone,
+  });
+
+  private viewInitialized = false;
+  private pendingScrollToToday = false;
 
   ngOnInit(): void {
     void this.loadData();
+  }
+
+  ngAfterViewInit(): void {
+    this.viewInitialized = true;
+    if (this.pendingScrollToToday) {
+      this.pendingScrollToToday = false;
+      setTimeout(() => this.scrollToToday(), 0);
+    }
   }
 
   async loadData(): Promise<void> {
@@ -106,7 +158,13 @@ export class ProgressGanttComponent implements OnInit {
   }
 
   getGridTemplate(): string {
-    return this.timeline.length > 0 ? `repeat(${this.timeline.length}, minmax(56px, 1fr))` : '';
+    return this.timeline.length > 0 ? `repeat(${this.timeline.length}, var(--day-width))` : '';
+  }
+
+  onTimelineScroll(event: Event): void {
+    const element = event.target as HTMLElement;
+    this.currentScrollLeft = element.scrollLeft;
+    this.updateActiveMonthLabel(element);
   }
 
   selectTask(issue: GanttIssue, task: Task): void {
@@ -134,6 +192,35 @@ export class ProgressGanttComponent implements OnInit {
       queryParams: { focus: this.selectedTask.id },
     });
   }
+
+  scrollByWeeks(weeks: number): void {
+    if (!this.timelineViewport) {
+      return;
+    }
+    const element = this.timelineViewport.nativeElement;
+    const target = element.scrollLeft + weeks * 7 * this.dayCellWidth;
+    this.setScrollPosition(target);
+  }
+
+  scrollToToday(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!this.timelineViewport) {
+      this.pendingScrollToToday = true;
+      return;
+    }
+    if (this.timeline.length === 0) {
+      return;
+    }
+    const today = this.toTokyoDate(new Date());
+    const index = this.timeline.findIndex((day) => this.isSameDay(day.date, today));
+    const fallbackIndex = index >= 0 ? index : Math.floor(this.timeline.length / 2);
+    const element = this.timelineViewport.nativeElement;
+    const target = fallbackIndex * this.dayCellWidth - element.clientWidth / 2 + this.dayCellWidth / 2;
+    this.setScrollPosition(target);
+  }
+
 
   getTaskOffset(task: Task): string {
     if (!this.timelineStart) {
@@ -199,39 +286,52 @@ export class ProgressGanttComponent implements OnInit {
   }
 
   getTimelineLabel(day: TimelineDay): string {
-    return new Intl.DateTimeFormat('ja-JP', {
-      month: '2-digit',
-      day: '2-digit',
-      weekday: 'short',
-      timeZone: this.tokyoTimezone,
-    }).format(day.date);
+    return `${this.dayFormatter.format(day.date)} (${this.weekdayFormatter.format(day.date)})`;
   }
 
   private buildTimeline(allDates: Date[]): void {
+    const today = this.toTokyoDate(new Date());
+    const baseStart = this.startOfWeek(this.addYears(today, -5));
+    const baseEnd = this.endOfWeek(this.addYears(today, 5));
     if (allDates.length === 0) {
-      const today = this.toTokyoDate(new Date());
-      this.timelineStart = this.startOfWeek(today);
-      this.timelineEnd = this.endOfWeek(today);
+      this.timelineStart = baseStart;
+      this.timelineEnd = baseEnd;
     } else {
       const sorted = allDates.map((d) => this.toTokyoDate(d)).sort((a, b) => a.getTime() - b.getTime());
       const min = sorted[0];
       const max = sorted[sorted.length - 1];
-      this.timelineStart = this.startOfWeek(min);
-      this.timelineEnd = this.endOfWeek(max);
+      const computedStart = this.startOfWeek(min);
+      const computedEnd = this.endOfWeek(max);
+      this.timelineStart = computedStart.getTime() < baseStart.getTime() ? computedStart : baseStart;
+      this.timelineEnd = computedEnd.getTime() > baseEnd.getTime() ? computedEnd : baseEnd;
     }
 
     const days: TimelineDay[] = [];
     const cursor = new Date(this.timelineStart);
     while (cursor.getTime() <= this.timelineEnd.getTime()) {
+      const date = new Date(cursor);
       days.push({
-        date: new Date(cursor),
+        date,
         isWeekend: cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6,
+        isToday: this.isSameDay(date, today),
+        dayLabel: this.dayFormatter.format(date),
+        weekdayLabel: this.weekdayFormatter.format(date),
       });
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
 
     this.timeline = days;
     this.totalDays = Math.max(1, days.length);
+    this.timelineMonths = this.buildMonthSegments(days);
+    this.timelineWidth = this.totalDays * this.dayCellWidth;
+    this.activeMonthLabel = this.timelineMonths[0]?.label ?? '';
+
+    if (this.viewInitialized) {
+      setTimeout(() => this.scrollToToday(), 0);
+      this.updateActiveMonthLabel();
+    } else {
+      this.pendingScrollToToday = true;
+    }
   }
 
   private normalizeTaskDates(task: Task): Task {
@@ -273,6 +373,14 @@ export class ProgressGanttComponent implements OnInit {
     return Math.floor((start - end) / msPerDay);
   }
 
+  private isSameDay(a: Date, b: Date): boolean {
+    return (
+      a.getUTCFullYear() === b.getUTCFullYear() &&
+      a.getUTCMonth() === b.getUTCMonth() &&
+      a.getUTCDate() === b.getUTCDate()
+    );
+  }
+
   private getEffectiveStart(task: Task): Date | null {
     if (task.startDate instanceof Date) {
       return task.startDate;
@@ -302,6 +410,73 @@ export class ProgressGanttComponent implements OnInit {
     const day = date.getUTCDate();
     return new Date(Date.UTC(year, month, day));
   }
+
+  private addYears(date: Date, years: number): Date {
+    const result = new Date(date);
+    result.setUTCFullYear(result.getUTCFullYear() + years);
+    return result;
+  }
+
+  private buildMonthSegments(days: TimelineDay[]): TimelineMonthSegment[] {
+    const segments: TimelineMonthSegment[] = [];
+    let current: TimelineMonthSegment | null = null;
+    let currentKey = '';
+    for (const day of days) {
+      const key = `${day.date.getUTCFullYear()}-${day.date.getUTCMonth()}`;
+      if (key !== currentKey) {
+        if (current) {
+          segments.push(current);
+        }
+        currentKey = key;
+        current = {
+          label: this.monthFormatter.format(day.date),
+          span: 1,
+        };
+      } else if (current) {
+        current.span += 1;
+      }
+    }
+    if (current) {
+      segments.push(current);
+    }
+    return segments;
+  }
+
+  private setScrollPosition(target: number): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const viewport = this.timelineViewport?.nativeElement;
+    if (!viewport) {
+      return;
+    }
+    const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    const next = Math.min(Math.max(0, target), maxScroll);
+    if (typeof viewport.scrollTo === 'function') {
+      viewport.scrollTo({ left: next, behavior: 'smooth' });
+    } else {
+      viewport.scrollLeft = next;
+    }
+    this.currentScrollLeft = next;
+    this.updateActiveMonthLabel(viewport);
+  }
+
+  private updateActiveMonthLabel(source?: HTMLElement): void {
+    const viewport = source ?? this.timelineViewport?.nativeElement;
+    if (!viewport || this.timeline.length === 0) {
+      this.activeMonthLabel = this.timelineMonths[0]?.label ?? '';
+      return;
+    }
+    const center = viewport.scrollLeft + viewport.clientWidth / 2;
+    const index = Math.max(0, Math.min(this.timeline.length - 1, Math.round(center / this.dayCellWidth)));
+    const day = this.timeline[index];
+    const label = this.monthFormatter.format(day.date);
+    if (this.activeMonthLabel !== label) {
+      this.activeMonthLabel = label;
+      this.cdr.markForCheck();
+    }
+  }
+
 
   private createSampleDate(base: Date, offset: number): Date {
     const result = new Date(base);
