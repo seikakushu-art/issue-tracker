@@ -802,6 +802,25 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return getAvatarColor(uid);
   }
 
+  getAssigneeDisplayName(uid: string): string {
+    const profile = this.projectMemberProfiles[uid];
+    if (profile?.username && profile.username.trim().length > 0) {
+      return profile.username;
+    }
+    return uid;
+  }
+
+  getAssigneePhotoUrl(uid: string): string | null {
+    const photoUrl = this.projectMemberProfiles[uid]?.photoURL;
+    return typeof photoUrl === 'string' && photoUrl.trim().length > 0 ? photoUrl : null;
+  }
+
+  getAssigneeInitial(uid: string): string {
+    const profile = this.projectMemberProfiles[uid];
+    const source = profile?.username && profile.username.trim().length > 0 ? profile.username : uid;
+    return getAvatarInitial(source, '?');
+  }
+
   getMemberInitial(member: UserDirectoryProfile): string {
     return getAvatarInitial(member.username || member.uid, '?');
   }

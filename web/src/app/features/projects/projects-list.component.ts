@@ -109,6 +109,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     endDate: '',
     goal: ''
   };
+  memberSearchTerm = '';
 
   /** 課題数のキャッシュ（一覧表示・並び替え用） */
   private issueCountMap: Record<string, number> = {};
@@ -162,6 +163,12 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
         const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
         if (refreshed) {
           this.inviteProject = refreshed;
+        }
+      }
+      if (this.showModal && this.editingProject?.id) {
+        const refreshedEditing = this.projects.find(project => project.id === this.editingProject?.id) ?? null;
+        if (refreshedEditing) {
+          this.editingProject = refreshedEditing;
         }
       }
     } catch (error) {
@@ -373,6 +380,21 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     const photoUrl = profile?.photoURL;
     return typeof photoUrl === 'string' && photoUrl.trim().length > 0 ? photoUrl : null;
   }
+  get filteredEditingMemberIds(): string[] {
+    if (!this.editingProject) {
+      return [];
+    }
+    const memberIds = this.editingProject.memberIds ?? [];
+    const keyword = this.memberSearchTerm.trim().toLowerCase();
+    if (!keyword) {
+      return memberIds;
+    }
+    return memberIds.filter((memberId) => {
+      const profile = this.memberProfiles[memberId];
+      const username = profile?.username ?? '';
+      return username.toLowerCase().includes(keyword) || memberId.toLowerCase().includes(keyword);
+    });
+  }
 
 
   /**
@@ -389,6 +411,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     };
     this.selectedTemplateId = null;
     this.templateNotice = '';
+    this.memberSearchTerm = '';
+    this.memberRemovalMessage = '';
+    this.memberRemovalError = '';
+    this.removingMemberId = null;
     this.showModal = true;
   }
 
@@ -411,6 +437,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     };
     this.selectedTemplateId = null;
     this.templateNotice = '';
+    this.memberSearchTerm = '';
+    this.memberRemovalMessage = '';
+    this.memberRemovalError = '';
+    this.removingMemberId = null;
     this.showModal = true;
   }
 
@@ -696,11 +726,15 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     return role ? this.translateRole(role) : '権限未設定';
   }
 
-  async removeMember(memberId: string): Promise<void> {
-    if (!this.inviteProject?.id) {
+  private async removeMemberCore(
+    targetProject: Project | null,
+    memberId: string,
+    onRefreshed: (refreshed: Project | null) => void,
+  ): Promise<void> {
+    if (!targetProject?.id) {
       return;
     }
-    if (!this.canRemoveMember(this.inviteProject, memberId)) {
+    if (!this.canRemoveMember(targetProject, memberId)) {
       alert('このメンバーを削除する権限がありません');
       return;
     }
@@ -716,14 +750,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.removingMemberId = memberId;
 
     try {
-      await this.projectsService.removeProjectMember(this.inviteProject.id, memberId);
+      await this.projectsService.removeProjectMember(targetProject.id, memberId);
       await this.loadProjects();
-      if (this.inviteProject?.id) {
-        const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
-        if (refreshed) {
-          this.inviteProject = refreshed;
-        }
-      }
+      const refreshed = this.projects.find(project => project.id === targetProject.id) ?? null;
+      onRefreshed(refreshed);
       this.memberRemovalMessage = 'メンバーを削除しました。';
     } catch (error) {
       console.error('メンバーの削除に失敗しました:', error);
@@ -732,6 +762,27 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       this.removingMemberId = null;
     }
   }
+  async removeMember(memberId: string): Promise<void> {
+    await this.removeMemberCore(this.inviteProject, memberId, (refreshed) => {
+      this.inviteProject = refreshed;
+    });
+  }
+
+  async removeMemberFromEditing(memberId: string): Promise<void> {
+    if (!this.editingProject) {
+      return;
+    }
+    await this.removeMemberCore(this.editingProject, memberId, (refreshed) => {
+      this.editingProject = refreshed;
+      if (!refreshed) {
+        this.closeModal();
+      }
+    });
+    if (!this.memberRemovalError) {
+      this.memberSearchTerm = '';
+    }
+  }
+
 
   buildInviteUrl(invite: ProjectInvite): string {
     return `${location.origin}/invite/${invite.token}`;
@@ -809,6 +860,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.saving = false;
     this.selectedTemplateId = null;
     this.templateNotice = '';
+    this.memberSearchTerm = '';
+    this.memberRemovalMessage = '';
+    this.memberRemovalError = '';
+    this.removingMemberId = null;
   }
 
   /**

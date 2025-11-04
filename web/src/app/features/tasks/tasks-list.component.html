@@ -432,7 +432,22 @@
       <h3>担当者</h3>
       <p *ngIf="selectedTask.assigneeIds.length === 0" class="placeholder-text">担当者はまだ割り当てられていません。</p>
       <ul *ngIf="selectedTask.assigneeIds.length > 0" class="assignee-list">
-        <li *ngFor="let assigneeId of selectedTask.assigneeIds">{{ assigneeId }}</li>
+        <li *ngFor="let assigneeId of selectedTask.assigneeIds" class="assignee-item">
+          <ng-container *ngIf="getAssigneePhotoUrl(assigneeId) as photoUrl; else assigneeFallback">
+            <span class="assignee-avatar assignee-avatar--image">
+              <img [src]="photoUrl" [alt]="getAssigneeDisplayName(assigneeId) + 'のアイコン'">
+            </span>
+          </ng-container>
+          <ng-template #assigneeFallback>
+            <span
+              class="assignee-avatar assignee-avatar--fallback"
+              [style.backgroundColor]="getMemberAvatarColor(assigneeId)"
+            >
+              {{ getAssigneeInitial(assigneeId) }}
+            </span>
+          </ng-template>
+          <span class="assignee-name">{{ getAssigneeDisplayName(assigneeId) }}</span>
+        </li>
       </ul>
     </section>
 

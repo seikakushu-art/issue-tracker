@@ -402,6 +402,62 @@
             rows="2"
           ></textarea>
       </div>
+      <div class="form-group" *ngIf="editingProject">
+        <label for="memberSearch">担当者の編集</label>
+        <div class="member-editor">
+          <div class="member-editor__search">
+            <input
+              id="memberSearch"
+              type="search"
+              name="memberSearch"
+              [(ngModel)]="memberSearchTerm"
+              placeholder="ユーザー名でメンバーを検索"
+            >
+          </div>
+          <div class="member-editor__list">
+            <p class="info-text" *ngIf="editingProject.memberIds.length === 0">
+              参加メンバーがいません。
+            </p>
+            <p
+              class="info-text"
+              *ngIf="editingProject.memberIds.length > 0 && filteredEditingMemberIds.length === 0"
+            >
+              検索条件に一致するメンバーが見つかりません。
+            </p>
+            <ul class="member-editor__items" *ngIf="filteredEditingMemberIds.length > 0">
+              <li class="member-editor__item" *ngFor="let memberId of filteredEditingMemberIds">
+                <div class="member-editor__member">
+                  <ng-container *ngIf="getMemberPhoto(memberId) as photoUrl; else memberEditorFallback">
+                    <span class="member-editor__avatar member-editor__avatar--image">
+                      <img [src]="photoUrl" [alt]="getMemberDisplayName(memberId) + 'のアイコン'">
+                    </span>
+                  </ng-container>
+                  <ng-template #memberEditorFallback>
+                    <span class="member-editor__avatar" [style.background]="getMemberColor(memberId)">
+                      {{ getMemberInitial(memberId) }}
+                    </span>
+                  </ng-template>
+                  <div class="member-editor__details">
+                    <span class="member-editor__name">{{ getMemberDisplayName(memberId) }}</span>
+                    <span class="member-editor__role">権限: {{ getMemberRoleLabel(editingProject, memberId) }}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-small"
+                  *ngIf="canRemoveMember(editingProject, memberId)"
+                  (click)="removeMemberFromEditing(memberId)"
+                  [disabled]="removingMemberId === memberId"
+                >
+                  {{ removingMemberId === memberId ? '削除中...' : '削除' }}
+                </button>
+              </li>
+            </ul>
+            <p *ngIf="memberRemovalMessage" class="success-message">{{ memberRemovalMessage }}</p>
+            <p *ngIf="memberRemovalError" class="error-message">{{ memberRemovalError }}</p>
+          </div>
+        </div>
+      </div>
       
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" (click)="closeModal()">
