@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Issue, Project, Task } from '../../models/schema';
@@ -31,6 +31,7 @@ export class ProgressGanttComponent implements OnInit {
   private issuesService = inject(IssuesService);
   private tasksService = inject(TasksService);
   private router = inject(Router);
+  private cdr = inject(ChangeDetectorRef);
 
   loading = false;
   loadError: string | null = null;
@@ -89,12 +90,14 @@ export class ProgressGanttComponent implements OnInit {
 
       this.ganttIssues = ganttIssues;
       this.buildTimeline(allTaskDates);
+      this.cdr.markForCheck();
     } catch (error) {
       console.error('ガントチャートのデータ読み込みに失敗しました:', error);
       this.loadError = 'リアルデータの取得に失敗したため、サンプルデータを表示しています。';
       this.applySampleData();
     } finally {
       this.loading = false;
+      this.cdr.markForCheck();
     }
   }
 
@@ -406,5 +409,6 @@ export class ProgressGanttComponent implements OnInit {
       return dates;
     });
     this.buildTimeline(sampleDates);
+    this.cdr.markForCheck();
   }
 }
