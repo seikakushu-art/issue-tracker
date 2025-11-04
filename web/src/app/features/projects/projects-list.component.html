@@ -237,6 +237,35 @@
       <p *ngIf="inviteMessage" class="success-message">{{ inviteMessage }}</p>
       <p *ngIf="inviteError" class="error-message">{{ inviteError }}</p>
 
+      <section class="member-management" *ngIf="inviteProject">
+        <div class="member-management__header">
+          <h3>参加メンバー</h3>
+          <span class="member-management__count">{{ inviteProject.memberIds.length }}人</span>
+        </div>
+        <p class="info-text" *ngIf="inviteProject.memberIds.length === 0">
+          まだメンバーが参加していません。
+        </p>
+        <ul class="member-list" *ngIf="inviteProject.memberIds.length > 0">
+          <li class="member-item" *ngFor="let memberId of inviteProject.memberIds">
+            <div class="member-item__info">
+              <span class="member-item__name">{{ getMemberDisplayName(memberId) }}</span>
+              <span class="member-item__role">権限: {{ getMemberRoleLabel(inviteProject, memberId) }}</span>
+            </div>
+            <button
+              type="button"
+              class="btn btn-secondary btn-small"
+              *ngIf="canRemoveMember(inviteProject, memberId)"
+              (click)="removeMember(memberId)"
+              [disabled]="removingMemberId === memberId"
+            >
+              {{ removingMemberId === memberId ? '削除中...' : '削除' }}
+            </button>
+          </li>
+        </ul>
+        <p *ngIf="memberRemovalMessage" class="success-message">{{ memberRemovalMessage }}</p>
+        <p *ngIf="memberRemovalError" class="error-message">{{ memberRemovalError }}</p>
+      </section>
+
       <div class="invite-list" *ngIf="inviteLinks.length > 0">
         <table>
           <thead>

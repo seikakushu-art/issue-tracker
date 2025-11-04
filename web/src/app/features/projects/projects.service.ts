@@ -252,12 +252,36 @@ export class ProjectsService {
     await this.ensureProjectRole(id, ['admin']);
     return updateDoc(doc(this.db, 'projects', id), { archived });
   }
-   /**
+  async removeProjectMember(projectId: string, memberId: string): Promise<void> {
+    const { project } = await this.ensureProjectRole(projectId, ['admin']);
+
+    if (!project.memberIds.includes(memberId)) {
+      throw new Error('指定されたユーザーはこのプロジェクトのメンバーではありません');
+    }
+
+    const nextMemberIds = project.memberIds.filter((id) => id !== memberId);
+    const nextRoles = { ...(project.roles ?? {}) } as Record<string, Role>;
+    if (memberId in nextRoles) {
+      delete nextRoles[memberId];
+    }
+
+    const hasAdmin = Object.values(nextRoles).some((role) => role === 'admin');
+    if (!hasAdmin) {
+      throw new Error('少なくとも1人の管理者が必要です。');
+    }
+
+    await updateDoc(doc(this.db, 'projects', projectId), {
+      memberIds: nextMemberIds,
+      roles: nextRoles,
+    });
+  }
+
+  /**
    * 既存プロジェクトの情報を更新する
    * @param id 更新対象のプロジェクトID
    * @param updates 更新内容（空文字はnullとして扱う）
    */
-   async updateProject(
+  async updateProject(
     id: string,
     updates: Partial<{
       name: string;

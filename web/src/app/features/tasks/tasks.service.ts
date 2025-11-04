@@ -209,6 +209,13 @@ export class TasksService {
     const checklist = input.checklist || [];
     const progress = this.calculateProgressFromChecklist(checklist);
 
+    const initialAssignees = Array.isArray(input.assigneeIds)
+      ? input.assigneeIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      : [];
+    const assigneeSet = new Set<string>(initialAssignees);
+    assigneeSet.add(uid);
+    const assigneeIds = Array.from(assigneeSet);
+
     // タグ数の上限チェック（最大10個）
     if (input.tagIds && input.tagIds.length > 10) {
       throw new Error('タスクに付与できるタグは最大10個までです');
@@ -225,7 +232,7 @@ export class TasksService {
       title: input.title,
       status: input.status,
       archived: false,
-      assigneeIds: input.assigneeIds || [],
+      assigneeIds,
       tagIds: input.tagIds || [],
       checklist,
       progress,

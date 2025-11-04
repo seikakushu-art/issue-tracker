@@ -93,6 +93,9 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   inviteMessage = '';
   inviteError = '';
   generatedUrl = '';
+  removingMemberId: string | null = null;
+  memberRemovalMessage = '';
+  memberRemovalError = '';
 
   // 並び替え設定
   sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' | 'period' | 'issueCount' | 'memberCount' = 'name';
@@ -155,6 +158,12 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       await this.loadMemberProfiles(this.projects);
       await this.loadProjectTasks();
       this.filterProjects();
+      if (this.showInviteModal && this.inviteProject?.id) {
+        const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
+        if (refreshed) {
+          this.inviteProject = refreshed;
+        }
+      }
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
     }
@@ -563,6 +572,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.inviteForm = { role: 'member', expiresInHours: 24 };
     this.generatedUrl = '';
     this.inviteMessage = '';
+    this.inviteError = '';
+    this.memberRemovalMessage = '';
+    this.memberRemovalError = '';
+    this.removingMemberId = null;
     this.showInviteModal = true;
     await this.loadInvites(project.id);
   }
@@ -623,6 +636,9 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.generatedUrl = '';
     this.inviteMessage = '';
     this.inviteError = '';
+    this.memberRemovalMessage = '';
+    this.memberRemovalError = '';
+    this.removingMemberId = null;
   }
 
   translateRole(role: Role): string {
@@ -650,6 +666,70 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
         return '取り消し済み';
       default:
         return status;
+    }
+  }
+  canRemoveMember(project: Project | null, memberId: string): boolean {
+    if (!project?.id) {
+      return false;
+    }
+    if (!this.isAdmin(project)) {
+      return false;
+    }
+    if (!project.memberIds.includes(memberId)) {
+      return false;
+    }
+    if (memberId === this.currentUid) {
+      return false;
+    }
+    const remainingRoles = { ...(project.roles ?? {}) } as Record<string, Role>;
+    if (memberId in remainingRoles) {
+      delete remainingRoles[memberId];
+    }
+    return Object.values(remainingRoles).some(role => role === 'admin');
+  }
+
+  getMemberRoleLabel(project: Project | null, memberId: string): string {
+    if (!project) {
+      return '';
+    }
+    const role = project.roles?.[memberId] ?? null;
+    return role ? this.translateRole(role) : '権限未設定';
+  }
+
+  async removeMember(memberId: string): Promise<void> {
+    if (!this.inviteProject?.id) {
+      return;
+    }
+    if (!this.canRemoveMember(this.inviteProject, memberId)) {
+      alert('このメンバーを削除する権限がありません');
+      return;
+    }
+
+    const displayName = this.getMemberDisplayName(memberId);
+    const confirmed = confirm(`メンバー「${displayName}」をプロジェクトから削除しますか？`);
+    if (!confirmed) {
+      return;
+    }
+
+    this.memberRemovalMessage = '';
+    this.memberRemovalError = '';
+    this.removingMemberId = memberId;
+
+    try {
+      await this.projectsService.removeProjectMember(this.inviteProject.id, memberId);
+      await this.loadProjects();
+      if (this.inviteProject?.id) {
+        const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
+        if (refreshed) {
+          this.inviteProject = refreshed;
+        }
+      }
+      this.memberRemovalMessage = 'メンバーを削除しました。';
+    } catch (error) {
+      console.error('メンバーの削除に失敗しました:', error);
+      this.memberRemovalError = error instanceof Error ? error.message : 'メンバーの削除に失敗しました';
+    } finally {
+      this.removingMemberId = null;
     }
   }
 
