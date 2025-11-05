@@ -10,6 +10,7 @@ import { FirebaseError } from 'firebase/app';
 import { TasksService, TaskSummary } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
+import { ISSUE_THEME_PALETTE, resolveIssueThemeColor } from '../../shared/issue-theme';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 import { ProjectSidebarComponent } from '../../shared/project-sidebar/project-sidebar.component';
 import { SmartFilterPanelComponent } from '../../shared/smart-filter/smart-filter-panel.component';
@@ -108,10 +109,8 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   };
 
   // ランダムカラー生成用
-  private colorPalette = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
-  ];
+   /** 課題テーマカラーの候補一覧（タスク側と共通化） */
+   readonly colorPalette = ISSUE_THEME_PALETTE;
 
   ngOnInit() {
     void this.loadAvailableProjects();
@@ -574,14 +573,11 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
   }
 
   /**
-   * ランダムカラーを取得
+   * 課題カードで利用するテーマカラーを一元的に算出
+   * 明示カラーが無ければIDから決定論的に引き当てる
    */
-  getRandomColor(issueId: string): string {
-    const hash = issueId.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    return this.colorPalette[Math.abs(hash) % this.colorPalette.length];
+  getIssueThemeColorValue(issue: Issue): string {
+    return resolveIssueThemeColor(issue.themeColor ?? null, issue.id ?? null);
   }
 
   /**

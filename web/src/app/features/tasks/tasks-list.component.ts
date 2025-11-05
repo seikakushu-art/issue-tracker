@@ -23,6 +23,7 @@ import {
   matchesSmartFilterTask,
   isSmartFilterEmpty,
 } from '../../shared/smart-filter/smart-filter.model';
+import { resolveIssueThemeColor } from '../../shared/issue-theme';
 
 interface TaskCommentView extends Comment {
   authorUsername: string;
@@ -142,12 +143,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   private tagsLoaded = false;
   private availableTagIdSet = new Set<string>();
-
-  // カラーパレット（課題テーマカラー用）
-  private colorPalette = [
-    '#007bff', '#20c997', '#ffc107', '#dc3545', '#6f42c1',
-    '#e83e8c', '#fd7e14', '#28a745', '#17a2b8', '#6c757d'
-  ];
 
   // 重要度表示用
   private importanceDisplay: Record<Importance, { label: string; weight: number }> = {
@@ -1262,7 +1257,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.newTagColor = this.generateRandomUniqueTagColor(); // 次回用にランダムカラーを再割り当て
     } catch (error) {
       console.error('カスタムタグの作成に失敗しました:', error);
-      alert('タグの作成に失敗しました。時間を置いて再度お試しください。');
+       // サービス層からの詳細メッセージをそのまま伝えて重複検知を明示
+       if (error instanceof Error && error.message) {
+        alert(error.message);
+      } else {
+        alert('タグの作成に失敗しました。時間を置いて再度お試しください。');
+      }
     } finally {
       this.creatingTag = false; // ローディング状態を解除
     }
@@ -1460,12 +1460,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 課題のテーマカラーを取得 */
   getIssueThemeColor(): string {
-    const explicitColor = this.issueDetails?.themeColor;
-    if (typeof explicitColor === 'string' && explicitColor.trim().length > 0) {
-      return explicitColor.trim();
-    }
     const fallbackKey = this.issueDetails?.id ?? this.issueId ?? null;
-    return this.getFallbackColor(fallbackKey);
+    return resolveIssueThemeColor(this.issueDetails?.themeColor ?? null, fallbackKey);
   }
   /**
    * テーマカラーを透過色に変換
@@ -1516,17 +1512,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
       b: value & 0xff
     };
   }
-
-  /** フォールバックカラーを取得 */
-  getFallbackColor(id: string | null | undefined): string {
-    const source = typeof id === 'string' ? id.trim() : '';
-    if (source.length === 0) {
-      return this.colorPalette[0];
-    }
-    const index = source.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return this.colorPalette[index % this.colorPalette.length];
-  }
-
   /** 重要度のラベルを日本語で取得 */
   getImportanceLabel(importance?: Importance): string {
     const key = importance ?? 'Low';

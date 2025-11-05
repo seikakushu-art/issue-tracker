@@ -137,7 +137,7 @@
     >
       <div
         class="theme-strip"
-        [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
+        [style.background-color]="getIssueThemeColorValue(issue)"
       ></div>
       <div class="issue-header">
         <div class="issue-actions" *ngIf="isAdmin()">
@@ -157,7 +157,7 @@
         <div class="issue-title">
           <div
             class="theme-color-badge"
-            [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
+            [style.background-color]="getIssueThemeColorValue(issue)"
           ></div>
           <h3>{{ issue.name }}</h3>
         </div>
@@ -186,7 +186,7 @@
             <div 
               class="progress-fill" 
               [style.width.%]="issue.progress || 0"
-              [style.background-color]="issue.themeColor || getRandomColor(issue.id!)"
+              [style.background-color]="getIssueThemeColorValue(issue)"
             ></div>
           </div>
         </div>
@@ -200,7 +200,7 @@
         <div
           class="representative-task"
           *ngIf="getRepresentativeTask(issue.id!) as representativeTask"
-          [style.border-left-color]="issue.themeColor || getRandomColor(issue.id!)"
+          [style.border-left-color]="getIssueThemeColorValue(issue)"
         >
           <span class="task-label">代表タスク</span>
           <div class="representative-task-main">
