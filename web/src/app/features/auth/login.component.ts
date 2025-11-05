@@ -53,13 +53,13 @@ import { AuthService } from '../../core/auth.service';
 
           <div class="form-group remember-group">
             <label class="remember-label">
+            <span class="remember-text">ログイン状態を維持します</span>
               <input
                 type="checkbox"
                 [(ngModel)]="loginForm.remember"
                 name="remember"
                 [disabled]="loading"
               >
-              <span class="remember-text">ログイン状態を維持します</span>
             </label>
             <p class="remember-note">チェックすると30日間ログイン状態を維持します。</p>
           </div>
@@ -150,7 +150,7 @@ import { AuthService } from '../../core/auth.service';
       margin-bottom: 20px;
     }
 
-    .form-group label {
+    .form-group label:not(.remember-label) {
       display: block;
       margin-bottom: 6px;
       font-weight: 500;
@@ -165,21 +165,25 @@ import { AuthService } from '../../core/auth.service';
       gap: 8px;
     }
 
-    .remember-label {
-      display: flex;
+    .remember-label{
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
       color: #333;
       font-size: 14px;
+      white-space: nowrap;
     }
 
     .remember-label input {
       width: 18px;
       height: 18px;
+      margin: 0 2px 0 0;
     }
 
     .remember-text {
       font-weight: 500;
+      padding: 2px 12px 2px 8px;
+      border-radius: 4px; 
     }
 
     .remember-note {
