@@ -131,6 +131,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 @media (max-width: 1024px) {
@@ -344,12 +345,17 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-width: 0;
   }
 
   .gantt-grid__scroll {
     display: flex;
     flex-direction: column;
-    overflow: auto;
+    overflow-x: auto;     /* 横だけスクロール発生にする */
+    overflow-y: hidden;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-width: 0;         /* ← Flex/Grid の“はみ出し”特効薬 */
     border-radius: 20px;
   }
 
