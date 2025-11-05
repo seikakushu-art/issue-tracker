@@ -49,32 +49,14 @@
         [style.--label-width.px]="labelColumnWidth"
       >
         <div class="gantt-grid">
-          <div class="gantt-grid__scroll" #timelineViewport (scroll)="onTimelineScroll($event)">
-            <div class="gantt-grid__header" [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()">
-              <div class="gantt-grid__header-label">
-                <span>課題 / タスク</span>
-              </div>
-              <div class="gantt-month-row" [style.gridTemplateColumns]="getGridTemplate()">
-                <div
-                  *ngFor="let month of timelineMonths"
-                  class="gantt-month-cell"
-                  [style.gridColumn]="'span ' + month.span"
-                >
-                  {{ month.label }}
-                </div>
-              </div>
-              <div class="gantt-day-row" [style.gridTemplateColumns]="getGridTemplate()">
-                <div
-                  *ngFor="let day of timeline"
-                  class="gantt-grid__header-date"
-                  [class.weekend]="day.isWeekend"
-                  [class.today]="day.isToday"
-                >
-                  <span class="day-number">{{ day.dayLabel }}</span>
-                  <span class="day-weekday">{{ day.weekdayLabel }}</span>
-                </div>
-              </div>
-            </div>
+          <app-progress-gantt-timeline
+          [timeline]="timeline"
+          [timelineMonths]="timelineMonths"
+          [gridTemplate]="getGridTemplate()"
+          [labelColumnWidth]="labelColumnWidth"
+          [dayCellWidth]="dayCellWidth"
+          (scrolled)="onTimelineScroll($event)"
+        >
 
             <div class="gantt-grid__rows">
               <ng-container *ngIf="ganttIssues.length > 0; else emptyState">
@@ -137,7 +119,7 @@
                 </div>
               </ng-template>
             </div>
-          </div>
+          </app-progress-gantt-timeline>
         </div>
       </section>
     </div>

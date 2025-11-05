@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
-  ElementRef,
   OnInit,
   ViewChild,
   inject,
@@ -14,6 +13,7 @@ import { Issue, Project, Task } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
+import { ProgressGanttTimelineComponent } from './progress-gantt-timeline.component';
 
 interface GanttIssue {
   project: Project;
@@ -27,12 +27,12 @@ interface GanttProjectIssue {
   tasks: Task[];
 }
 
-interface GanttProjectGroup {
+export interface GanttProjectGroup {
   project: Project;
   issues: GanttProjectIssue[];
 }
 
-interface TimelineDay {
+export interface TimelineDay {
   date: Date;
   isWeekend: boolean;
   isToday: boolean;
@@ -40,7 +40,7 @@ interface TimelineDay {
   weekdayLabel: string;
 }
 
-interface TimelineMonthSegment {
+export interface TimelineMonthSegment {
   label: string;
   span: number;
 }
@@ -48,7 +48,7 @@ interface TimelineMonthSegment {
 @Component({
   selector: 'app-progress-gantt',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ProgressGanttTimelineComponent],
   templateUrl: './progress-gantt.component.html',
   styleUrls: ['./progress-gantt.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,7 +60,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
 
-  @ViewChild('timelineViewport') timelineViewport?: ElementRef<HTMLDivElement>;
+  @ViewChild(ProgressGanttTimelineComponent) timelineViewport?: ProgressGanttTimelineComponent;
+
 
   loading = false;
   loadError: string | null = null;
@@ -225,6 +226,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       return;
     }
     const element = this.timelineViewport.nativeElement;
+    if (!element) {
+      return;
+    }
     const target = element.scrollLeft + weeks * 7 * this.dayCellWidth;
     this.setScrollPosition(target);
   }
@@ -233,7 +237,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     if (!this.timelineViewport || this.timeline.length === 0) {
       return;
     }
-    const viewport = this.timelineViewport.nativeElement;
+    const viewport = this.timelineViewport?.nativeElement;
+    if (!viewport) {
+      return;
+    }
     const centerPosition = viewport.scrollLeft + viewport.clientWidth / 2;
     const centerIndex = Math.max(
       0,
@@ -279,7 +286,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const today = this.toTokyoDate(new Date());
     const index = this.timeline.findIndex((day) => this.isSameDay(day.date, today));
     const fallbackIndex = index >= 0 ? index : Math.floor(this.timeline.length / 2);
-    const element = this.timelineViewport.nativeElement;
+    const element = this.timelineViewport?.nativeElement;
+    if (!element) {
+      return;
+    }
     const target = fallbackIndex * this.dayCellWidth - element.clientWidth / 2 + this.dayCellWidth / 2;
     this.setScrollPosition(target);
   }
@@ -562,6 +572,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     }
     const index = Math.max(0, Math.min(this.timeline.length - 1, this.diffInDays(start, this.timelineStart)));
     const element = this.timelineViewport.nativeElement;
+    if (!element) {
+      return;
+    }
     const target = index * this.dayCellWidth - element.clientWidth / 3;
     this.setScrollPosition(target);
   }
