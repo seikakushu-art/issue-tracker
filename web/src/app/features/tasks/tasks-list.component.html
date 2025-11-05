@@ -176,10 +176,6 @@
             <i class="icon-archive" aria-hidden="true"></i>
             <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
           </button>
-          <button class="btn-icon btn-icon--labeled" *ngIf="canDeleteTask(task)" (click)="deleteTask(task, $event)" title="削除">
-            <i class="icon-delete" aria-hidden="true"></i>
-            <span class="btn-label">削除</span>
-          </button>
           <button
           class="btn-icon btn-icon--labeled"
           *ngIf="isAdmin() && !isRepresentativeTask(task)"
@@ -199,6 +195,10 @@
         >
           <i class="icon-remove-star" aria-hidden="true"></i>
           <span class="btn-label">代表解除</span>
+        </button>
+        <button class="btn-icon btn-icon--labeled" *ngIf="canDeleteTask(task)" (click)="deleteTask(task, $event)" title="削除">
+          <i class="icon-delete" aria-hidden="true"></i>
+          <span class="btn-label">削除</span>
         </button>
         </div>
         <div class="task-title">

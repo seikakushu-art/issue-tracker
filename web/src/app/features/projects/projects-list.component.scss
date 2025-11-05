@@ -115,7 +115,7 @@
 
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 350px));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 520px));
   gap: 20px;
   justify-content: center;
 }
@@ -160,7 +160,21 @@
   gap: 8px;
   justify-content: flex-end;
   align-self: flex-end; // 右上に寄せる
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px; // 横スクロールバーが出てもタイトルに干渉しないよう余白を確保
+}
+
+@media (max-width: 768px) {
+  .projects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .project-actions {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
 }
 
 .btn-action {

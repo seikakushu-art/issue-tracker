@@ -291,7 +291,7 @@
 
 .tasks-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 300px));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 380px));
   gap: 16px;
   justify-content: center;
 }
@@ -392,9 +392,23 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   align-self: flex-end; // 右上に寄せる
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+@media (max-width: 768px) {
+  .tasks-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+
+  .task-actions {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
 }
 
 .task-flags {
@@ -412,12 +426,6 @@
 
 .archived-flag {
   background: #6c757d;
-}
-
-
-.task-actions {
-  display: flex;
-  gap: 8px;
 }
 
 .btn-action {
