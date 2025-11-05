@@ -143,6 +143,7 @@ export interface Tag {
   name: string;  // 必須、ワークスペースで一意
   color?: string;  // タグのカラー
   createdAt?: Date | null;
+  createdBy?: string | null;  // 作成ユーザーID
 }
 
 /**

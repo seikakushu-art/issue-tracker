@@ -234,6 +234,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private async loadTags() {
     try {
       this.availableTags = await this.tagsService.listTags();
+      this.newTagColor = this.generateRandomUniqueTagColor(); // 既存タグと被らない初期カラーを再計算
       this.refreshSmartFilterTags();
     } catch (error) {
       console.error('タグの読み込みに失敗しました:', error);
@@ -1120,8 +1121,46 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
-   /** カスタムタグを即時作成し、一覧とフォームへ反映する */
-   async createCustomTag() {
+    /** タグが削除可能か（作成者本人か）を判定 */
+  canDeleteTag(tag: Tag): boolean {
+    if (!tag.id || !this.currentUid) {
+      return false;
+    }
+    return tag.createdBy === this.currentUid;
+  }
+
+  /** カスタムタグを一覧から削除し、フォームの選択状態も同期する */
+  async deleteCustomTag(tag: Tag, event: Event) {
+    event.stopPropagation();
+    event.preventDefault();
+
+    if (!tag.id) {
+      return;
+    }
+
+    if (!this.canDeleteTag(tag)) {
+      alert('このタグを削除する権限がありません');
+      return;
+    }
+
+    if (!confirm(`タグ「${tag.name}」を削除しますか？`)) {
+      return;
+    }
+
+    try {
+      await this.tagsService.deleteTag(tag.id);
+      this.availableTags = this.availableTags.filter(t => t.id !== tag.id); // 表示リストから除外
+      this.taskForm.tagIds = this.taskForm.tagIds.filter(id => id !== tag.id); // フォームで選択されていれば外す
+      this.refreshSmartFilterTags();
+      this.newTagColor = this.generateRandomUniqueTagColor(); // 削除で空いた色を考慮し初期色を再計算
+    } catch (error) {
+      console.error('タグの削除に失敗しました:', error);
+      alert('タグの削除に失敗しました。権限を確認してください。');
+    }
+  }
+
+  /** カスタムタグを即時作成し、一覧とフォームへ反映する */
+  async createCustomTag() {
     const name = this.newTagName.trim(); // 前後の空白を除去
     if (!name) {
       alert('タグ名を入力してください');
@@ -1134,22 +1173,63 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     this.creatingTag = true;
     try {
-      const color = this.newTagColor?.trim() || undefined; // 空文字列は未指定扱い
-      const tagId = await this.tagsService.createTag({ name, color }); // Firestoreへタグを保存
-      const newTag: Tag = { id: tagId, name, color }; // 表示用にタグ情報を構築
+      const preferredColor = this.normalizeHexColorInput(this.newTagColor); // 入力値を正規化（未指定ならundefined）
+      const tagId = await this.tagsService.createTag({ name, color: preferredColor ?? undefined }); // Firestoreへタグを保存
+      const createdTag = await this.tagsService.getTag(tagId); // 付与されたカラーや作成者情報を取得
+      const newTag: Tag = createdTag ?? { id: tagId, name, color: preferredColor ?? undefined, createdBy: this.currentUid ?? null };
       this.availableTags = [...this.availableTags, newTag]; // Change Detectionを確実に発火
+      this.refreshSmartFilterTags(); // フィルター用のタグ一覧も更新
 
       if (!this.taskForm.tagIds.includes(tagId) && this.taskForm.tagIds.length < 10) {
         this.taskForm.tagIds.push(tagId); // 作成したタグを自動的に選択
       }
 
       this.newTagName = ''; // 入力欄をクリア
-      this.newTagColor = '#4c6ef5'; // 次回作成時の初期色に戻す
+      this.newTagColor = this.generateRandomUniqueTagColor(); // 次回用にランダムカラーを再割り当て
     } catch (error) {
       console.error('カスタムタグの作成に失敗しました:', error);
       alert('タグの作成に失敗しました。時間を置いて再度お試しください。');
     } finally {
       this.creatingTag = false; // ローディング状態を解除
+    }
+  }
+   /** カラー入力値を正規化し、不正な値はundefined扱いにする */
+   private normalizeHexColorInput(color: string | null | undefined): string | undefined {
+    if (!color) {
+      return undefined;
+    }
+    const trimmed = color.trim();
+    const match = trimmed.match(/^#([0-9a-fA-F]{6})$/);
+    if (!match) {
+      return undefined;
+    }
+    return `#${match[1].toUpperCase()}`;
+  }
+
+  /** 既存タグと重複しないランダムカラーを算出 */
+  private generateRandomUniqueTagColor(): string {
+    const usedColors = new Set(
+      this.availableTags
+        .map(tag => tag.color)
+        .filter((color): color is string => typeof color === 'string' && color.trim().length > 0)
+        .map(color => color.trim().toUpperCase()),
+    );
+
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const color = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0').toUpperCase()}`;
+      if (!usedColors.has(color)) {
+        return color;
+      }
+    }
+
+    let fallback = usedColors.size + 1;
+    while (true) {
+      const value = ((fallback * 2654435761) & 0xffffff).toString(16).padStart(6, '0').toUpperCase();
+      const color = `#${value}`;
+      if (!usedColors.has(color)) {
+        return color;
+      }
+      fallback++;
     }
   }
   /** 課題進捗更新 */

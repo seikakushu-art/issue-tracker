@@ -758,7 +758,17 @@
               class="tag-color"
               [style.background-color]="tag.color || '#ccc'"
             ></span>
-            {{ tag.name }}
+            <span class="tag-name">{{ tag.name }}</span>
+            <button
+              *ngIf="canDeleteTag(tag)"
+              type="button"
+              class="tag-delete-button"
+              (click)="deleteCustomTag(tag, $event)"
+              aria-label="タグを削除"
+              title="削除"
+            >
+              <i class="icon-delete"></i>
+            </button>
           </div>
         </div>
         <div class="custom-tag-controls">

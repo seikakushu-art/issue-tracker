@@ -736,6 +736,42 @@
   font-size: 14px; // タグの文字を通常テキストと同じサイズに揃える
 }
 
+.tag-name {
+  flex: 1 1 auto; // タグ名を広げて削除ボタンとの余白を確保
+  min-width: 0;
+}
+
+.tag-delete-button {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  margin-left: auto;
+}
+
+.tag-delete-button:hover,
+.tag-delete-button:focus {
+  color: #dc3545; // 削除操作であることを色で示す
+}
+
+.tag-option.selected .tag-delete-button {
+  color: #fff;
+}
+
+.tag-option.selected .tag-delete-button:hover,
+.tag-option.selected .tag-delete-button:focus {
+  color: #ffe3e3;
+}
+
+
 .tag-option:hover {
   background: #f8f9fa;
 }
