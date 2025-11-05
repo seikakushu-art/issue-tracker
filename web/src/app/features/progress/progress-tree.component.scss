@@ -20,7 +20,40 @@
     border-bottom: 1px solid #e2e8f0;
     background: #ffffff;
   }
-  
+  .tree-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .tree-header__filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #475569;
+    flex: 0 0 auto;  /* 伸びすぎ防止（flexの余白を食べない） */
+    max-width: 480px; /* 最大幅は任意で調整可 */
+  }
+
+  .tree-header__filter select {
+    min-width: 220px;
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    width: 100%;
+    color: #0f172a;
+    font-size: 14px;
+    line-height: 1.4;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .tree-header__filter select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
   .tree-header__titles {
     display: flex;
     flex-direction: column;

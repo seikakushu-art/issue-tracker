@@ -6,10 +6,18 @@
           プロジェクト → 課題 → タスクの階層のツリー表示です。
         </p>
       </div>
-      <button class="tree-header__refresh" type="button" (click)="loadData()" [disabled]="loading">
-        <i class="icon-rotate"></i>
-        <span>最新の状態を取得</span>
-      </button>
+      <div class="tree-header__actions">
+        <label class="tree-header__filter">
+          <span class="tree-header__filter-label">表示プロジェクト</span>
+          <select [ngModel]="projectFilterId" (ngModelChange)="onProjectFilterChange($event)">
+            <option *ngFor="let option of projectFilterOptions" [value]="option.id">{{ option.label }}</option>
+          </select>
+        </label>
+        <button class="tree-header__refresh" type="button" (click)="loadData()" [disabled]="loading">
+          <i class="icon-rotate"></i>
+          <span>最新の状態を取得</span>
+        </button>
+      </div>
     </header>
   
     <section *ngIf="loadError" class="tree-error" role="alert">
@@ -29,8 +37,8 @@
   
     <section *ngIf="!loading" class="tree-content">
       <div class="tree-panel" role="tree">
-        <ng-container *ngIf="treeProjects.length > 0; else emptyState">
-          <div *ngFor="let project of treeProjects" class="tree-node project" [attr.aria-expanded]="!project.collapsed">
+        <ng-container *ngIf="displayedTreeProjects.length > 0; else emptyState">
+          <div *ngFor="let project of displayedTreeProjects" class="tree-node project" [attr.aria-expanded]="!project.collapsed">
             <div class="tree-node__header">
               <button type="button" class="toggle" (click)="toggleProject(project)">
                 <i class="icon-chevron" [class.collapsed]="project.collapsed"></i>
@@ -59,7 +67,7 @@
                 </div>
   
                 <div class="tree-children" [class.collapsed]="issue.collapsed">
-                  <div *ngFor="let treeTask of issue.tasks" class="tree-node task" role="treeitem" tabindex="0" [attr.aria-selected]="selectedTask?.id === treeTask.task.id" (click)="selectTask(project, issue, treeTask)" (keydown.enter)="selectTask(project, issue, treeTask)" (keydown.space)="selectTask(project, issue, treeTask)">
+                  <div *ngFor="let treeTask of issue.tasks" class="tree-node task" role="treeitem" aria-selected="false" tabindex="0" (click)="selectTask(project, issue, treeTask)" (keydown.enter)="selectTask(project, issue, treeTask)" (keydown.space)="selectTask(project, issue, treeTask)">
                     <div class="task-body">
                       <div class="task-main">
                         <span class="status-badge" [class]="'status-badge ' + getStatusClass(treeTask.task)">{{ getTaskStatusLabel(treeTask.task) }}</span>
@@ -106,80 +114,4 @@
         <p>表示できるデータがありません。プロジェクトに課題とタスクを追加するとツリーに表示されます。</p>
       </div>
     </ng-template>
-  
-    <aside *ngIf="selectedTask as task" class="task-detail-panel" role="dialog" aria-modal="true">
-      <div
-        class="task-detail__backdrop"
-        role="button"
-        tabindex="0"
-        aria-label="詳細を閉じる"
-        (click)="closeDetailPanel()"
-        (keydown.enter)="closeDetailPanel()"
-        (keydown.space)="closeDetailPanel()"
-      ></div>
-      <div class="task-detail__body">
-        <header class="task-detail__header">
-          <h2>{{ task.title }}</h2>
-          <button type="button" class="btn-close" (click)="closeDetailPanel()" aria-label="閉じる">
-            <i class="icon-close"></i>
-          </button>
-        </header>
-        <section class="task-detail__section">
-          <h3>基本情報</h3>
-          <dl>
-            <div>
-              <dt>所属</dt>
-              <dd>{{ selectedProject?.name || '未設定のプロジェクト' }} / {{ selectedIssue?.name || '未設定の課題' }}</dd>
-            </div>
-            <div>
-              <dt>ステータス</dt>
-              <dd>{{ getTaskStatusLabel(task) }}</dd>
-            </div>
-            <div>
-              <dt>重要度</dt>
-              <dd>{{ getImportanceLabel(task) }}</dd>
-            </div>
-            <div *ngIf="task.startDate">
-              <dt>開始日</dt>
-              <dd>{{ task.startDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</dd>
-            </div>
-            <div *ngIf="task.endDate">
-              <dt>終了日</dt>
-              <dd>{{ task.endDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</dd>
-            </div>
-          </dl>
-        </section>
-        <section class="task-detail__section" *ngIf="task.goal">
-          <h3>達成目標</h3>
-          <p>{{ task.goal }}</p>
-        </section>
-        <section class="task-detail__section" *ngIf="task.description">
-          <h3>説明</h3>
-          <p class="task-detail__description">{{ task.description }}</p>
-        </section>
-        <section class="task-detail__section" *ngIf="selectedDependencies.length > 0 || selectedDependents.length > 0">
-          <h3>依存関係</h3>
-          <div class="detail-dependency">
-            <div class="detail-dependency__group" *ngIf="selectedDependencies.length > 0">
-              <h4><i class="icon-branch-in"></i> 依存元</h4>
-              <ul>
-                <li *ngFor="let dep of selectedDependencies">{{ dep.label }}</li>
-              </ul>
-            </div>
-            <div class="detail-dependency__group" *ngIf="selectedDependents.length > 0">
-              <h4><i class="icon-branch-out"></i> 依存先</h4>
-              <ul>
-                <li *ngFor="let dep of selectedDependents">{{ dep.label }}</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-        <div class="task-detail__actions">
-          <button type="button" class="btn-primary" (click)="goToTaskDetail()">
-            <i class="icon-open"></i>
-            <span>タスク詳細で開く</span>
-          </button>
-        </div>
-      </div>
-    </aside>
   </div>

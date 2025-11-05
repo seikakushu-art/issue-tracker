@@ -71,7 +71,6 @@ export const routes: Routes = [
     title: 'ツリー',
     canActivate: [authGuard]
   },
-  // ダッシュボード: トップと明示的な /dashboard の両方で表示
   {
     path: '',
     component: DashboardComponent,
@@ -112,6 +111,6 @@ export const routes: Routes = [
   // 404ページ
   {
     path: '**',
-    redirectTo: 'dashboard'
+    redirectTo: 'login'
   }
 ];

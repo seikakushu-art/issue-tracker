@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule, registerLocaleData } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import localeJa from '@angular/common/locales/ja';
 import { Router } from '@angular/router';
 import { Issue, Project, Task } from '../../models/schema';
@@ -33,10 +34,16 @@ interface TreeProject {
   collapsed: boolean;
 }
 
+interface ProjectFilterOption {
+  id: string;
+  label: string;
+}
+
+
 @Component({
   selector: 'app-progress-tree',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './progress-tree.component.html',
   styleUrls: ['./progress-tree.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -54,11 +61,10 @@ export class ProgressTreeComponent implements OnInit {
 
   treeProjects: TreeProject[] = [];
 
-  selectedTask: Task | null = null;
-  selectedIssue: Issue | null = null;
-  selectedProject: Project | null = null;
-  selectedDependencies: DependencyDisplay[] = [];
-  selectedDependents: DependencyDisplay[] = [];
+  projectFilterId = 'all';
+  projectFilterOptions: ProjectFilterOption[] = [
+    { id: 'all', label: 'すべてのプロジェクト' },
+  ];
 
   readonly tokyoTimezone = 'Asia/Tokyo';
 
@@ -71,7 +77,6 @@ export class ProgressTreeComponent implements OnInit {
     this.loadError = null;
     this.sampleNotice = null;
     this.treeProjects = [];
-    this.closeDetailPanel();
 
     try {
       const projects = (await this.projectsService
@@ -130,6 +135,7 @@ export class ProgressTreeComponent implements OnInit {
 
       if (this.hasAnyTasks(treeProjects)) {
         this.treeProjects = treeProjects;
+        this.updateProjectFilterOptions(treeProjects);
       } else {
         this.applySampleData('empty');
       }
@@ -152,32 +158,19 @@ export class ProgressTreeComponent implements OnInit {
   }
 
   selectTask(project: TreeProject, issue: TreeIssue, treeTask: TreeTask): void {
-    this.selectedTask = treeTask.task;
-    this.selectedIssue = issue.issue;
-    this.selectedProject = project.project;
-    this.selectedDependencies = treeTask.dependencies;
-    this.selectedDependents = treeTask.dependents;
-  }
-
-  closeDetailPanel(): void {
-    this.selectedTask = null;
-    this.selectedIssue = null;
-    this.selectedProject = null;
-    this.selectedDependencies = [];
-    this.selectedDependents = [];
-  }
-
-  goToTaskDetail(): void {
-    if (!this.selectedTask || !this.selectedTask.id || !this.selectedIssue?.id || !this.selectedProject?.id) {
+    const projectId = project.project.id;
+    const issueId = issue.issue.id;
+    const taskId = treeTask.task.id;
+    if (!projectId || !issueId || !taskId) {
       return;
     }
     void this.router.navigate([
       '/projects',
-      this.selectedProject.id,
+      projectId,
       'issues',
-      this.selectedIssue.id,
+      issueId,
     ], {
-      queryParams: { focus: this.selectedTask.id },
+      queryParams: { focus: taskId },
     });
   }
 
@@ -234,6 +227,38 @@ export class ProgressTreeComponent implements OnInit {
       project.issues.some((issue) => issue.tasks.length > 0)
     );
   }
+
+  get displayedTreeProjects(): TreeProject[] {
+    if (this.projectFilterId === 'all') {
+      return this.treeProjects;
+    }
+
+    return this.treeProjects.filter((treeProject) => treeProject.project.id === this.projectFilterId);
+  }
+
+  onProjectFilterChange(value: string): void {
+    this.projectFilterId = value;
+  }
+
+  private updateProjectFilterOptions(treeProjects: TreeProject[]): void {
+    const options = treeProjects
+      .map((treeProject) => treeProject.project)
+      .filter((project): project is Project & { id: string } => Boolean(project.id))
+      .map((project) => ({
+        id: project.id!,
+        label: project.name,
+      }));
+
+    this.projectFilterOptions = [
+      { id: 'all', label: 'すべてのプロジェクト' },
+      ...options,
+    ];
+
+    if (this.projectFilterId !== 'all' && !options.some((option) => option.id === this.projectFilterId)) {
+      this.projectFilterId = 'all';
+    }
+  }
+
 
   private resolveDependencies(task: Task, index: Map<string, { title: string; issue: Issue; project: Project }>, key: 'dependencies' | 'dependents'):
     DependencyDisplay[] {
@@ -580,6 +605,7 @@ export class ProgressTreeComponent implements OnInit {
         collapsed: false,
       },
     ];
+    this.updateProjectFilterOptions(this.treeProjects);
     this.cdr.markForCheck();
   }
 }

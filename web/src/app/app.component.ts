@@ -236,7 +236,7 @@ export class AppComponent implements OnInit, OnDestroy {
  
      if (urlParts.length === 1 && urlParts[0] === 'attachments') {
        this.breadcrumbs.push({
-         label: '添付ファイル一覧',
+         label: '',
          path: '/attachments'
        });
        return;
@@ -244,7 +244,7 @@ export class AppComponent implements OnInit, OnDestroy {
  
      if (urlParts.length === 1 && urlParts[0] === 'board') {
        this.breadcrumbs.push({
-         label: '掲示板',
+         label: '',
          path: '/board'
        });
        return;
@@ -255,7 +255,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     this.breadcrumbs.push({
-      label: 'プロジェクト一覧',
+      label: '',
       path: '//projects'
     });
 
