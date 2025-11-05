@@ -80,6 +80,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   templateLoadError = '';
   selectedTemplateId: string | null = null;
   templateNotice = '';
+  templateDeleting = false;
 
   // 招待リンク関連
   showInviteModal = false;
@@ -102,13 +103,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   sortOrder: 'asc' | 'desc' = 'asc';
 
   // フォームデータ
-  projectForm = {
-    name: '',
-    description: '',
-    startDate: '',
-    endDate: '',
-    goal: ''
-  };
+  projectForm = this.createEmptyProjectForm();
   memberSearchTerm = '';
 
   /** 課題数のキャッシュ（一覧表示・並び替え用） */
@@ -402,13 +397,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   openCreateModal() {
     this.editingProject = null;
-    this.projectForm = {
-      name: '',
-      description: '',
-      startDate: '',
-      endDate: '',
-      goal: ''
-    };
+    this.projectForm = this.createEmptyProjectForm();
     this.selectedTemplateId = null;
     this.templateNotice = '';
     this.memberSearchTerm = '';
@@ -529,6 +518,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     if (!templateId) {
       this.selectedTemplateId = null;
       this.templateNotice = '';
+      this.projectForm = this.createEmptyProjectForm();
       return;
     }
     this.selectedTemplateId = templateId;
@@ -538,13 +528,51 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.projectForm.name = template.name;
-    this.projectForm.description = template.description ?? '';
-    this.projectForm.goal = template.goal ?? '';
-    this.projectForm.startDate = '';
-    this.projectForm.endDate = '';
+    this.projectForm = {
+      name: template.name ?? '',
+      description: template.description ?? '',
+      startDate: '',
+      endDate: '',
+      goal: template.goal ?? '',
+    };
     this.templateNotice = 'テンプレートを適用しました。期間・担当者・ステータス・添付ファイルは空の状態で作成されます。';
   }
+
+  async deleteSelectedTemplate(): Promise<void> {
+    if (!this.selectedTemplateId) {
+      return;
+    }
+    const template = this.templates.find((item) => item.id === this.selectedTemplateId);
+    if (!template) {
+      return;
+    }
+    const confirmed = confirm(`テンプレート「${template.name}」を削除しますか？`);
+    if (!confirmed) {
+      return;
+    }
+
+    if (!template.id) {
+      console.warn('テンプレートIDが見つかりません:', template);
+      return;
+    }
+
+    this.templateDeleting = true;
+    this.templateLoadError = '';
+    this.templateNotice = '';
+    try {
+      await this.projectTemplatesService.deleteTemplate(template.id);
+      this.templates = this.templates.filter((item) => item.id !== template.id);
+      this.selectedTemplateId = null;
+      this.projectForm = this.createEmptyProjectForm();
+      this.templateNotice = `テンプレート「${template.name}」を削除しました。`;
+    } catch (error) {
+      console.error('テンプレートの削除に失敗しました:', error);
+      this.templateLoadError = 'テンプレートの削除に失敗しました';
+    } finally {
+      this.templateDeleting = false;
+    }
+  }
+
 
   /**
    * プロジェクトをテンプレートとして保存
@@ -974,5 +1002,15 @@ private async loadTags(): Promise<void> {
     this.availableTags = [];
     this.smartFilterTagOptions = [];
   }
+}
+
+private createEmptyProjectForm(): { name: string; description: string; startDate: string; endDate: string; goal: string } {
+  return {
+    name: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    goal: '',
+  };
 }
 }

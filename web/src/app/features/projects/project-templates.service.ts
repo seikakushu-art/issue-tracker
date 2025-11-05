@@ -7,6 +7,8 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  deleteDoc,
+  doc,
 } from '@angular/fire/firestore';
 import { ProjectTemplate } from '../../models/schema';
 import { ProjectsService } from './projects.service';
@@ -88,5 +90,15 @@ export class ProjectTemplatesService {
 
     const ref = await addDoc(collection(this.db, 'projectTemplates'), payload);
     return ref.id;
+  }
+  /**
+   * 指定したテンプレートを削除
+   */
+  async deleteTemplate(templateId: string): Promise<void> {
+    if (!templateId) {
+      return;
+    }
+    const templateRef = doc(this.db, 'projectTemplates', templateId);
+    await deleteDoc(templateRef);
   }
 }

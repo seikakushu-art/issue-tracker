@@ -340,6 +340,15 @@
             <option value="">テンプレートを選択してください</option>
             <option *ngFor="let template of templates" [value]="template.id">{{ template.name }}</option>
           </select>
+          <button
+          type="button"
+          class="btn btn-secondary btn-small"
+          *ngIf="selectedTemplateId"
+          (click)="deleteSelectedTemplate()"
+          [disabled]="templateDeleting"
+        >
+          {{ templateDeleting ? '削除中...' : 'テンプレート削除' }}
+        </button>
           <span class="template-loading" *ngIf="templatesLoading">読み込み中...</span>
         </div>
         <p class="template-error" *ngIf="templateLoadError">{{ templateLoadError }}</p>
