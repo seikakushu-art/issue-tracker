@@ -17,8 +17,8 @@ import { Project, Issue, Task } from './models/schema';
   imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="app-container">
-      <!-- ヘッダー -->
-      <header class="app-header">
+       <!-- ヘッダー（ログイン画面では非表示） -->
+       <header class="app-header" *ngIf="!isLoginPage">
         <div class="header-content">
           <h1 class="app-title" (click)="goHome()" (keydown.enter)="goHome()" role="button" tabindex="0">
             <i class="icon-folder"></i>
@@ -194,11 +194,14 @@ export class AppComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   breadcrumbs: { label: string; path: string }[] = [];
+  /** ログイン画面かどうか */
+  isLoginPage = false;
   currentProject: Project | null = null;
   currentIssue: Issue | null = null;
   currentTask: Task | null = null;
 
   ngOnInit() {
+    this.isLoginPage = this.isLoginUrl(this.router.url);
     this.router.events
       .pipe(
         filter(event => event instanceof NavigationEnd), // ナビゲーション完了時だけ
@@ -206,6 +209,7 @@ export class AppComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(() => {
+        this.isLoginPage = this.isLoginUrl(this.router.url);
         this.updateBreadcrumbs();
       });
   }
@@ -309,6 +313,14 @@ export class AppComponent implements OnInit, OnDestroy {
         }
       }
     }
+  }
+
+  /**
+   * 指定URLがログイン画面かどうか判定
+   */
+  private isLoginUrl(url: string): boolean {
+    const [path] = url.split('?');
+    return path === '/login';
   }
 
   /**
