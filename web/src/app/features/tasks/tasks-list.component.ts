@@ -181,8 +181,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
-  goToDashboard(): void {
-    void this.router.navigate(['/dashboard']);
+  goToIssuesList(): void {
+    if (!this.projectId) {
+      return;
+    }
+
+    void this.router.navigate(['/projects', this.projectId]);
   }
 
   /** データ読み込み */

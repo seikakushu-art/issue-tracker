@@ -258,8 +258,8 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     this.sortIssues();
   }
 
-  goToDashboard(): void {
-    void this.router.navigate(['/dashboard']);
+  goToProjectsList(): void {
+    void this.router.navigate(['/projects']);
   }
 
   /** スマートフィルターの開閉をトグル */
