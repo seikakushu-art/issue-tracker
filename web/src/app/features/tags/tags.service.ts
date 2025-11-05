@@ -206,30 +206,45 @@ export class TagsService {
   async listTags(): Promise<Tag[]> {
     try {
       const tags = await this.fetchTagsRaw();
-      const assignedThisRound = new Set<string>();
-      const normalizedTags: Tag[] = tags.map(tag => {
-        const tagId = tag.id;
-        const cachedColor = tagId ? this.colorAssignments.get(tagId) ?? null : null;
-        const normalizedOriginal = this.normalizeColor(tag.color);
-        let colorToUse = cachedColor ?? normalizedOriginal;
+      const usedColors = new Set<string>();
+      const tagsNeedingColor: { id: string; fallbackColor: string }[] = [];
 
-        if (!colorToUse || assignedThisRound.has(colorToUse)) {
-          const generated = this.generateUniqueColor(assignedThisRound);
-          assignedThisRound.add(generated);
-          colorToUse = generated;
-        } else {
-          assignedThisRound.add(colorToUse);
+      // 既存タグのカラーを正規化し、使用済みカラー集合を先に構築
+      for (const tag of tags) {
+        const normalized = this.normalizeColor(tag.color);
+        if (normalized) {
+          usedColors.add(normalized);
+        }
+      }
+
+      const normalizedTags: Tag[] = tags.map((tag) => {
+        const normalized = this.normalizeColor(tag.color);
+        let resolvedColor = normalized;
+
+        if (!resolvedColor) {
+          // カラー未設定のタグには新たに一意なカラーを割り当てる（以後変更しない）
+          resolvedColor = this.generateUniqueColor(usedColors);
+          usedColors.add(resolvedColor);
+          tagsNeedingColor.push({ id: tag.id, fallbackColor: resolvedColor });
         }
 
-        if (tagId) {
-          this.colorAssignments.set(tagId, colorToUse);
+        if (tag.id) {
+          this.colorAssignments.set(tag.id, resolvedColor);
         }
 
         return {
           ...tag,
-          color: colorToUse,
+          color: resolvedColor,
         };
       });
+      if (tagsNeedingColor.length > 0) {
+        await Promise.all(
+          tagsNeedingColor.map(({ id, fallbackColor }) => {
+            const docRef = doc(this.db, `tags/${id}`);
+            return updateDoc(docRef, { color: fallbackColor });
+          }),
+        );
+      }
 
       const validIds = new Set(tags.map(tag => tag.id));
       for (const cachedId of Array.from(this.colorAssignments.keys())) {

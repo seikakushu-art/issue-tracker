@@ -251,9 +251,9 @@
           </div>
         </div>
 
-        <div class="task-tags" *ngIf="task.tagIds.length > 0">
-          <span 
-            *ngFor="let tagId of task.tagIds" 
+        <div class="task-tags" *ngIf="getVisibleTagIds(task).length > 0">
+          <span
+            *ngFor="let tagId of getVisibleTagIds(task)"
             class="tag"
             [style.background-color]="getTagColor(tagId)"
           >
@@ -415,11 +415,11 @@
       </div>
     </section>
 
-    <section class="detail-section" *ngIf="selectedTask.tagIds.length > 0">
+    <section class="detail-section" *ngIf="getVisibleTagIds(selectedTask).length > 0">
       <h3>タグ</h3>
       <div class="detail-tags">
         <span
-          *ngFor="let tagId of selectedTask.tagIds"
+        *ngFor="let tagId of getVisibleTagIds(selectedTask)"
           class="tag"
           [style.background-color]="getTagColor(tagId)"
         >

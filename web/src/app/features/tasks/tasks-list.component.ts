@@ -140,6 +140,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
   attachmentDeletingId: string | null = null;
   attachmentLimitReached = false;
 
+  private tagsLoaded = false;
+  private availableTagIdSet = new Set<string>();
+
   // カラーパレット（課題テーマカラー用）
   private colorPalette = [
     '#007bff', '#20c997', '#ffc107', '#dc3545', '#6f42c1',
@@ -208,6 +211,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.tasks = tasks;
       this.currentUid = uid;
       this.currentRole = project?.roles?.[uid] ?? null;
+      this.sanitizeAllTagSelections();
       this.filterTasks();
       this.updateIssueProgress();
       if (this.pendingFocusTaskId) {
@@ -234,6 +238,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private async loadTags() {
     try {
       this.availableTags = await this.tagsService.listTags();
+      this.tagsLoaded = true;
+      this.updateAvailableTagIndex();
+      this.sanitizeAllTagSelections();
       this.newTagColor = this.generateRandomUniqueTagColor(); // 既存タグと被らない初期カラーを再計算
       this.refreshSmartFilterTags();
     } catch (error) {
@@ -380,6 +387,69 @@ export class TasksListComponent implements OnInit, OnDestroy {
         color: tag.color ?? null,
       }));
   }
+
+  /** 有効なタグID集合を再構築 */
+  private updateAvailableTagIndex(): void {
+    this.availableTagIdSet = new Set(
+      this.availableTags
+        .filter((tag): tag is Tag & { id: string } => Boolean(tag.id))
+        .map((tag) => tag.id!),
+    );
+  }
+
+  /** 利用可能タグが変わった際に、タスクやフォームのタグ選択を正規化 */
+  private sanitizeAllTagSelections(): void {
+    if (!this.tagsLoaded) {
+      return;
+    }
+
+    const isValid = (id: string) => this.availableTagIdSet.has(id);
+
+    const sanitizeTask = (task: Task | null): Task | null => {
+      if (!task) {
+        return task;
+      }
+      const current = task.tagIds ?? [];
+      const filtered = current.filter(isValid);
+      if (filtered.length !== current.length) {
+        task.tagIds = filtered;
+      }
+      return task;
+    };
+
+    this.tasks.forEach(task => sanitizeTask(task));
+    this.filteredTasks.forEach(task => sanitizeTask(task));
+
+    if (this.selectedTask) {
+      this.selectedTask = { ...this.selectedTask, tagIds: (this.selectedTask.tagIds ?? []).filter(isValid) };
+    }
+
+    if (this.editingTask) {
+      this.editingTask = { ...this.editingTask, tagIds: (this.editingTask.tagIds ?? []).filter(isValid) };
+    }
+
+    this.taskForm.tagIds = this.taskForm.tagIds.filter(isValid);
+
+    this.smartFilterCriteria = {
+      ...this.smartFilterCriteria,
+      tagIds: this.smartFilterCriteria.tagIds.filter(isValid),
+    };
+
+    this.filterTasks();
+  }
+
+  /** 表示可能なタグID一覧を取得（削除済みタグは除外） */
+  getVisibleTagIds(task: Task | null | undefined): string[] {
+    if (!task) {
+      return [];
+    }
+    const base = task.tagIds ?? [];
+    if (!this.tagsLoaded) {
+      return base;
+    }
+    return base.filter((id) => this.availableTagIdSet.has(id));
+  }
+
 
   /** メンバー一覧からスマートフィルター用担当者リストを整形 */
   private updateSmartFilterAssignees(): void {
@@ -1151,6 +1221,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
       await this.tagsService.deleteTag(tag.id);
       this.availableTags = this.availableTags.filter(t => t.id !== tag.id); // 表示リストから除外
       this.taskForm.tagIds = this.taskForm.tagIds.filter(id => id !== tag.id); // フォームで選択されていれば外す
+      this.updateAvailableTagIndex();
+      this.sanitizeAllTagSelections();
       this.refreshSmartFilterTags();
       this.newTagColor = this.generateRandomUniqueTagColor(); // 削除で空いた色を考慮し初期色を再計算
     } catch (error) {
@@ -1178,6 +1250,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
       const createdTag = await this.tagsService.getTag(tagId); // 付与されたカラーや作成者情報を取得
       const newTag: Tag = createdTag ?? { id: tagId, name, color: preferredColor ?? undefined, createdBy: this.currentUid ?? null };
       this.availableTags = [...this.availableTags, newTag]; // Change Detectionを確実に発火
+      this.updateAvailableTagIndex();
+      this.sanitizeAllTagSelections();
       this.refreshSmartFilterTags(); // フィルター用のタグ一覧も更新
 
       if (!this.taskForm.tagIds.includes(tagId) && this.taskForm.tagIds.length < 10) {
