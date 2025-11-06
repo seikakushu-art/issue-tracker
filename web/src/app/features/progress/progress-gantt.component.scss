@@ -327,6 +327,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
   }
 
   .gantt-header__refresh:disabled {
@@ -531,7 +532,7 @@
     display: grid;
     align-items: stretch;
     gap: 0;
-    min-height: 52px;
+    min-height: 28px;
   }
 
   .gantt-row-line.task.collapsed {
@@ -543,15 +544,18 @@
     left: 0;
     z-index: 4;
     background: #ffffff;
-    padding: 12px 18px;
+    padding: 0 18px;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 4px;
+    gap: 2px;
     cursor: pointer;
     border-right: 1px solid #e2e8f0;
     box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.2);
     box-sizing: border-box;
+    min-height: 28px;
+    overflow: hidden;
+    min-width: 0;
   }
 
   .gantt-row__label.issue {
@@ -572,12 +576,27 @@
     font-size: 15px;
     font-weight: 600;
     color: #0f172a;
+    min-width: 0;
+    line-height: 1;
+  }
+
+  .issue-name {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
   }
 
   .issue-meta {
     margin: 0;
     font-size: 12px;
     color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
   }
 
   .icon-chevron {
@@ -596,7 +615,7 @@
     display: grid;
     grid-auto-rows: 1fr;
     gap: 0;
-    min-height: 44px;
+    min-height: 28px;
   }
 
   .gantt-row__chart::after {
@@ -616,7 +635,7 @@
   }
 
   .gantt-row__chart.issue {
-    min-height: 18px;
+    min-height: 28px;
     opacity: 0.4;
   }
 
@@ -649,20 +668,28 @@
   }
 
   .task-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: #0f172a;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .task-meta {
-    font-size: 12px;
+    font-size: 11px;
     color: #64748b;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .gantt-bar {
     position: absolute;
-    top: 8px;
-    height: 28px;
+    top: 0;
+    height: 100%;
     border-radius: 10px;
     border: none;
     color: #ffffff;

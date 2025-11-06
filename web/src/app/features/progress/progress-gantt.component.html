@@ -89,9 +89,14 @@
                     <div class="gantt-row__label issue" [style.borderLeftColor]="getIssueTheme(group.issue)">
                       <button class="issue-toggle" type="button" (click)="toggleIssue(group)" [attr.aria-expanded]="!group.collapsed">
                         <i class="icon-chevron" [class.collapsed]="group.collapsed"></i>
-                        <span class="issue-name">{{ group.issue.name }}</span>
+                        <span class="issue-name" [title]="group.issue.name">{{ group.issue.name }}</span>
                       </button>
-                      <p class="issue-meta">{{ group.project.name }} / タスク {{ group.tasks.length }} 件</p>
+                      <p
+                        class="issue-meta"
+                        [title]="group.project.name + ' / タスク ' + group.tasks.length + ' 件'"
+                      >
+                        {{ group.project.name }} / タスク {{ group.tasks.length }} 件
+                      </p>
                     </div>
                     <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
                       <div
@@ -117,8 +122,13 @@
                       (keydown.enter)="selectTask(group, task)"
                       (keydown.space)="selectTask(group, task)"
                     >
-                      <span class="task-title">{{ task.title }}</span>
-                      <span class="task-meta">{{ getTaskStatusLabel(task) }} / {{ getImportanceLabel(task) }}</span>
+                    <span class="task-title" [title]="task.title">{{ task.title }}</span>
+                    <span
+                      class="task-meta"
+                      [title]="getTaskStatusLabel(task) + ' / ' + getImportanceLabel(task)"
+                    >
+                      {{ getTaskStatusLabel(task) }} / {{ getImportanceLabel(task) }}
+                    </span>
                     </div>
                     <div class="gantt-row__chart" [style.gridTemplateColumns]="getGridTemplate()">
                       <div
