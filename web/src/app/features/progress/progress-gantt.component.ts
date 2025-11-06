@@ -69,6 +69,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   loadError: string | null = null;
 
   ganttIssues: GanttIssue[] = [];
+  visibleGanttIssues: GanttIssue[] = [];
   timeline: TimelineDay[] = [];
   timelineMonths: TimelineMonthSegment[] = [];
   totalDays = 0;
@@ -87,6 +88,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   readonly labelColumnWidth = 280;
 
   projectHierarchy: GanttProjectGroup[] = [];
+  availableProjects: Project[] = [];
+  private selectedProjectIds = new Set<string>();
 
   private readonly monthFormatter = new Intl.DateTimeFormat('ja-JP', {
     year: 'numeric',
@@ -127,7 +130,6 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       );
 
       const ganttIssues: GanttIssue[] = [];
-      const allTaskDates: Date[] = [];
 
       for (const { project, issues } of issueResults) {
         for (const issue of issues) {
@@ -136,23 +138,14 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
           }
           const tasks = await this.tasksService.listTasks(project.id!, issue.id, false);
           const hydratedTasks = tasks.map((task) => this.normalizeTaskDates(task));
-          for (const task of hydratedTasks) {
-            const start = task.startDate;
-            const end = task.endDate;
-            if (start) {
-              allTaskDates.push(start);
-            }
-            if (end) {
-              allTaskDates.push(end);
-            }
-          }
           ganttIssues.push({ project, issue, tasks: hydratedTasks, collapsed: false });
         }
       }
 
       this.ganttIssues = ganttIssues;
       this.buildProjectHierarchy(ganttIssues);
-      this.buildTimeline(allTaskDates);
+      this.initializeProjectSelection(projects);
+      this.applyProjectFilters();
       this.cdr.markForCheck();
     } catch (error) {
       console.error('ガントチャートのデータ読み込みに失敗しました:', error);
@@ -196,6 +189,59 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     }
     this.selectTask(group, task);
     this.focusTaskOnTimeline(task);
+  }
+
+  isProjectSelected(projectId: string | undefined): boolean {
+    if (!projectId) {
+      return false;
+    }
+    return this.selectedProjectIds.has(projectId);
+  }
+
+  areAllProjectsSelected(): boolean {
+    return (
+      this.availableProjects.length > 0 &&
+      this.availableProjects.every((project) => project.id && this.selectedProjectIds.has(project.id))
+    );
+  }
+
+  onProjectSelectionChange(projectId: string | undefined, checked: boolean): void {
+    if (!projectId) {
+      return;
+    }
+    if (checked) {
+      this.selectedProjectIds.add(projectId);
+    } else {
+      this.selectedProjectIds.delete(projectId);
+    }
+    this.applyProjectFilters();
+  }
+
+  toggleAllProjects(checked: boolean): void {
+    if (checked) {
+      for (const project of this.availableProjects) {
+        if (project.id) {
+          this.selectedProjectIds.add(project.id);
+        }
+      }
+    } else {
+      this.selectedProjectIds.clear();
+    }
+    this.applyProjectFilters();
+  }
+
+  trackByProjectId(_: number, project: Project): string | undefined {
+    return project.id ?? project.name;
+  }
+
+  handleProjectSelectAll(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.toggleAllProjects(Boolean(input?.checked));
+  }
+
+  handleProjectFilterChange(projectId: string | undefined, event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.onProjectSelectionChange(projectId, Boolean(input?.checked));
   }
 
   closeDetailPanel(): void {
@@ -421,6 +467,68 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       projectGroup.issues.push({ issue: group.issue, tasks: group.tasks });
     }
     this.projectHierarchy = Array.from(projectMap.values());
+  }
+
+  private initializeProjectSelection(projects: (Project & { id: string })[]): void {
+    this.availableProjects = projects;
+    this.selectedProjectIds = new Set(projects.map((project) => project.id));
+  }
+
+  private applyProjectFilters(): void {
+    const activeIds = this.selectedProjectIds;
+    const treatAsAll = activeIds.size === 0 && this.availableProjects.length === 0;
+    const visible = this.ganttIssues.filter((group) => {
+      const projectId = group.project.id;
+      if (!projectId) {
+        return treatAsAll;
+      }
+      if (treatAsAll) {
+        return true;
+      }
+      if (activeIds.size === 0) {
+        return false;
+      }
+      return activeIds.has(projectId);
+    });
+
+    this.visibleGanttIssues = visible;
+    this.ensureSelectionVisibility(visible);
+
+    const taskDates = visible.flatMap((group) =>
+      group.tasks.flatMap((task) => {
+        const dates: Date[] = [];
+        if (task.startDate instanceof Date) {
+          dates.push(task.startDate);
+        }
+        if (task.endDate instanceof Date) {
+          dates.push(task.endDate);
+        }
+        return dates;
+      }),
+    );
+
+    this.buildTimeline(taskDates);
+    this.cdr.markForCheck();
+  }
+
+  private ensureSelectionVisibility(groups: GanttIssue[]): void {
+    if (!this.selectedTask || !this.selectedTask.id) {
+      return;
+    }
+
+    const isVisible = groups.some((group) => {
+      if (!group.project.id || !group.issue.id) {
+        return false;
+      }
+      if (group.project.id !== this.selectedProject?.id || group.issue.id !== this.selectedIssue?.id) {
+        return false;
+      }
+      return group.tasks.some((task) => task.id === this.selectedTask?.id);
+    });
+
+    if (!isVisible) {
+      this.closeDetailPanel();
+    }
   }
 
   private normalizeTaskDates(task: Task): Task {
@@ -695,18 +803,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     ];
 
     this.buildProjectHierarchy(this.ganttIssues);
+    this.availableProjects = [project];
+    this.selectedProjectIds = new Set(project.id ? [project.id] : []);
 
-    const sampleDates = normalizedTasks.flatMap((task) => {
-      const dates: Date[] = [];
-      if (task.startDate instanceof Date) {
-        dates.push(task.startDate);
-      }
-      if (task.endDate instanceof Date) {
-        dates.push(task.endDate);
-      }
-      return dates;
-    });
-    this.buildTimeline(sampleDates);
-    this.cdr.markForCheck();
+    this.applyProjectFilters();
   }
 }

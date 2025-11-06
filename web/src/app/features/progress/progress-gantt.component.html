@@ -21,6 +21,30 @@
           <span class="gantt-controls__month">{{ activeMonthLabel }}</span>
           <span class="gantt-controls__hint">タイムラインは過去・未来5年までスクロールできます。</span>
         </div>
+        <div class="gantt-controls__filter" *ngIf="availableProjects.length > 0">
+          <span class="gantt-controls__filter-label">表示プロジェクト</span>
+          <label class="gantt-controls__filter-option">
+            <input
+              type="checkbox"
+              [checked]="areAllProjectsSelected()"
+              (change)="handleProjectSelectAll($event)"
+            />
+            <span>すべて</span>
+          </label>
+          <div class="gantt-controls__filter-list">
+            <label
+              class="gantt-controls__filter-option"
+              *ngFor="let project of availableProjects; trackBy: trackByProjectId"
+            >
+              <input
+                type="checkbox"
+                [checked]="isProjectSelected(project.id)"
+                (change)="handleProjectFilterChange(project.id, $event)"
+              />
+              <span>{{ project.name }}</span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
     <button class="gantt-header__refresh" type="button" (click)="loadData()" [disabled]="loading">
@@ -59,8 +83,8 @@
         >
 
             <div class="gantt-grid__rows">
-              <ng-container *ngIf="ganttIssues.length > 0; else emptyState">
-                <ng-container *ngFor="let group of ganttIssues">
+              <ng-container *ngIf="visibleGanttIssues.length > 0; else emptyState">
+                <ng-container *ngFor="let group of visibleGanttIssues">
                   <div class="gantt-row-line issue" [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()">
                     <div class="gantt-row__label issue" [style.borderLeftColor]="getIssueTheme(group.issue)">
                       <button class="issue-toggle" type="button" (click)="toggleIssue(group)" [attr.aria-expanded]="!group.collapsed">

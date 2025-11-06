@@ -179,6 +179,46 @@
   margin-top: 8px;
 }
 
+.gantt-controls__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.25);
+  flex-wrap: wrap;
+}
+
+.gantt-controls__filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.gantt-controls__filter-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gantt-controls__filter-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.gantt-controls__filter-option input {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+}
+
+
 .gantt-controls__nav {
   display: inline-flex;
   align-items: center;
@@ -484,7 +524,7 @@
   .gantt-grid__rows {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 0px;
     padding: 16px 0 24px;
   }
 
