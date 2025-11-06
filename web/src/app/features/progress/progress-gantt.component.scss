@@ -179,44 +179,57 @@
   margin-top: 8px;
 }
 
-.gantt-controls__filter {
-  display: inline-flex;
+.gantt-controls__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gantt-controls__meta-row {
+  display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
-  background: #ffffff;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.25);
   flex-wrap: wrap;
 }
 
-.gantt-controls__filter-label {
-  font-size: 12px;
-  font-weight: 600;
+.gantt-controls__month {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.gantt-controls__project-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
   color: #475569;
 }
 
-.gantt-controls__filter-list {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+.gantt-controls__project-select-label {
+  font-weight: 600;
 }
 
-.gantt-controls__filter-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
+.gantt-controls__project-select-input {
+  min-width: 200px;
+  padding: 6px 12px;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  background: #ffffff;
   color: #0f172a;
-  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-.gantt-controls__filter-option input {
-  width: 16px;
-  height: 16px;
-  accent-color: #2563eb;
+.gantt-controls__project-select-input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
+.gantt-controls__hint {
+  font-size: 12px;
+  color: #64748b;
+}
 
 .gantt-controls__nav {
   display: inline-flex;
@@ -299,20 +312,22 @@
 }
 
   .gantt-controls__meta {
-    display: flex;
+    align-items: flex-start;
+  }
+
+  .gantt-controls__meta-row {
     flex-direction: column;
-    gap: 2px;
+    align-items: flex-start;
+    gap: 8px;
   }
 
-  .gantt-controls__month {
-    font-size: 18px;
-    font-weight: 700;
-    color: #0f172a;
+  .gantt-controls__project-select {
+    width: 100%;
   }
 
-  .gantt-controls__hint {
-    font-size: 12px;
-    color: #64748b;
+  .gantt-controls__project-select-input {
+    width: 100%;
+    min-width: 0;
   }
 
   .gantt-header__refresh {
@@ -730,7 +745,7 @@
     transform: translateY(-2px);
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.25);
   }
-  
+
   .gantt-bar.is-highlighted {
     transform: translateY(-2px);
     box-shadow: 0 16px 32px rgba(37, 99, 235, 0.35);

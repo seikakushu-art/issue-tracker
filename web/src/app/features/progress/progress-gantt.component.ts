@@ -93,7 +93,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   projectHierarchy: GanttProjectGroup[] = [];
   availableProjects: Project[] = [];
-  private selectedProjectIds = new Set<string>();
+  selectedProjectId: string | null = null;
 
   private readonly monthFormatter = new Intl.DateTimeFormat('ja-JP', {
     year: 'numeric',
@@ -216,57 +216,15 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.focusTaskOnTimeline(task);
   }
 
-  isProjectSelected(projectId: string | undefined): boolean {
-    if (!projectId) {
-      return false;
-    }
-    return this.selectedProjectIds.has(projectId);
-  }
-
-  areAllProjectsSelected(): boolean {
-    return (
-      this.availableProjects.length > 0 &&
-      this.availableProjects.every((project) => project.id && this.selectedProjectIds.has(project.id))
-    );
-  }
-
-  onProjectSelectionChange(projectId: string | undefined, checked: boolean): void {
-    if (!projectId) {
-      return;
-    }
-    if (checked) {
-      this.selectedProjectIds.add(projectId);
-    } else {
-      this.selectedProjectIds.delete(projectId);
-    }
-    this.applyProjectFilters();
-  }
-
-  toggleAllProjects(checked: boolean): void {
-    if (checked) {
-      for (const project of this.availableProjects) {
-        if (project.id) {
-          this.selectedProjectIds.add(project.id);
-        }
-      }
-    } else {
-      this.selectedProjectIds.clear();
-    }
-    this.applyProjectFilters();
-  }
-
   trackByProjectId(_: number, project: Project): string | undefined {
     return project.id ?? project.name;
   }
 
-  handleProjectSelectAll(event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    this.toggleAllProjects(Boolean(input?.checked));
-  }
-
-  handleProjectFilterChange(projectId: string | undefined, event: Event): void {
-    const input = event.target as HTMLInputElement | null;
-    this.onProjectSelectionChange(projectId, Boolean(input?.checked));
+  handleProjectSelectChange(event: Event): void {
+    const select = event.target as HTMLSelectElement | null;
+    const value = select?.value?.trim() ?? '';
+    this.selectedProjectId = value === '' ? null : value;
+    this.applyProjectFilters();
   }
 
   closeDetailPanel(): void {
@@ -542,25 +500,27 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   private initializeProjectSelection(projects: (Project & { id: string })[]): void {
+    const previousSelection = this.selectedProjectId;
     this.availableProjects = projects;
-    this.selectedProjectIds = new Set(projects.map((project) => project.id));
+    if (previousSelection) {
+      const exists = projects.some((project) => project.id === previousSelection);
+      this.selectedProjectId = exists ? previousSelection : null;
+    } else {
+      this.selectedProjectId = null;
+    }
   }
 
   private applyProjectFilters(): void {
-    const activeIds = this.selectedProjectIds;
-    const treatAsAll = activeIds.size === 0 && this.availableProjects.length === 0;
+    const activeId = this.selectedProjectId;
     const visible = this.ganttIssues.filter((group) => {
       const projectId = group.project.id;
       if (!projectId) {
-        return treatAsAll;
+        return !activeId;
       }
-      if (treatAsAll) {
+      if (!activeId) {
         return true;
       }
-      if (activeIds.size === 0) {
-        return false;
-      }
-      return activeIds.has(projectId);
+      return projectId === activeId;
     });
 
     this.visibleGanttIssues = visible;

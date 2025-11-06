@@ -18,32 +18,29 @@
           <button type="button" class="gantt-controls__jump-btn" (click)="scrollByMonths(1)">来月</button>
         </div>
         <div class="gantt-controls__meta">
-          <span class="gantt-controls__month">{{ activeMonthLabel }}</span>
-          <span class="gantt-controls__hint">タイムラインは過去・未来5年までスクロールできます。</span>
-        </div>
-        <div class="gantt-controls__filter" *ngIf="availableProjects.length > 0">
-          <span class="gantt-controls__filter-label">表示プロジェクト</span>
-          <label class="gantt-controls__filter-option">
-            <input
-              type="checkbox"
-              [checked]="areAllProjectsSelected()"
-              (change)="handleProjectSelectAll($event)"
-            />
-            <span>すべて</span>
-          </label>
-          <div class="gantt-controls__filter-list">
+          <div class="gantt-controls__meta-row">
+            <span class="gantt-controls__month">{{ activeMonthLabel }}</span>
             <label
-              class="gantt-controls__filter-option"
-              *ngFor="let project of availableProjects; trackBy: trackByProjectId"
+              class="gantt-controls__project-select"
+              *ngIf="availableProjects.length > 0"
             >
-              <input
-                type="checkbox"
-                [checked]="isProjectSelected(project.id)"
-                (change)="handleProjectFilterChange(project.id, $event)"
-              />
-              <span>{{ project.name }}</span>
+              <span class="gantt-controls__project-select-label">プロジェクト</span>
+              <select
+                class="gantt-controls__project-select-input"
+                (change)="handleProjectSelectChange($event)"
+                [value]="selectedProjectId ?? ''"
+              >
+                <option value="">プロジェクトを選択</option>
+                <option
+                  *ngFor="let project of availableProjects; trackBy: trackByProjectId"
+                  [value]="project.id ?? ''"
+                >
+                  {{ project.name }}
+                </option>
+              </select>
             </label>
           </div>
+          <span class="gantt-controls__hint">タイムラインは過去・未来5年までスクロールできます。</span>
         </div>
       </div>
     </div>
@@ -97,7 +94,7 @@
                     </div>
                     <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
                       <div
-                      **ngFor="let day of timeline; index as dayIndex"
+                      *ngFor="let day of timeline; index as dayIndex"
                       class="gantt-cell"
                       [class.weekend]="day.isWeekend"
                       [class.holiday]="day.isHoliday"
