@@ -80,7 +80,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   selectedProject: Project | null = null;
 
   readonly tokyoTimezone = 'Asia/Tokyo';
-  readonly dayCellWidth = 48;
+  readonly dayCellWidth = 36;
   readonly labelColumnWidth = 280;
 
   projectHierarchy: GanttProjectGroup[] = [];
