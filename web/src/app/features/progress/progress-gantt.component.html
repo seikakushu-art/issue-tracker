@@ -79,7 +79,10 @@
           [gridTemplate]="getGridTemplate()"
           [labelColumnWidth]="labelColumnWidth"
           [dayCellWidth]="dayCellWidth"
+          [highlightedDayIndex]="hoveredDayIndex"
+          [highlightedTaskRange]="hoveredTaskRange"
           (scrolled)="onTimelineScroll($event)"
+          (dayHoverChange)="handleTimelineDayHover($event)"
         >
 
             <div class="gantt-grid__rows">
@@ -91,19 +94,16 @@
                         <i class="icon-chevron" [class.collapsed]="group.collapsed"></i>
                         <span class="issue-name" [title]="group.issue.name">{{ group.issue.name }}</span>
                       </button>
-                      <p
-                        class="issue-meta"
-                        [title]="group.project.name + ' / タスク ' + group.tasks.length + ' 件'"
-                      >
-                        {{ group.project.name }} / タスク {{ group.tasks.length }} 件
-                      </p>
                     </div>
                     <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
                       <div
-                      *ngFor="let day of timeline"
+                      **ngFor="let day of timeline; index as dayIndex"
                       class="gantt-cell"
                       [class.weekend]="day.isWeekend"
                       [class.holiday]="day.isHoliday"
+                      [class.is-highlighted]="isDayHighlighted(dayIndex)"
+                      (mouseenter)="handleTimelineCellHover(dayIndex)"
+                      (mouseleave)="handleTimelineCellHover(null)"
                     ></div>
                     </div>
                   </div>
@@ -121,22 +121,20 @@
                       (click)="selectTask(group, task)"
                       (keydown.enter)="selectTask(group, task)"
                       (keydown.space)="selectTask(group, task)"
+                      [class.is-highlighted]="isTaskHighlighted(task)"
                     >
                     <span class="task-title" [title]="task.title">{{ task.title }}</span>
-                    <span
-                      class="task-meta"
-                      [title]="getTaskStatusLabel(task) + ' / ' + getImportanceLabel(task)"
-                    >
-                      {{ getTaskStatusLabel(task) }} / {{ getImportanceLabel(task) }}
-                    </span>
                     </div>
                     <div class="gantt-row__chart" [style.gridTemplateColumns]="getGridTemplate()">
                       <div
-                        *ngFor="let day of timeline"
+                      *ngFor="let day of timeline; index as dayIndex"
                         class="gantt-cell"
                         [class.weekend]="day.isWeekend"
                         [class.holiday]="day.isHoliday"
                         [class.today]="day.isToday"
+                        [class.is-highlighted]="isDayHighlighted(dayIndex)"
+                        (mouseenter)="handleTimelineCellHover(dayIndex)"
+                        (mouseleave)="handleTimelineCellHover(null)"
                       ></div>
                       <button
                         type="button"
@@ -145,6 +143,9 @@
                         [style.left]="getTaskOffset(task)"
                         [style.width]="getTaskWidth(task)"
                         (click)="selectTask(group, task)"
+                        (mouseenter)="handleTaskHover(task)"
+                        (mouseleave)="handleTaskHover(null)"
+                        [class.is-highlighted]="isTaskHighlighted(task)"
                       >
                         <span class="gantt-bar__label">{{ task.title }}</span>
                       </button>

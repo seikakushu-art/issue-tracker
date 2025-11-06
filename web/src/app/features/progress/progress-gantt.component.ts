@@ -79,6 +79,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   timelineWidth = 0;
   activeMonthLabel = '';
   currentScrollLeft = 0;
+  hoveredDayIndex: number | null = null;
+  hoveredTaskRange: Readonly<[number, number]> | null = null;
+  hoveredTask: Task | null = null;
 
   selectedTask: Task | null = null;
   selectedIssue: Issue | null = null;
@@ -168,6 +171,27 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const element = event.target as HTMLElement;
     this.currentScrollLeft = element.scrollLeft;
     this.updateActiveMonthLabel(element);
+  }
+
+  handleTimelineDayHover(index: number | null): void {
+    this.hoveredDayIndex = index;
+    if (index !== null) {
+      this.hoveredTask = null;
+      this.hoveredTaskRange = null;
+    }
+  }
+
+  handleTimelineCellHover(index: number | null): void {
+    this.hoveredDayIndex = index;
+    if (index !== null) {
+      this.hoveredTask = null;
+      this.hoveredTaskRange = null;
+    }
+  }
+
+  handleTaskHover(task: Task | null): void {
+    this.hoveredTask = task;
+    this.hoveredTaskRange = task ? this.getTaskDayRange(task) : null;
   }
 
   selectTask(issue: GanttIssue, task: Task): void {
@@ -374,6 +398,37 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const width = this.totalDays > 0 ? (clampedDuration / this.totalDays) * 100 : 0;
     const minWidth = this.totalDays > 0 ? (1 / this.totalDays) * 100 : 0;
     return `${Math.max(width, minWidth)}%`;
+  }
+
+  isDayHighlighted(index: number): boolean {
+    if (this.hoveredDayIndex === index) {
+      return true;
+    }
+    if (this.hoveredTaskRange) {
+      const [start, end] = this.hoveredTaskRange;
+      return index >= start && index <= end;
+    }
+    return false;
+  }
+
+  isTaskHighlighted(task: Task): boolean {
+    return this.isTaskHovered(task) || this.isTaskInHoveredDay(task);
+  }
+
+  private isTaskHovered(task: Task): boolean {
+    return this.hoveredTask === task;
+  }
+
+  private isTaskInHoveredDay(task: Task): boolean {
+    if (this.hoveredDayIndex === null) {
+      return false;
+    }
+    const range = this.getTaskDayRange(task);
+    if (!range) {
+      return false;
+    }
+    const [start, end] = range;
+    return this.hoveredDayIndex >= start && this.hoveredDayIndex <= end;
   }
 
   getIssueTheme(issue: Issue): string {
@@ -613,6 +668,20 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       return task.startDate;
     }
     return null;
+  }
+
+  private getTaskDayRange(task: Task): Readonly<[number, number]> | null {
+    if (!this.timelineStart || this.timeline.length === 0) {
+      return null;
+    }
+    const start = this.getEffectiveStart(task);
+    const end = this.getEffectiveEnd(task);
+    if (!start || !end) {
+      return null;
+    }
+    const startIndex = Math.max(0, Math.min(this.timeline.length - 1, this.diffInDays(start, this.timelineStart)));
+    const endIndex = Math.max(startIndex, Math.min(this.timeline.length - 1, this.diffInDays(end, this.timelineStart)));
+    return [startIndex, endIndex];
   }
 
   private formatDayNumber(date: Date): string {

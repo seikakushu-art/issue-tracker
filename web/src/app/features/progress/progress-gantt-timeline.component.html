@@ -4,6 +4,11 @@
       class="gantt-timeline__viewport"
       (scroll)="onScroll($event)"
       (wheel)="onWheel($event)"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+      (pointerleave)="onPointerUp($event)"
     >
       <div class="gantt-timeline__rail">
         <div
@@ -24,11 +29,16 @@
           </div>
           <div class="gantt-timeline__days" [style.gridTemplateColumns]="gridTemplate">
             <div
-              *ngFor="let day of timeline"
+            *ngFor="let day of timeline; index as dayIndex"
               class="gantt-timeline__day"
               [class.weekend]="day.isWeekend"
               [class.holiday]="day.isHoliday"
               [class.today]="day.isToday"
+              [class.is-highlighted]="isDayHighlighted(dayIndex)"
+              (mouseenter)="onDayHover(dayIndex)"
+              (focusin)="onDayHover(dayIndex)"
+              (mouseleave)="onDayHover(null)"
+              (focusout)="onDayHover(null)"
             >
               <span class="day-number">{{ day.dayLabel }}</span>
               <span class="day-weekday">{{ day.weekdayLabel }}</span>
