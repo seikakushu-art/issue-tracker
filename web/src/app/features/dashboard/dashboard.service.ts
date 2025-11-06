@@ -315,17 +315,6 @@ export class DashboardService {
               severity: 'warning',
             });
           }
-
-          if ((task.importance === 'Critical') && (!task.assigneeIds || task.assigneeIds.length === 0)) {
-            insights.push({
-              type: 'critical_unassigned',
-              label: 'Criticalタスクの担当者が未設定',
-              projectId: project.id!,
-              issueId: issue.id!,
-              taskId: task.id!,
-              severity: 'danger',
-            });
-          }
         }
 
         if (

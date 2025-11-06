@@ -131,7 +131,7 @@
                       <button
                         type="button"
                         class="gantt-bar"
-                        [style.backgroundColor]="getIssueTheme(group.issue)"
+                        [style.backgroundColor]="getTaskTheme(task, group.issue)"
                         [style.left]="getTaskOffset(task)"
                         [style.width]="getTaskWidth(task)"
                         (click)="selectTask(group, task)"

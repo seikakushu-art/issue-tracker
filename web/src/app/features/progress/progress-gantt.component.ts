@@ -15,6 +15,7 @@ import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { ProgressGanttTimelineComponent } from './progress-gantt-timeline.component';
 import { isJapaneseHoliday } from './japanese-holidays';
+import { resolveIssueThemeColor } from '../../shared/issue-theme';
 
 interface GanttIssue {
   project: Project;
@@ -149,8 +150,6 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       this.cdr.markForCheck();
     } catch (error) {
       console.error('ガントチャートのデータ読み込みに失敗しました:', error);
-      this.loadError = 'リアルデータの取得に失敗したため、サンプルデータを表示しています。';
-      this.applySampleData();
     } finally {
       this.loading = false;
       this.cdr.markForCheck();
@@ -175,6 +174,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.selectedTask = task;
     this.selectedIssue = issue.issue;
     this.selectedProject = issue.project;
+    this.cdr.markForCheck();
+    this.goToTaskDetail(task, issue.issue, issue.project);
   }
 
   onSidebarTaskSelect(projectId: string | undefined, issueId: string | undefined, task: Task): void {
@@ -250,17 +251,24 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.selectedProject = null;
   }
 
-  goToTaskDetail(): void {
-    if (!this.selectedTask || !this.selectedTask.id || !this.selectedIssue?.id || !this.selectedProject?.id) {
+  goToTaskDetail(
+    task: Task | null = this.selectedTask,
+    issue: Issue | null = this.selectedIssue,
+    project: Project | null = this.selectedProject,
+  ): void {
+    const taskId = task?.id;
+    const issueId = issue?.id;
+    const projectId = project?.id;
+    if (!taskId || !issueId || !projectId) {
       return;
     }
     void this.router.navigate([
       '/projects',
-      this.selectedProject.id,
+      projectId,
       'issues',
-      this.selectedIssue.id,
+      issueId,
     ], {
-      queryParams: { focus: this.selectedTask.id },
+      queryParams: { focus: taskId },
     });
   }
 
@@ -369,7 +377,16 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   getIssueTheme(issue: Issue): string {
-    return issue.themeColor && issue.themeColor.trim().length > 0 ? issue.themeColor : '#475569';
+    const fallbackKey = issue.id ?? issue.projectId ?? issue.name ?? null;
+    return resolveIssueThemeColor(issue.themeColor ?? null, fallbackKey);
+  }
+
+  getTaskTheme(task: Task, issue: Issue): string {
+    const candidate = typeof task.themeColor === 'string' ? task.themeColor.trim() : '';
+    if (candidate.length > 0) {
+      return candidate;
+    }
+    return this.getIssueTheme(issue);
   }
 
   getTaskStatusLabel(task: Task): string {
@@ -711,101 +728,5 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const result = new Date(base);
     result.setUTCDate(result.getUTCDate() + offset);
     return result;
-  }
-
-  private applySampleData(): void {
-    const base = this.toTokyoDate(new Date());
-    const project: Project = {
-      id: 'sample-project',
-      name: 'サンプルプロジェクト',
-      description: 'デモ用のプロジェクト',
-      memberIds: [],
-      roles: {},
-      archived: false,
-      progress: 45,
-    };
-
-    const issue: Issue = {
-      id: 'sample-issue',
-      projectId: project.id!,
-      name: 'UI改善イニシアチブ',
-      description: '主要画面のUIを段階的に改善します。',
-      startDate: this.createSampleDate(base, -14),
-      endDate: this.createSampleDate(base, 14),
-      goal: '第1四半期中に主要画面の改善を完了する',
-      themeColor: '#2563eb',
-      archived: false,
-      progress: 60,
-    };
-
-    const rawTasks: Task[] = [
-      {
-        id: 'sample-task-1',
-        projectId: project.id!,
-        issueId: issue.id!,
-        title: '画面レイアウト策定',
-        description: 'ワイヤーフレームを作成し、関係者レビューを通過。',
-        startDate: this.createSampleDate(base, -12),
-        endDate: this.createSampleDate(base, -6),
-        goal: 'レビュー合格',
-        importance: 'High',
-        status: 'completed',
-        archived: false,
-        assigneeIds: [],
-        tagIds: [],
-        checklist: [],
-        createdBy: 'system',
-      },
-      {
-        id: 'sample-task-2',
-        projectId: project.id!,
-        issueId: issue.id!,
-        title: 'コンポーネント設計',
-        description: '再利用可能なUIコンポーネントの仕様を整理。',
-        startDate: this.createSampleDate(base, -5),
-        endDate: this.createSampleDate(base, 4),
-        goal: '主要部品の設計完了',
-        importance: 'Critical',
-        status: 'in_progress',
-        archived: false,
-        assigneeIds: [],
-        tagIds: [],
-        checklist: [],
-        createdBy: 'system',
-      },
-      {
-        id: 'sample-task-3',
-        projectId: project.id!,
-        issueId: issue.id!,
-        title: 'ユーザーテスト準備',
-        description: '想定シナリオとテスト環境を準備。',
-        startDate: this.createSampleDate(base, 3),
-        endDate: this.createSampleDate(base, 12),
-        goal: 'テスト計画の承認',
-        importance: 'Medium',
-        status: 'incomplete',
-        archived: false,
-        assigneeIds: [],
-        tagIds: [],
-        checklist: [],
-        createdBy: 'system',
-      },
-    ];
-
-    const normalizedTasks = rawTasks.map((task) => this.normalizeTaskDates(task));
-    this.ganttIssues = [
-      {
-        project,
-        issue,
-        tasks: normalizedTasks,
-        collapsed: false,
-      },
-    ];
-
-    this.buildProjectHierarchy(this.ganttIssues);
-    this.availableProjects = [project];
-    this.selectedProjectIds = new Set(project.id ? [project.id] : []);
-
-    this.applyProjectFilters();
   }
 }
