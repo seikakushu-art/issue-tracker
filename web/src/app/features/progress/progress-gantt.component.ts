@@ -95,6 +95,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   availableProjects: Project[] = [];
   selectedProjectId: string | null = null;
 
+  get shouldShowProjectSelectionHint(): boolean {
+    return !this.selectedProjectId && this.availableProjects.length > 0;
+  }
+
   private readonly monthFormatter = new Intl.DateTimeFormat('ja-JP', {
     year: 'numeric',
     month: 'long',
