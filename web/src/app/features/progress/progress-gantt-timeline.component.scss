@@ -2,7 +2,8 @@
     display: block;
     width: 100%;
     min-width: 0;
-    --gantt-timeline-max-height: clamp(320px, 70vh, 720px);
+    min-height: 0;
+    --gantt-timeline-max-height: clamp(320px, 100vh, 720px);
   }
   
   .gantt-timeline {
@@ -130,7 +131,7 @@
       rgba(148, 163, 184, 0.2) 0,
       rgba(148, 163, 184, 0.2) 1px,
       transparent 1px,
-      transparent calc(var(--day-width) - 1px)
+      transparent calc(var(--day-width) )
     );
   }
   

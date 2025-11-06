@@ -392,6 +392,7 @@
     font-weight: 700;
     color: #1e293b;
     box-shadow: inset -1px 0 0 #e2e8f0;
+    box-sizing: border-box;
   }
 
   .gantt-month-row,
@@ -435,7 +436,7 @@
       rgba(148, 163, 184, 0.28),
       rgba(148, 163, 184, 0.28) 1px,
       transparent 1px,
-      transparent calc(var(--day-width))
+      transparent calc(var(--day-width) - 1px)
     );
     mix-blend-mode: multiply;
     z-index: 0;
@@ -511,6 +512,7 @@
     cursor: pointer;
     border-right: 1px solid #e2e8f0;
     box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.2);
+    box-sizing: border-box;
   }
 
   .gantt-row__label.issue {
@@ -568,7 +570,7 @@
       rgba(148, 163, 184, 0.24),
       rgba(148, 163, 184, 0.24) 1px,
       transparent 1px,
-      transparent calc(var(--day-width))
+      transparent calc(var(--day-width) - 1px)
     );
     mix-blend-mode: multiply;
     z-index: 1;
@@ -583,6 +585,7 @@
     position: relative;
     z-index: 2;
     background: #ffffff;
+    box-sizing: border-box;
   }
 
   .gantt-cell.weekend {
