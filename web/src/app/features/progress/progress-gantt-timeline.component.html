@@ -27,6 +27,7 @@
               *ngFor="let day of timeline"
               class="gantt-timeline__day"
               [class.weekend]="day.isWeekend"
+              [class.holiday]="day.isHoliday"
               [class.today]="day.isToday"
             >
               <span class="day-number">{{ day.dayLabel }}</span>

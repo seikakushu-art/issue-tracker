@@ -14,6 +14,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { ProgressGanttTimelineComponent } from './progress-gantt-timeline.component';
+import { isJapaneseHoliday } from './japanese-holidays';
 
 interface GanttIssue {
   project: Project;
@@ -35,6 +36,7 @@ export interface GanttProjectGroup {
 export interface TimelineDay {
   date: Date;
   isWeekend: boolean;
+  isHoliday: boolean;
   isToday: boolean;
   dayLabel: string;
   weekdayLabel: string;
@@ -81,7 +83,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   selectedProject: Project | null = null;
 
   readonly tokyoTimezone = 'Asia/Tokyo';
-  readonly dayCellWidth = 48;
+  readonly dayCellWidth = 30;
   readonly labelColumnWidth = 280;
 
   projectHierarchy: GanttProjectGroup[] = [];
@@ -94,11 +96,6 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   private readonly weekdayFormatter = new Intl.DateTimeFormat('ja-JP', {
     weekday: 'short',
-    timeZone: this.tokyoTimezone,
-  });
-
-  private readonly dayFormatter = new Intl.DateTimeFormat('ja-JP', {
-    day: '2-digit',
     timeZone: this.tokyoTimezone,
   });
 
@@ -359,7 +356,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   getTimelineLabel(day: TimelineDay): string {
-    return `${this.dayFormatter.format(day.date)} (${this.weekdayFormatter.format(day.date)})`;
+    return `${this.formatDayNumber(day.date)} (${this.weekdayFormatter.format(day.date)})`;
   }
 
   private buildTimeline(allDates: Date[]): void {
@@ -386,8 +383,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       days.push({
         date,
         isWeekend: cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6,
+        isHoliday: isJapaneseHoliday(date),
         isToday: this.isSameDay(date, today),
-        dayLabel: this.dayFormatter.format(date),
+        dayLabel: this.formatDayNumber(date),
         weekdayLabel: this.weekdayFormatter.format(date),
       });
       cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -490,6 +488,11 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       return task.startDate;
     }
     return null;
+  }
+
+  private formatDayNumber(date: Date): string {
+    const day = date.getUTCDate();
+    return day.toString().padStart(2, '0');
   }
 
   private toTokyoDate(date: Date): Date {

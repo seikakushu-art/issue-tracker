@@ -152,8 +152,17 @@
   }
   
   .gantt-timeline__day.weekend {
-    color: #94a3b8;
+    color: #64748b;
     background: #f8fafc;
+  }
+
+  .gantt-timeline__day.holiday {
+    color: #be123c;
+    background: #fff1f2;
+  }
+
+  .gantt-timeline__day.holiday.weekend {
+    background: #ffe4e6;
   }
   
   .gantt-timeline__day.today {

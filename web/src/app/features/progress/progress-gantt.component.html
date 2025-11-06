@@ -70,7 +70,12 @@
                       <p class="issue-meta">{{ group.project.name }} / タスク {{ group.tasks.length }} 件</p>
                     </div>
                     <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
-                      <div *ngFor="let day of timeline" class="gantt-cell" [class.weekend]="day.isWeekend"></div>
+                      <div
+                      *ngFor="let day of timeline"
+                      class="gantt-cell"
+                      [class.weekend]="day.isWeekend"
+                      [class.holiday]="day.isHoliday"
+                    ></div>
                     </div>
                   </div>
 
@@ -96,6 +101,7 @@
                         *ngFor="let day of timeline"
                         class="gantt-cell"
                         [class.weekend]="day.isWeekend"
+                        [class.holiday]="day.isHoliday"
                         [class.today]="day.isToday"
                       ></div>
                       <button
