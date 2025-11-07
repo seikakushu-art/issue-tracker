@@ -206,7 +206,7 @@ export class NotificationService {
     due_today: '本日締切',
     overdue: '期限超過',
     on_hold: '保留継続',
-    no_progress: '進捗0%',
+    no_progress: '未着手',
     mentioned: 'メンションあり',
   };
 

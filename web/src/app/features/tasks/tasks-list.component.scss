@@ -1384,10 +1384,55 @@
   gap: 12px;
 }
 
+.comment-form-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mention-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mention-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4338ca;
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.mention-toggle[disabled] .mention-toggle-icon {
+  background: #9ca3af;
+}
+
+.mention-helper {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 .mention-selector {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+.mention-helper-text {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .mention-label {
@@ -1399,6 +1444,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-height: 216px;
+  overflow-y: auto;
 }
 
 .mention-option {

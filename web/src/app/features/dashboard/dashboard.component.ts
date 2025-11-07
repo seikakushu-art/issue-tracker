@@ -464,10 +464,10 @@ export class DashboardComponent implements OnInit {
   /** 重要度の表示ラベル */
   getImportanceLabel(importance: Importance | null): string {
     const labels: Record<Importance, string> = {
-      Critical: '最重要',
-      High: '高',
-      Medium: '中',
-      Low: '低',
+      Critical: '至急重要',
+      High: '至急',
+      Medium: '重要',
+      Low: '普通',
     };
     return importance ? labels[importance] : '未設定';
   }

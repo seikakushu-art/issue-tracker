@@ -599,8 +599,32 @@
         ></textarea>
 
         <div class="comment-form-footer">
-          <div class="mention-selector" *ngIf="mentionableMembers.length > 0">
-            <span class="mention-label">メンション</span>
+          <div class="comment-form-toolbar">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm mention-toggle"
+              (click)="toggleMentionSelector()"
+              [disabled]="mentionableMembers.length === 0"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="mentionSelectorOpen"
+              [attr.aria-controls]="mentionSelectorPanelId"
+            >
+              <span class="mention-toggle-icon">&#64;</span>
+              <span class="mention-toggle-label">メンション</span>
+            </button>
+            <span class="mention-helper" *ngIf="mentionableMembers.length === 0">
+              メンションできるメンバーがいません。
+            </span>
+          </div>
+
+          <div
+            class="mention-selector"
+            *ngIf="mentionSelectorOpen && mentionableMembers.length > 0"
+            [attr.id]="mentionSelectorPanelId"
+            role="listbox"
+            aria-label="メンション候補"
+          >
+            <p class="mention-helper-text">タスクの所属プロジェクトのメンバーだけが表示されます。</p>
             <div class="mention-list">
               <button
                 type="button"

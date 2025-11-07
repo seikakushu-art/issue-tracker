@@ -92,6 +92,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
   currentUserProfile: UserDirectoryProfile | null = null;
   projectMemberProfiles: Record<string, UserDirectoryProfile> = {};
   mentionableMembers: UserDirectoryProfile[] = [];
+  mentionSelectorOpen = false;
+  readonly mentionSelectorPanelId = 'task-list-mention-selector';
 
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
@@ -531,6 +533,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     if (!memberIds || memberIds.length === 0) {
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
+      this.mentionSelectorOpen = false;
       this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid)  : null;
       this.updateSmartFilterAssignees();
       return;
@@ -544,6 +547,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
       }
       this.projectMemberProfiles = profileMap;
       this.mentionableMembers = profiles.filter(profile => profile.uid !== currentUid);
+      if (this.mentionableMembers.length === 0) {
+        this.mentionSelectorOpen = false;
+      }
       if (currentUid) {
         const directoryProfile = profileMap[currentUid];
         const fallbackProfile = baseFallbackProfile(currentUid);
@@ -562,6 +568,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       console.error('メンバー情報の取得に失敗しました:', error);
       this.projectMemberProfiles = {};
       this.mentionableMembers = [];
+      this.mentionSelectorOpen = false;
       this.currentUserProfile = currentUid ? baseFallbackProfile(currentUid) : null;
       this.attachments = this.attachments.map(attachment => this.composeAttachmentView(attachment));
       this.updateSmartFilterAssignees();
@@ -697,6 +704,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
       );
       this.commentForm = { text: '', mentions: [] };
+      this.mentionSelectorOpen = false;
       this.updateCommentLimitState();
     } catch (error) {
       console.error('コメントの投稿に失敗しました:', error);
@@ -832,8 +840,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.commentForm.mentions.includes(member.uid)) {
-      this.commentForm.mentions = this.commentForm.mentions.filter(id => id !== member.uid);
+    const uid = member.uid;
+    if (!uid) {
+      return;
+    }
+
+    if (this.commentForm.mentions.includes(uid)) {
+      this.commentForm.mentions = this.commentForm.mentions.filter(id => id !== uid);
+      const mentionToken = `@${member.username}`;
+      this.commentForm.text = this.commentForm.text
+        .replace(new RegExp(`\\s*${mentionToken}\\s*`, 'g'), ' ')
+        .trim();
       return;
     }
 
@@ -846,9 +863,18 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.commentForm.mentions = [...this.commentForm.mentions, member.uid];
+    this.commentForm.mentions = [...this.commentForm.mentions, uid];
     this.commentForm.text = appended;
     this.commentError = '';
+  }
+
+  toggleMentionSelector(): void {
+    if (this.mentionableMembers.length === 0) {
+      this.mentionSelectorOpen = false;
+      return;
+    }
+
+    this.mentionSelectorOpen = !this.mentionSelectorOpen;
   }
 
   isMentionSelected(uid: string): boolean {

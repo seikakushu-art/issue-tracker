@@ -33,7 +33,21 @@
 .notification-area {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 8px;
+}
+
+.notification-area__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.notification-area__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .notification-area h1 {
@@ -47,30 +61,30 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .notification-area__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 6px;
 }
 
 .summary-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 18px;
+  gap: 4px;
+  padding: 4px 12px;
   border-radius: 999px;
   border: 1px solid transparent;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.2;
 }
 
 .summary-chip__icon {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .summary-chip__label {
@@ -102,7 +116,8 @@
 .notification-area__headline {
   margin: 0;
   color: #64748b;
-  font-size: 15px;
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .notification-area__headline--error {
@@ -118,10 +133,10 @@
   border-radius: 20px;
   border: 1px solid #e2e8f0;
   background: linear-gradient(135deg, rgba(226, 232, 240, 0.35), rgba(248, 250, 252, 0.65));
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .notification-card__state {
@@ -142,16 +157,16 @@
 .notification-card__list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .notification-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
-  padding: 14px 18px;
+  padding: 10px 16px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
@@ -190,13 +205,14 @@
 .notification-item__content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .notification-item__title {
   font-size: 15px;
   font-weight: 600;
   color: #0f172a;
+  line-height: 1.3;
 }
 
 .notification-item__title--unread {
@@ -207,6 +223,7 @@
 .notification-item__description {
   font-size: 13px;
   color: #64748b;
+  line-height: 1.3;
 }
 
 .notification-item__meta {
@@ -833,6 +850,14 @@
 
 .actionable-card__meta {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.actionable-card__meta-left {
+  display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
@@ -876,23 +901,6 @@
 .due-label {
   font-size: 12px;
   color: #475569;
-}
-
-.actionable-card__reasons {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
-  color: #0f172a;
-}
-
-.actionable-card__reasons li {
-  background: #e2e8f0;
-  border-radius: 999px;
-  padding: 4px 10px;
 }
 
 .actionable-card__mentions {
@@ -1025,6 +1033,16 @@
   .actionable-card__actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .actionable-card__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .actionable-card__meta-left {
+    width: 100%;
   }
 
   .user-chip {

@@ -103,6 +103,8 @@ import {
       text: '',
       mentions: [] as string[],
     };
+    mentionSelectorOpen = false;
+    readonly mentionSelectorPanelId = 'task-detail-mention-selector';
   
     private readonly importanceDisplay: Record<Importance, { label: string; weight: number }> = {
       Critical: { label: '至急重要', weight: 4 },
@@ -298,6 +300,15 @@ import {
       this.commentForm.text = appended;
       this.commentError = '';
     }
+
+    toggleMentionSelector(): void {
+      if (this.mentionableMembers.length === 0) {
+        this.mentionSelectorOpen = false;
+        return;
+      }
+
+      this.mentionSelectorOpen = !this.mentionSelectorOpen;
+    }
   
     async toggleChecklistItem(itemId: string, completed: boolean): Promise<void> {
       if (!this.task || !this.canEditTask(this.task)) {
@@ -451,6 +462,7 @@ import {
         const view = this.composeCommentView(created);
         this.comments = [...this.comments, view].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
         this.commentForm = { text: '', mentions: [] };
+        this.mentionSelectorOpen = false;
         this.updateCommentLimitState();
         await this.refreshTask();
       } catch (error) {
@@ -536,6 +548,7 @@ import {
       if (!memberIds || memberIds.length === 0) {
         this.projectMemberProfiles = {};
         this.mentionableMembers = [];
+        this.mentionSelectorOpen = false;
         this.currentUserProfile = currentUid ? fallbackProfile(currentUid) : null;
         return;
       }
@@ -548,6 +561,9 @@ import {
         }
         this.projectMemberProfiles = profileMap;
         this.mentionableMembers = profiles.filter((profile) => profile.uid !== currentUid);
+        if (this.mentionableMembers.length === 0) {
+          this.mentionSelectorOpen = false;
+        }
         if (currentUid) {
           const directoryProfile = profileMap[currentUid];
           const fallback = fallbackProfile(currentUid);
@@ -563,6 +579,7 @@ import {
         console.error('メンバー情報の取得に失敗しました:', error);
         this.projectMemberProfiles = {};
         this.mentionableMembers = [];
+        this.mentionSelectorOpen = false;
         this.currentUserProfile = currentUid ? fallbackProfile(currentUid) : null;
       }
     }
