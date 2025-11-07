@@ -35,6 +35,13 @@ export interface GanttProjectGroup {
   issues: GanttProjectIssue[];
 }
 
+interface GanttPersistedState {
+  /** 前回選択していたプロジェクト ID（未選択時は null） */
+  selectedProjectId: string | null;
+  /** タイムラインの左スクロール位置（px） */
+  scrollLeft: number;
+}
+
 export interface TimelineDay {
   date: Date;
   isWeekend: boolean;
@@ -96,6 +103,13 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   availableProjects: Project[] = [];
   selectedProjectId: string | null = null;
 
+  /** localStorage 用の保存キーをひとつにまとめる */
+  private readonly storageKey = 'progressGanttState';
+  /** ビュー描画後に反映するスクロール位置（null の場合は未指定） */
+  private pendingScrollLeft: number | null = null;
+  /** 初期表示時のスクロール復元処理が完了したかどうか */
+  private hasRestoredInitialState = false;
+
   get shouldShowProjectSelectionHint(): boolean {
     return !this.selectedProjectId && this.availableProjects.length > 0;
   }
@@ -115,14 +129,27 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   private pendingScrollToToday = false;
 
   ngOnInit(): void {
+    this.restorePersistedState();
     void this.loadData();
   }
 
   ngAfterViewInit(): void {
     this.viewInitialized = true;
-    if (this.pendingScrollToToday) {
+    if (this.pendingScrollLeft !== null) {
+      // 保存しておいたスクロール位置を即座に復元する
+      const target = this.pendingScrollLeft;
+      this.pendingScrollLeft = null;
+      setTimeout(() => {
+        this.setScrollPosition(target, { smooth: false });
+        this.hasRestoredInitialState = true;
+      }, 0);
+    } else if (this.pendingScrollToToday) {
+      // 復元対象がない場合のみ「今日へジャンプ」を行う
       this.pendingScrollToToday = false;
-      setTimeout(() => this.scrollToToday(), 0);
+      setTimeout(() => {
+        this.scrollToToday();
+        this.hasRestoredInitialState = true;
+      }, 0);
     }
   }
 
@@ -176,6 +203,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const element = event.target as HTMLElement;
     this.currentScrollLeft = element.scrollLeft;
     this.updateActiveMonthLabel(element);
+    this.persistState();
   }
 
   handleTimelineDayHover(index: number | null): void {
@@ -230,6 +258,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const value = select?.value?.trim() ?? '';
     this.selectedProjectId = value === '' ? null : value;
     this.applyProjectFilters();
+    this.persistState();
   }
 
   closeDetailPanel(): void {
@@ -534,10 +563,33 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.activeMonthLabel = this.timelineMonths[0]?.label ?? '';
 
     if (this.viewInitialized) {
-      setTimeout(() => this.scrollToToday(), 0);
+      if (this.pendingScrollLeft !== null) {
+        // ビューが存在する場合は保存しておいた位置へ移動
+        const target = this.pendingScrollLeft;
+        this.pendingScrollLeft = null;
+        setTimeout(() => {
+          this.setScrollPosition(target, { smooth: false });
+          this.hasRestoredInitialState = true;
+        }, 0);
+      } else if (!this.hasRestoredInitialState) {
+        // 初回表示のみ今日にスクロールする
+        setTimeout(() => {
+          this.scrollToToday();
+          this.hasRestoredInitialState = true;
+        }, 0);
+      } else {
+        // それ以外は現在地を保ったまま再描画
+        setTimeout(() => this.setScrollPosition(this.currentScrollLeft, { smooth: false }), 0);
+      }
       this.updateActiveMonthLabel();
     } else {
-      this.pendingScrollToToday = true;
+      if (this.pendingScrollLeft !== null) {
+        // 後でスクロール復元を実行するため今日へのジャンプは抑制
+        this.pendingScrollToToday = false;
+      } else if (!this.hasRestoredInitialState) {
+        // ビュー初期化待ちの場合は今日に移動するフラグだけ立てておく
+        this.pendingScrollToToday = true;
+      }
     }
   }
 
@@ -568,9 +620,14 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     } else {
       this.selectedProjectId = null;
     }
+    this.persistState();
   }
 
   private applyProjectFilters(): void {
+    if (this.viewInitialized && this.hasRestoredInitialState) {
+      // フィルター変更でタイムラインが再生成される前に位置を保持
+      this.pendingScrollLeft = this.currentScrollLeft;
+    }
     const activeId = this.selectedProjectId;
     const visible = this.ganttIssues.filter((group) => {
       const projectId = group.project.id;
@@ -793,7 +850,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     return segments;
   }
 
-  private setScrollPosition(target: number): void {
+  private setScrollPosition(target: number, options?: { smooth?: boolean; suppressPersist?: boolean }): void {
     if (typeof window === 'undefined') {
       return;
     }
@@ -803,13 +860,17 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     }
     const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
     const next = Math.min(Math.max(0, target), maxScroll);
+    const shouldSmooth = options?.smooth ?? true;
     if (typeof viewport.scrollTo === 'function') {
-      viewport.scrollTo({ left: next, behavior: 'smooth' });
+      viewport.scrollTo({ left: next, behavior: shouldSmooth ? 'smooth' : 'auto' });
     } else {
       viewport.scrollLeft = next;
     }
     this.currentScrollLeft = next;
     this.updateActiveMonthLabel(viewport);
+    if (!options?.suppressPersist) {
+      this.persistState();
+    }
   }
 
   private focusTaskOnTimeline(task: Task): void {
@@ -850,5 +911,43 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const result = new Date(base);
     result.setUTCDate(result.getUTCDate() + offset);
     return result;
+  }
+   /** localStorage から前回の状態を読み戻す */
+   private restorePersistedState(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(this.storageKey);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<GanttPersistedState>;
+      if (parsed.selectedProjectId === null || typeof parsed.selectedProjectId === 'string') {
+        this.selectedProjectId = parsed.selectedProjectId;
+      }
+      if (typeof parsed.scrollLeft === 'number' && Number.isFinite(parsed.scrollLeft)) {
+        this.pendingScrollLeft = parsed.scrollLeft;
+        this.currentScrollLeft = parsed.scrollLeft;
+      }
+    } catch (error) {
+      console.warn('ガントチャートの状態復元に失敗しました。', error);
+    }
+  }
+
+  /** 現在の状態を localStorage に保存する */
+  private persistState(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const payload: GanttPersistedState = {
+      selectedProjectId: this.selectedProjectId ?? null,
+      scrollLeft: this.currentScrollLeft ?? 0,
+    };
+    try {
+      window.localStorage.setItem(this.storageKey, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('ガントチャートの状態保存に失敗しました。', error);
+    }
   }
 }

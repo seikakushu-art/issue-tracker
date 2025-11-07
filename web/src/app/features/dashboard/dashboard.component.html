@@ -109,11 +109,6 @@
                     </div>
                     <div class="summary__cards">
                         <article class="summary-card">
-                            <h3>タスク総数</h3>
-                            <p class="summary-card__value">{{ summary.totalTasks }}</p>
-                            <span class="summary-card__hint">Critical未着手 {{ summary.criticalChecklistBacklog }}</span>
-                        </article>
-                        <article class="summary-card">
                             <h3>期限超過</h3>
                             <p class="summary-card__value">{{ summary.overdueCount }}</p>
                             <span class="summary-card__hint">要再調整のタスク</span>
@@ -213,7 +208,7 @@
         <section class="widget widget--bottlenecks" aria-labelledby="bottleneck-title">
             <div class="widget__header">
                 <h2 id="bottleneck-title">ボトルネック検知</h2>
-                <span class="widget__hint">進捗0%、長期保留、Critical無担当などを抽出</span>
+                <span class="widget__hint">進捗0%、長期保留などを抽出</span>
             </div>
             <div class="widget__content widget__content--bottlenecks">
                 <p class="widget__empty" *ngIf="bottlenecks().length === 0">現在検出されたボトルネックはありません。</p>
@@ -289,27 +284,15 @@
                         <div class="actionable-card__body">
                             <h3>{{ card.title }}</h3>
                             <div class="actionable-card__meta">
-                                <div class="actionable-card__meta-left">
-                                    <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
-                                        {{ getImportanceLabel(card.importance) }}
-                                    </span>
-                                    <span class="status-badge" [ngClass]="'status-' + card.status">
-                                        {{ card.statusLabel }}
-                                    </span>
-                                    <span class="due-label" *ngIf="card.dueDate">
-                                        期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
-                                    </span>
-                                </div>
-                                <div class="actionable-card__actions">
-                                    <button type="button" class="button button--ghost" (click)="markOnHold(card)"
-                                        [disabled]="isUpdating(card)">
-                                        保留
-                                    </button>
-                                    <button type="button" class="button button--primary" (click)="markCompleted(card)"
-                                        [disabled]="isUpdating(card)">
-                                        完了
-                                    </button>
-                                </div>
+                                <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
+                                    {{ getImportanceLabel(card.importance) }}
+                                </span>
+                                <span class="status-badge" [ngClass]="'status-' + card.status">
+                                    {{ card.statusLabel }}
+                                </span>
+                                <span class="due-label" *ngIf="card.dueDate">
+                                    期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
+                                </span>
                             </div>
                             <div class="actionable-card__mentions" *ngIf="card.mentionCount > 0">
                                 <h4>メンション {{ card.mentionCount }}件</h4>
@@ -320,6 +303,16 @@
                                     </li>
                                 </ul>
                             </div>
+                        </div>
+                        <div class="actionable-card__actions">
+                            <button type="button" class="button button--ghost" (click)="markOnHold(card)"
+                                [disabled]="isUpdating(card)">
+                                保留
+                            </button>
+                            <button type="button" class="button button--primary" (click)="markCompleted(card)"
+                                [disabled]="isUpdating(card)">
+                                完了
+                            </button>
                         </div>
                     </li>
                 </ul>
