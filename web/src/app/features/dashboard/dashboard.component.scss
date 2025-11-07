@@ -855,7 +855,52 @@
   }
 }
 .widget--board .widget__content--board {
-  /* 子のpaddingを0にしたので、必要なら微調整 */
-  padding-top: 0;
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+.widget--board .widget__content--board::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget--board .widget__content--board::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.widget--board .widget__content--board::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.widget--board .widget__content--board::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.widget--deadlines .widget__content--actionable {
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+.widget--deadlines .widget__content--actionable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget--deadlines .widget__content--actionable::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.widget--deadlines .widget__content--actionable::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.widget--deadlines .widget__content--actionable::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
   
