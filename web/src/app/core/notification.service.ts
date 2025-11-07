@@ -151,6 +151,12 @@ export class NotificationService {
     return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
   }
 
+  /** 日付を東京時間での日付部分のみに正規化（時間部分を00:00:00にリセット） */
+  private normalizeToTokyoDate(date: Date): Date {
+    const { year, month, day } = this.getTokyoDateParts(date);
+    return new Date(Date.UTC(year, month, day));
+  }
+
   /**
    * Firestoreから取得した日時をDate型へ統一する
    */
@@ -282,7 +288,6 @@ export class NotificationService {
     const mentionTake = options.mentionTake ?? 3;
     const now = new Date();
     const startOfToday = this.getStartOfToday(now);
-    const endOfToday = this.getEndOfToday(now);
 
     const tasksRef = collectionGroup(this.db, 'tasks');
     const taskQuery = query(
@@ -301,9 +306,13 @@ export class NotificationService {
         const highlightReasons: HighlightReason[] = [];
 
         if (dueDate) {
-          if (dueDate < startOfToday) {
+          // 東京時間での日付部分のみを比較
+          const dueDateNormalized = this.normalizeToTokyoDate(dueDate);
+          const startOfTodayNormalized = this.normalizeToTokyoDate(startOfToday);
+          
+          if (dueDateNormalized < startOfTodayNormalized) {
             highlightReasons.push('overdue');
-          } else if (dueDate >= startOfToday && dueDate <= endOfToday) {
+          } else if (dueDateNormalized.getTime() === startOfTodayNormalized.getTime()) {
             highlightReasons.push('due_today');
           }
         }
@@ -479,6 +488,13 @@ export class NotificationService {
     const now = new Date();
     const startOfToday = this.getStartOfToday(now);
     const endOfToday = this.getEndOfToday(now);
+    
+    console.log('[通知デバッグ] 検索条件:', {
+      now: now.toISOString(),
+      startOfToday: startOfToday.toISOString(),
+      endOfToday: endOfToday.toISOString(),
+      totalTasks: snapshot.docs.length,
+    });
 
     const candidateTasks = snapshot.docs
       .map((docSnap) => ({
@@ -487,19 +503,40 @@ export class NotificationService {
       }))
       .filter((entry) => {
         const data = entry.data;
-        const dueDate = this.normalizeDate((data as unknown as Record<string, unknown>)['endDate']);
+        const dueDateRaw = this.normalizeDate((data as unknown as Record<string, unknown>)['endDate']);
+        if (!dueDateRaw) {
+          return false;
+        }
+        // 東京時間での日付部分のみを比較
+        const dueDateNormalized = this.normalizeToTokyoDate(dueDateRaw);
+        const startOfTodayNormalized = this.normalizeToTokyoDate(startOfToday);
+        
+        // デバッグログ
+        console.log('[通知デバッグ] タスク:', {
+          title: data.title,
+          endDateRaw: dueDateRaw.toISOString(),
+          endDateNormalized: dueDateNormalized.toISOString(),
+          startOfTodayNormalized: startOfTodayNormalized.toISOString(),
+          isMatch: dueDateNormalized.getTime() === startOfTodayNormalized.getTime(),
+          projectId: data.projectId,
+          issueId: data.issueId,
+          status: data.status,
+          archived: data.archived,
+        });
+        
         return (
           Boolean(data.projectId) &&
           Boolean(data.issueId) &&
-          dueDate !== null &&
-          dueDate >= startOfToday &&
-          dueDate <= endOfToday
+          dueDateNormalized.getTime() === startOfTodayNormalized.getTime()
         );
       });
 
     if (candidateTasks.length === 0) {
+      console.log('[通知デバッグ] 本日終了タスクが見つかりませんでした');
       return [];
     }
+    
+    console.log('[通知デバッグ] 本日終了タスク候補:', candidateTasks.length, '件');
 
     const projectIds = new Set<string>();
     const issueRefs = new Map<string, { projectId: string; issueId: string }>();

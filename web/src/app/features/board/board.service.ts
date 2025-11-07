@@ -10,6 +10,7 @@ import {
   doc,
   getDoc,
   getCountFromServer,
+  deleteDoc,
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { firstValueFrom, TimeoutError } from 'rxjs';
@@ -289,5 +290,26 @@ export class BoardService {
     }
 
     return posts;
+  }
+
+  async deletePost(postId: string): Promise<void> {
+    const user = await this.requireUser();
+    if (!postId) {
+      throw new Error('投稿IDが指定されていません');
+    }
+
+    const postRef = doc(this.db, 'bulletinPosts', postId);
+    const postSnap = await getDoc(postRef);
+
+    if (!postSnap.exists()) {
+      throw new Error('投稿が見つかりません');
+    }
+
+    const postData = postSnap.data() as BulletinPost;
+    if (postData.authorId !== user.uid) {
+      throw new Error('自分の投稿のみ削除できます');
+    }
+
+    await deleteDoc(postRef);
   }
 }

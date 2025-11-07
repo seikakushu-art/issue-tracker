@@ -119,9 +119,23 @@
                 </time>
               </div>
             </div>
-            <ul class="board-post__projects">
-              <li *ngFor="let name of post.projectNames">{{ name }}</li>
-            </ul>
+            <div class="board-post__header-right">
+              <ul class="board-post__projects">
+                <li *ngFor="let name of post.projectNames">{{ name }}</li>
+              </ul>
+              <button
+                *ngIf="isMyPost(post)"
+                type="button"
+                class="board-post__delete-button"
+                (click)="deletePost(post.id)"
+                [disabled]="isDeletingPost(post.id)"
+                [attr.aria-label]="'投稿「' + post.title + '」を削除'"
+                title="投稿を削除"
+              >
+                <span *ngIf="!isDeletingPost(post.id)">削除</span>
+                <span *ngIf="isDeletingPost(post.id)">削除中...</span>
+              </button>
+            </div>
           </header>
           <h3 class="board-post__title">{{ post.title }}</h3>
           <div class="board-post__content-wrapper">

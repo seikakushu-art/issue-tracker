@@ -28,6 +28,7 @@ export class BoardListComponent implements OnInit {
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
+  private readonly deletingPostIds = signal<Set<string>>(new Set());
 
   readonly accessibleProjects = signal<Project[]>([]);
   private readonly currentUid = signal<string | null>(null);
@@ -217,6 +218,49 @@ export class BoardListComponent implements OnInit {
       next.add(postId);
     }
     this.expandedPosts.set(next);
+  }
+
+  isMyPost(post: BoardPostView): boolean {
+    const uid = this.currentUid();
+    return uid !== null && post.authorId === uid;
+  }
+
+  isDeletingPost(postId: string | undefined): boolean {
+    if (!postId) {
+      return false;
+    }
+    return this.deletingPostIds().has(postId);
+  }
+
+  async deletePost(postId: string | undefined): Promise<void> {
+    if (!postId) {
+      return;
+    }
+
+    if (!confirm('この投稿を削除してもよろしいですか？')) {
+      return;
+    }
+
+    const current = this.deletingPostIds();
+    const next = new Set(current);
+    next.add(postId);
+    this.deletingPostIds.set(next);
+
+    try {
+      await this.boardService.deletePost(postId);
+      await this.loadPosts();
+      this.successMessage.set('投稿を削除しました');
+    } catch (error) {
+      console.error('Failed to delete bulletin post', error);
+      const message =
+        error instanceof Error ? error.message : '投稿の削除に失敗しました。';
+      this.formError.set(message);
+    } finally {
+      const final = this.deletingPostIds();
+      const finalNext = new Set(final);
+      finalNext.delete(postId);
+      this.deletingPostIds.set(finalNext);
+    }
   }
 
   private resolveRole(project: Project): Role | null {
