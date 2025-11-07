@@ -286,18 +286,19 @@ export class DashboardService {
             task.status !== 'completed' &&
             task.status !== 'discarded' &&
             (task.progress ?? 0) === 0 &&
-            endDate &&
-            this.diffInDays(now, endDate) <= DashboardService.DEADLINE_ALERT_THRESHOLD_DAYS &&
-            endDate >= now
+            endDate
           ) {
-            insights.push({
-              type: 'zero_progress_deadline',
-              label: '進捗0%で期限間近',
-              projectId: project.id!,
-              issueId: issue.id!,
-              taskId: task.id!,
-              severity: 'danger',
-            });
+            const daysUntil = this.daysUntilDeadline(now, endDate);
+            if (daysUntil >= 0 && daysUntil <= DashboardService.DEADLINE_ALERT_THRESHOLD_DAYS) {
+              insights.push({
+                type: 'zero_progress_deadline',
+                label: '進捗0%で期限間近',
+                projectId: project.id!,
+                issueId: issue.id!,
+                taskId: task.id!,
+                severity: 'danger',
+              });
+            }
           }
 
           if (
@@ -312,17 +313,6 @@ export class DashboardService {
               issueId: issue.id!,
               taskId: task.id!,
               severity: 'warning',
-            });
-          }
-
-          if ((task.importance === 'Critical') && (!task.assigneeIds || task.assigneeIds.length === 0)) {
-            insights.push({
-              type: 'critical_unassigned',
-              label: 'Criticalタスクの担当者が未設定',
-              projectId: project.id!,
-              issueId: issue.id!,
-              taskId: task.id!,
-              severity: 'danger',
             });
           }
         }
@@ -483,5 +473,14 @@ export class DashboardService {
   private diffInDays(a: Date, b: Date): number {
     const diff = a.getTime() - b.getTime();
     return Math.abs(Math.floor(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  /** 現在日時から期限までの日数を計算する（期限が過去の場合は負の値） */
+  private daysUntilDeadline(now: Date, deadline: Date): number {
+    // 日付のみを比較するため、時刻を00:00:00に設定
+    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+    const diff = deadlineDate.getTime() - nowDate.getTime();
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
   }
 }

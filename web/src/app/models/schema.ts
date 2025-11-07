@@ -159,6 +159,7 @@ export interface Task {
   startDate?: Date | null;
   endDate?: Date | null;
   goal?: string | null;
+  themeColor?: string | null;  // タスク固有のテーマカラー（未設定時は課題カラーを継承
   importance?: Importance;  // 重要度（Critical/High/Medium/Low）
   status: TaskStatus;  // ステータス（未完了/進行中/完了/破棄/保留）
   archived: boolean;  // アーカイブ状態（課題一覧の表示制御に使用）

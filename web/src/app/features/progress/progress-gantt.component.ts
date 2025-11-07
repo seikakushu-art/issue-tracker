@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
-  ElementRef,
   OnInit,
   ViewChild,
   inject,
@@ -14,6 +13,9 @@ import { Issue, Project, Task } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
+import { ProgressGanttTimelineComponent } from './progress-gantt-timeline.component';
+import { isJapaneseHoliday } from './japanese-holidays';
+import { resolveIssueThemeColor, tintIssueThemeColor, transparentizeIssueThemeColor } from '../../shared/issue-theme';
 
 interface GanttIssue {
   project: Project;
@@ -27,20 +29,21 @@ interface GanttProjectIssue {
   tasks: Task[];
 }
 
-interface GanttProjectGroup {
+export interface GanttProjectGroup {
   project: Project;
   issues: GanttProjectIssue[];
 }
 
-interface TimelineDay {
+export interface TimelineDay {
   date: Date;
   isWeekend: boolean;
+  isHoliday: boolean;
   isToday: boolean;
   dayLabel: string;
   weekdayLabel: string;
 }
 
-interface TimelineMonthSegment {
+export interface TimelineMonthSegment {
   label: string;
   span: number;
 }
@@ -48,7 +51,7 @@ interface TimelineMonthSegment {
 @Component({
   selector: 'app-progress-gantt',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ProgressGanttTimelineComponent],
   templateUrl: './progress-gantt.component.html',
   styleUrls: ['./progress-gantt.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,12 +63,14 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
 
-  @ViewChild('timelineViewport') timelineViewport?: ElementRef<HTMLDivElement>;
+  @ViewChild(ProgressGanttTimelineComponent) timelineViewport?: ProgressGanttTimelineComponent;
+
 
   loading = false;
   loadError: string | null = null;
 
   ganttIssues: GanttIssue[] = [];
+  visibleGanttIssues: GanttIssue[] = [];
   timeline: TimelineDay[] = [];
   timelineMonths: TimelineMonthSegment[] = [];
   totalDays = 0;
@@ -74,6 +79,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   timelineWidth = 0;
   activeMonthLabel = '';
   currentScrollLeft = 0;
+  hoveredDayIndex: number | null = null;
+  hoveredTaskRange: Readonly<[number, number]> | null = null;
+  hoveredTask: Task | null = null;
 
   selectedTask: Task | null = null;
   selectedIssue: Issue | null = null;
@@ -84,6 +92,12 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   readonly labelColumnWidth = 280;
 
   projectHierarchy: GanttProjectGroup[] = [];
+  availableProjects: Project[] = [];
+  selectedProjectId: string | null = null;
+
+  get shouldShowProjectSelectionHint(): boolean {
+    return !this.selectedProjectId && this.availableProjects.length > 0;
+  }
 
   private readonly monthFormatter = new Intl.DateTimeFormat('ja-JP', {
     year: 'numeric',
@@ -93,11 +107,6 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   private readonly weekdayFormatter = new Intl.DateTimeFormat('ja-JP', {
     weekday: 'short',
-    timeZone: this.tokyoTimezone,
-  });
-
-  private readonly dayFormatter = new Intl.DateTimeFormat('ja-JP', {
-    day: '2-digit',
     timeZone: this.tokyoTimezone,
   });
 
@@ -129,7 +138,6 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       );
 
       const ganttIssues: GanttIssue[] = [];
-      const allTaskDates: Date[] = [];
 
       for (const { project, issues } of issueResults) {
         for (const issue of issues) {
@@ -138,28 +146,17 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
           }
           const tasks = await this.tasksService.listTasks(project.id!, issue.id, false);
           const hydratedTasks = tasks.map((task) => this.normalizeTaskDates(task));
-          for (const task of hydratedTasks) {
-            const start = task.startDate;
-            const end = task.endDate;
-            if (start) {
-              allTaskDates.push(start);
-            }
-            if (end) {
-              allTaskDates.push(end);
-            }
-          }
           ganttIssues.push({ project, issue, tasks: hydratedTasks, collapsed: false });
         }
       }
 
       this.ganttIssues = ganttIssues;
       this.buildProjectHierarchy(ganttIssues);
-      this.buildTimeline(allTaskDates);
+      this.initializeProjectSelection(projects);
+      this.applyProjectFilters();
       this.cdr.markForCheck();
     } catch (error) {
       console.error('ガントチャートのデータ読み込みに失敗しました:', error);
-      this.loadError = 'リアルデータの取得に失敗したため、サンプルデータを表示しています。';
-      this.applySampleData();
     } finally {
       this.loading = false;
       this.cdr.markForCheck();
@@ -180,10 +177,33 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.updateActiveMonthLabel(element);
   }
 
+  handleTimelineDayHover(index: number | null): void {
+    this.hoveredDayIndex = index;
+    if (index !== null) {
+      this.hoveredTask = null;
+      this.hoveredTaskRange = null;
+    }
+  }
+
+  handleTimelineCellHover(index: number | null): void {
+    this.hoveredDayIndex = index;
+    if (index !== null) {
+      this.hoveredTask = null;
+      this.hoveredTaskRange = null;
+    }
+  }
+
+  handleTaskHover(task: Task | null): void {
+    this.hoveredTask = task;
+    this.hoveredTaskRange = task ? this.getTaskDayRange(task) : null;
+  }
+
   selectTask(issue: GanttIssue, task: Task): void {
     this.selectedTask = task;
     this.selectedIssue = issue.issue;
     this.selectedProject = issue.project;
+    this.cdr.markForCheck();
+    this.goToTaskDetail(task, issue.issue, issue.project);
   }
 
   onSidebarTaskSelect(projectId: string | undefined, issueId: string | undefined, task: Task): void {
@@ -200,23 +220,41 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.focusTaskOnTimeline(task);
   }
 
+  trackByProjectId(_: number, project: Project): string | undefined {
+    return project.id ?? project.name;
+  }
+
+  handleProjectSelectChange(event: Event): void {
+    const select = event.target as HTMLSelectElement | null;
+    const value = select?.value?.trim() ?? '';
+    this.selectedProjectId = value === '' ? null : value;
+    this.applyProjectFilters();
+  }
+
   closeDetailPanel(): void {
     this.selectedTask = null;
     this.selectedIssue = null;
     this.selectedProject = null;
   }
 
-  goToTaskDetail(): void {
-    if (!this.selectedTask || !this.selectedTask.id || !this.selectedIssue?.id || !this.selectedProject?.id) {
+  goToTaskDetail(
+    task: Task | null = this.selectedTask,
+    issue: Issue | null = this.selectedIssue,
+    project: Project | null = this.selectedProject,
+  ): void {
+    const taskId = task?.id;
+    const issueId = issue?.id;
+    const projectId = project?.id;
+    if (!taskId || !issueId || !projectId) {
       return;
     }
     void this.router.navigate([
       '/projects',
-      this.selectedProject.id,
+      projectId,
       'issues',
-      this.selectedIssue.id,
+      issueId,
     ], {
-      queryParams: { focus: this.selectedTask.id },
+      queryParams: { focus: taskId },
     });
   }
 
@@ -225,6 +263,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       return;
     }
     const element = this.timelineViewport.nativeElement;
+    if (!element) {
+      return;
+    }
     const target = element.scrollLeft + weeks * 7 * this.dayCellWidth;
     this.setScrollPosition(target);
   }
@@ -233,7 +274,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     if (!this.timelineViewport || this.timeline.length === 0) {
       return;
     }
-    const viewport = this.timelineViewport.nativeElement;
+    const viewport = this.timelineViewport?.nativeElement;
+    if (!viewport) {
+      return;
+    }
     const centerPosition = viewport.scrollLeft + viewport.clientWidth / 2;
     const centerIndex = Math.max(
       0,
@@ -279,7 +323,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const today = this.toTokyoDate(new Date());
     const index = this.timeline.findIndex((day) => this.isSameDay(day.date, today));
     const fallbackIndex = index >= 0 ? index : Math.floor(this.timeline.length / 2);
-    const element = this.timelineViewport.nativeElement;
+    const element = this.timelineViewport?.nativeElement;
+    if (!element) {
+      return;
+    }
     const target = fallbackIndex * this.dayCellWidth - element.clientWidth / 2 + this.dayCellWidth / 2;
     this.setScrollPosition(target);
   }
@@ -315,8 +362,64 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     return `${Math.max(width, minWidth)}%`;
   }
 
+  isDayHighlighted(index: number): boolean {
+    if (this.hoveredDayIndex === index) {
+      return true;
+    }
+    if (this.hoveredTaskRange) {
+      const [start, end] = this.hoveredTaskRange;
+      return index >= start && index <= end;
+    }
+    return false;
+  }
+
+  isTaskHighlighted(task: Task): boolean {
+    return this.isTaskHovered(task) || this.isTaskInHoveredDay(task);
+  }
+
+  private isTaskHovered(task: Task): boolean {
+    return this.hoveredTask === task;
+  }
+
+  private isTaskInHoveredDay(task: Task): boolean {
+    if (this.hoveredDayIndex === null) {
+      return false;
+    }
+    const range = this.getTaskDayRange(task);
+    if (!range) {
+      return false;
+    }
+    const [start, end] = range;
+    return this.hoveredDayIndex >= start && this.hoveredDayIndex <= end;
+  }
+
   getIssueTheme(issue: Issue): string {
-    return issue.themeColor && issue.themeColor.trim().length > 0 ? issue.themeColor : '#475569';
+    const fallbackKey = issue.id ?? issue.projectId ?? issue.name ?? null;
+    return resolveIssueThemeColor(issue.themeColor ?? null, fallbackKey);
+  }
+
+  getIssueSurfaceColor(issue: Issue): string {
+    return tintIssueThemeColor(this.getIssueTheme(issue), 0.82);
+  }
+
+  getIssueOverlayColor(issue: Issue): string {
+    return transparentizeIssueThemeColor(this.getIssueTheme(issue), 0.18);
+  }
+
+  getTaskTheme(task: Task, issue: Issue): string {
+    const candidate = typeof task.themeColor === 'string' ? task.themeColor.trim() : '';
+    if (candidate.length > 0) {
+      return candidate;
+    }
+    return this.getIssueTheme(issue);
+  }
+
+  getTaskSurfaceColor(task: Task, issue: Issue): string {
+    return tintIssueThemeColor(this.getTaskTheme(task, issue), 0.9);
+  }
+
+  getTaskOverlayColor(task: Task, issue: Issue): string {
+    return transparentizeIssueThemeColor(this.getTaskTheme(task, issue), 0.22);
   }
 
   getTaskStatusLabel(task: Task): string {
@@ -349,7 +452,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   getTimelineLabel(day: TimelineDay): string {
-    return `${this.dayFormatter.format(day.date)} (${this.weekdayFormatter.format(day.date)})`;
+    return `${this.formatDayNumber(day.date)} (${this.weekdayFormatter.format(day.date)})`;
   }
 
   private buildTimeline(allDates: Date[]): void {
@@ -376,8 +479,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       days.push({
         date,
         isWeekend: cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6,
+        isHoliday: isJapaneseHoliday(date),
         isToday: this.isSameDay(date, today),
-        dayLabel: this.dayFormatter.format(date),
+        dayLabel: this.formatDayNumber(date),
         weekdayLabel: this.weekdayFormatter.format(date),
       });
       cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -413,6 +517,70 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       projectGroup.issues.push({ issue: group.issue, tasks: group.tasks });
     }
     this.projectHierarchy = Array.from(projectMap.values());
+  }
+
+  private initializeProjectSelection(projects: (Project & { id: string })[]): void {
+    const previousSelection = this.selectedProjectId;
+    this.availableProjects = projects;
+    if (previousSelection) {
+      const exists = projects.some((project) => project.id === previousSelection);
+      this.selectedProjectId = exists ? previousSelection : null;
+    } else {
+      this.selectedProjectId = null;
+    }
+  }
+
+  private applyProjectFilters(): void {
+    const activeId = this.selectedProjectId;
+    const visible = this.ganttIssues.filter((group) => {
+      const projectId = group.project.id;
+      if (!projectId) {
+        return !activeId;
+      }
+      if (!activeId) {
+        return true;
+      }
+      return projectId === activeId;
+    });
+
+    this.visibleGanttIssues = visible;
+    this.ensureSelectionVisibility(visible);
+
+    const taskDates = visible.flatMap((group) =>
+      group.tasks.flatMap((task) => {
+        const dates: Date[] = [];
+        if (task.startDate instanceof Date) {
+          dates.push(task.startDate);
+        }
+        if (task.endDate instanceof Date) {
+          dates.push(task.endDate);
+        }
+        return dates;
+      }),
+    );
+
+    this.buildTimeline(taskDates);
+    this.cdr.markForCheck();
+  }
+
+  private ensureSelectionVisibility(groups: GanttIssue[]): void {
+    if (!this.selectedTask || !this.selectedTask.id) {
+      return;
+    }
+
+    const isVisible = groups.some((group) => {
+      if (!group.project.id || !group.issue.id) {
+        return false;
+      }
+      if (group.project.id !== this.selectedProject?.id || group.issue.id !== this.selectedIssue?.id) {
+        return false;
+      }
+      return group.tasks.some((task) => task.id === this.selectedTask?.id);
+    });
+
+    if (!isVisible) {
+      this.closeDetailPanel();
+    }
   }
 
   private normalizeTaskDates(task: Task): Task {
@@ -480,6 +648,25 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       return task.startDate;
     }
     return null;
+  }
+
+  private getTaskDayRange(task: Task): Readonly<[number, number]> | null {
+    if (!this.timelineStart || this.timeline.length === 0) {
+      return null;
+    }
+    const start = this.getEffectiveStart(task);
+    const end = this.getEffectiveEnd(task);
+    if (!start || !end) {
+      return null;
+    }
+    const startIndex = Math.max(0, Math.min(this.timeline.length - 1, this.diffInDays(start, this.timelineStart)));
+    const endIndex = Math.max(startIndex, Math.min(this.timeline.length - 1, this.diffInDays(end, this.timelineStart)));
+    return [startIndex, endIndex];
+  }
+
+  private formatDayNumber(date: Date): string {
+    const day = date.getUTCDate();
+    return day.toString().padStart(2, '0');
   }
 
   private toTokyoDate(date: Date): Date {
@@ -562,6 +749,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     }
     const index = Math.max(0, Math.min(this.timeline.length - 1, this.diffInDays(start, this.timelineStart)));
     const element = this.timelineViewport.nativeElement;
+    if (!element) {
+      return;
+    }
     const target = index * this.dayCellWidth - element.clientWidth / 3;
     this.setScrollPosition(target);
   }
@@ -587,110 +777,5 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     const result = new Date(base);
     result.setUTCDate(result.getUTCDate() + offset);
     return result;
-  }
-
-  private applySampleData(): void {
-    const base = this.toTokyoDate(new Date());
-    const project: Project = {
-      id: 'sample-project',
-      name: 'サンプルプロジェクト',
-      description: 'デモ用のプロジェクト',
-      memberIds: [],
-      roles: {},
-      archived: false,
-      progress: 45,
-    };
-
-    const issue: Issue = {
-      id: 'sample-issue',
-      projectId: project.id!,
-      name: 'UI改善イニシアチブ',
-      description: '主要画面のUIを段階的に改善します。',
-      startDate: this.createSampleDate(base, -14),
-      endDate: this.createSampleDate(base, 14),
-      goal: '第1四半期中に主要画面の改善を完了する',
-      themeColor: '#2563eb',
-      archived: false,
-      progress: 60,
-    };
-
-    const rawTasks: Task[] = [
-      {
-        id: 'sample-task-1',
-        projectId: project.id!,
-        issueId: issue.id!,
-        title: '画面レイアウト策定',
-        description: 'ワイヤーフレームを作成し、関係者レビューを通過。',
-        startDate: this.createSampleDate(base, -12),
-        endDate: this.createSampleDate(base, -6),
-        goal: 'レビュー合格',
-        importance: 'High',
-        status: 'completed',
-        archived: false,
-        assigneeIds: [],
-        tagIds: [],
-        checklist: [],
-        createdBy: 'system',
-      },
-      {
-        id: 'sample-task-2',
-        projectId: project.id!,
-        issueId: issue.id!,
-        title: 'コンポーネント設計',
-        description: '再利用可能なUIコンポーネントの仕様を整理。',
-        startDate: this.createSampleDate(base, -5),
-        endDate: this.createSampleDate(base, 4),
-        goal: '主要部品の設計完了',
-        importance: 'Critical',
-        status: 'in_progress',
-        archived: false,
-        assigneeIds: [],
-        tagIds: [],
-        checklist: [],
-        createdBy: 'system',
-      },
-      {
-        id: 'sample-task-3',
-        projectId: project.id!,
-        issueId: issue.id!,
-        title: 'ユーザーテスト準備',
-        description: '想定シナリオとテスト環境を準備。',
-        startDate: this.createSampleDate(base, 3),
-        endDate: this.createSampleDate(base, 12),
-        goal: 'テスト計画の承認',
-        importance: 'Medium',
-        status: 'incomplete',
-        archived: false,
-        assigneeIds: [],
-        tagIds: [],
-        checklist: [],
-        createdBy: 'system',
-      },
-    ];
-
-    const normalizedTasks = rawTasks.map((task) => this.normalizeTaskDates(task));
-    this.ganttIssues = [
-      {
-        project,
-        issue,
-        tasks: normalizedTasks,
-        collapsed: false,
-      },
-    ];
-
-    this.buildProjectHierarchy(this.ganttIssues);
-
-    const sampleDates = normalizedTasks.flatMap((task) => {
-      const dates: Date[] = [];
-      if (task.startDate instanceof Date) {
-        dates.push(task.startDate);
-      }
-      if (task.endDate instanceof Date) {
-        dates.push(task.endDate);
-      }
-      return dates;
-    });
-    this.buildTimeline(sampleDates);
-    this.cdr.markForCheck();
   }
 }

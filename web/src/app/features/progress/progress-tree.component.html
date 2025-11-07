@@ -51,14 +51,23 @@
             </div>
   
             <div class="tree-children" [class.collapsed]="project.collapsed">
-              <div *ngFor="let issue of project.issues" class="tree-node issue" [attr.aria-expanded]="!issue.collapsed">
+              <div
+                *ngFor="let issue of project.issues"
+                class="tree-node issue"
+                [attr.aria-expanded]="!issue.collapsed"
+                [style.--issue-theme-color]="getIssueTheme(issue.issue)"
+                [style.--issue-theme-soft]="getIssueSurfaceColor(issue.issue)"
+                [style.--issue-theme-overlay]="getIssueOverlayColor(issue.issue)"
+                [style.--task-theme-soft]="getTaskSurfaceColor(issue.issue)"
+                [style.--task-theme-overlay]="getTaskOverlayColor(issue.issue)"
+              >
                 <div class="tree-node__header">
                   <button type="button" class="toggle" (click)="toggleIssue(issue)">
                     <i class="icon-chevron" [class.collapsed]="issue.collapsed"></i>
                   </button>
                   <div class="tree-node__info">
                     <span class="tree-node__label">
-                      <span class="color-dot" [style.backgroundColor]="issue.issue.themeColor || '#475569'"></span>
+                      <span class="color-dot" aria-hidden="true"></span>
                       {{ issue.issue.name }}
                     </span>
                     <span class="tree-node__meta">タスク {{ issue.tasks.length }} 件</span>
@@ -67,10 +76,22 @@
                 </div>
   
                 <div class="tree-children" [class.collapsed]="issue.collapsed">
-                  <div *ngFor="let treeTask of issue.tasks" class="tree-node task" role="treeitem" aria-selected="false" tabindex="0" (click)="selectTask(project, issue, treeTask)" (keydown.enter)="selectTask(project, issue, treeTask)" (keydown.space)="selectTask(project, issue, treeTask)">
+                  <div
+                    *ngFor="let treeTask of issue.tasks"
+                    class="tree-node task"
+                    role="treeitem"
+                    aria-selected="false"
+                    tabindex="0"
+                    (click)="selectTask(project, issue, treeTask)"
+                    (keydown.enter)="selectTask(project, issue, treeTask)"
+                    (keydown.space)="selectTask(project, issue, treeTask)"
+                    [style.--issue-theme-color]="getIssueTheme(issue.issue)"
+                    [style.--task-theme-soft]="getTaskSurfaceColor(issue.issue)"
+                    [style.--task-theme-overlay]="getTaskOverlayColor(issue.issue)"
+                  >
                     <div class="task-body">
                       <div class="task-main">
-                        <span class="status-badge" [class]="'status-badge ' + getStatusClass(treeTask.task)">{{ getTaskStatusLabel(treeTask.task) }}</span>
+                        <span class="task-color-chip" aria-hidden="true"></span>
                         <span class="task-title">{{ treeTask.task.title }}</span>
                       </div>
                       <div class="task-sub">

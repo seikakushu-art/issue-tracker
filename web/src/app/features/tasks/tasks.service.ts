@@ -330,6 +330,12 @@ export class TasksService {
       archived: typeof record['archived'] === 'boolean' ? (record['archived'] as boolean) : false,
     };
 
+    if (typeof record['themeColor'] === 'string') {
+      normalized.themeColor = (record['themeColor'] as string).trim();
+    } else if (record['themeColor'] === null) {
+      normalized.themeColor = null;
+    }
+
     if (record['startDate']) {
       normalized.startDate = this.normalizeDate(record['startDate']);
     }

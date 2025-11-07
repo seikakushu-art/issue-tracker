@@ -1,0 +1,54 @@
+<div class="gantt-timeline" [style.--label-width.px]="labelColumnWidth" [style.--day-width.px]="dayCellWidth">
+    <div
+      #viewport
+      class="gantt-timeline__viewport"
+      (scroll)="onScroll($event)"
+      (wheel)="onWheel($event)"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+      (pointerleave)="onPointerUp($event)"
+    >
+      <div class="gantt-timeline__rail">
+        <div
+          class="gantt-timeline__header"
+          [style.gridTemplateColumns]="'var(--label-width) ' + gridTemplate"
+        >
+          <div class="gantt-timeline__header-label">
+            <span>課題 / タスク</span>
+          </div>
+          <div class="gantt-timeline__months" [style.gridTemplateColumns]="gridTemplate">
+            <div
+              *ngFor="let month of timelineMonths"
+              class="gantt-timeline__month"
+              [style.gridColumn]="'span ' + month.span"
+            >
+              {{ month.label }}
+            </div>
+          </div>
+          <div class="gantt-timeline__days" [style.gridTemplateColumns]="gridTemplate">
+            <div
+            *ngFor="let day of timeline; index as dayIndex"
+              class="gantt-timeline__day"
+              [class.weekend]="day.isWeekend"
+              [class.holiday]="day.isHoliday"
+              [class.today]="day.isToday"
+              [class.is-highlighted]="isDayHighlighted(dayIndex)"
+              (mouseenter)="onDayHover(dayIndex)"
+              (focusin)="onDayHover(dayIndex)"
+              (mouseleave)="onDayHover(null)"
+              (focusout)="onDayHover(null)"
+            >
+              <span class="day-number">{{ day.dayLabel }}</span>
+              <span class="day-weekday">{{ day.weekdayLabel }}</span>
+            </div>
+          </div>
+        </div>
+  
+        <div class="gantt-timeline__content">
+          <ng-content></ng-content>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -18,7 +18,28 @@
           <button type="button" class="gantt-controls__jump-btn" (click)="scrollByMonths(1)">来月</button>
         </div>
         <div class="gantt-controls__meta">
-          <span class="gantt-controls__month">{{ activeMonthLabel }}</span>
+          <div class="gantt-controls__meta-row">
+            <span class="gantt-controls__month">{{ activeMonthLabel }}</span>
+            <label
+              class="gantt-controls__project-select"
+              *ngIf="availableProjects.length > 0"
+            >
+              <span class="gantt-controls__project-select-label">プロジェクト</span>
+              <select
+                class="gantt-controls__project-select-input"
+                (change)="handleProjectSelectChange($event)"
+                [value]="selectedProjectId ?? ''"
+              >
+                <option value="">プロジェクトを選択</option>
+                <option
+                  *ngFor="let project of availableProjects; trackBy: trackByProjectId"
+                  [value]="project.id ?? ''"
+                >
+                  {{ project.name }}
+                </option>
+              </select>
+            </label>
+          </div>
           <span class="gantt-controls__hint">タイムラインは過去・未来5年までスクロールできます。</span>
         </div>
       </div>
@@ -49,46 +70,52 @@
         [style.--label-width.px]="labelColumnWidth"
       >
         <div class="gantt-grid">
-          <div class="gantt-grid__scroll" #timelineViewport (scroll)="onTimelineScroll($event)">
-            <div class="gantt-grid__header" [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()">
-              <div class="gantt-grid__header-label">
-                <span>課題 / タスク</span>
-              </div>
-              <div class="gantt-month-row" [style.gridTemplateColumns]="getGridTemplate()">
-                <div
-                  *ngFor="let month of timelineMonths"
-                  class="gantt-month-cell"
-                  [style.gridColumn]="'span ' + month.span"
-                >
-                  {{ month.label }}
-                </div>
-              </div>
-              <div class="gantt-day-row" [style.gridTemplateColumns]="getGridTemplate()">
-                <div
-                  *ngFor="let day of timeline"
-                  class="gantt-grid__header-date"
-                  [class.weekend]="day.isWeekend"
-                  [class.today]="day.isToday"
-                >
-                  <span class="day-number">{{ day.dayLabel }}</span>
-                  <span class="day-weekday">{{ day.weekdayLabel }}</span>
-                </div>
-              </div>
-            </div>
+          <app-progress-gantt-timeline
+          [timeline]="timeline"
+          [timelineMonths]="timelineMonths"
+          [gridTemplate]="getGridTemplate()"
+          [labelColumnWidth]="labelColumnWidth"
+          [dayCellWidth]="dayCellWidth"
+          [highlightedDayIndex]="hoveredDayIndex"
+          [highlightedTaskRange]="hoveredTaskRange"
+          (scrolled)="onTimelineScroll($event)"
+          (dayHoverChange)="handleTimelineDayHover($event)"
+        >
 
-            <div class="gantt-grid__rows">
-              <ng-container *ngIf="ganttIssues.length > 0; else emptyState">
-                <ng-container *ngFor="let group of ganttIssues">
-                  <div class="gantt-row-line issue" [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()">
-                    <div class="gantt-row__label issue" [style.borderLeftColor]="getIssueTheme(group.issue)">
-                      <button class="issue-toggle" type="button" (click)="toggleIssue(group)" [attr.aria-expanded]="!group.collapsed">
-                        <i class="icon-chevron" [class.collapsed]="group.collapsed"></i>
-                        <span class="issue-name">{{ group.issue.name }}</span>
-                      </button>
-                      <p class="issue-meta">{{ group.project.name }} / タスク {{ group.tasks.length }} 件</p>
-                    </div>
-                    <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
-                      <div *ngFor="let day of timeline" class="gantt-cell" [class.weekend]="day.isWeekend"></div>
+          
+        <ng-container *ngIf="shouldShowProjectSelectionHint; else ganttRows">
+          <div class="gantt-grid__selection-hint" role="status" aria-live="polite">
+            <i class="icon-info"></i>
+            <p>プロジェクトを選択してください</p>
+          </div>
+        </ng-container>
+        <ng-template #ganttRows>
+          <div class="gantt-grid__rows">
+            <ng-container *ngIf="visibleGanttIssues.length > 0; else emptyState">
+              <ng-container *ngFor="let group of visibleGanttIssues">
+                <div
+                  class="gantt-row-line issue"
+                  [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()"
+                  [style.--issue-theme-color]="getIssueTheme(group.issue)"
+                  [style.--issue-theme-soft]="getIssueSurfaceColor(group.issue)"
+                  [style.--issue-theme-overlay]="getIssueOverlayColor(group.issue)"
+                >
+                  <div class="gantt-row__label issue">
+                    <button class="issue-toggle" type="button" (click)="toggleIssue(group)" [attr.aria-expanded]="!group.collapsed">
+                      <i class="icon-chevron" [class.collapsed]="group.collapsed"></i>
+                      <span class="issue-name" [title]="group.issue.name">{{ group.issue.name }}</span>
+                    </button>
+                  </div>
+                  <div class="gantt-row__chart issue" [style.gridTemplateColumns]="getGridTemplate()">
+                    <div
+                    *ngFor="let day of timeline; index as dayIndex"
+                        class="gantt-cell"
+                        [class.weekend]="day.isWeekend"
+                        [class.holiday]="day.isHoliday"
+                        [class.is-highlighted]="isDayHighlighted(dayIndex)"
+                        (mouseenter)="handleTimelineCellHover(dayIndex)"
+                        (mouseleave)="handleTimelineCellHover(null)"
+                      ></div>
                     </div>
                   </div>
 
@@ -97,47 +124,61 @@
                     *ngFor="let task of group.tasks"
                     [class.collapsed]="group.collapsed"
                     [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()"
+                    [style.--task-theme-color]="getTaskTheme(task, group.issue)"
+                    [style.--task-theme-soft]="getTaskSurfaceColor(task, group.issue)"
+                    [style.--task-theme-overlay]="getTaskOverlayColor(task, group.issue)"
                   >
                     <div
                       class="gantt-row__label"
                       role="button"
                       tabindex="0"
-                      (click)="selectTask(group, task)"
-                      (keydown.enter)="selectTask(group, task)"
-                      (keydown.space)="selectTask(group, task)"
-                    >
-                      <span class="task-title">{{ task.title }}</span>
-                      <span class="task-meta">{{ getTaskStatusLabel(task) }} / {{ getImportanceLabel(task) }}</span>
-                    </div>
-                    <div class="gantt-row__chart" [style.gridTemplateColumns]="getGridTemplate()">
-                      <div
-                        *ngFor="let day of timeline"
-                        class="gantt-cell"
-                        [class.weekend]="day.isWeekend"
-                        [class.today]="day.isToday"
-                      ></div>
-                      <button
-                        type="button"
-                        class="gantt-bar"
-                        [style.backgroundColor]="getIssueTheme(group.issue)"
-                        [style.left]="getTaskOffset(task)"
-                        [style.width]="getTaskWidth(task)"
                         (click)="selectTask(group, task)"
+                        (keydown.enter)="selectTask(group, task)"
+                        (keydown.space)="selectTask(group, task)"
+                        [class.is-highlighted]="isTaskHighlighted(task)"
                       >
-                        <span class="gantt-bar__label">{{ task.title }}</span>
-                      </button>
+                      <div class="task-label">
+                        <span class="task-color-indicator" aria-hidden="true"></span>
+                        <span class="task-title" [title]="task.title">{{ task.title }}</span>
+                      </div>
+                      </div>
+                      <div class="gantt-row__chart" [style.gridTemplateColumns]="getGridTemplate()">
+                        <div
+                        *ngFor="let day of timeline; index as dayIndex"
+                          class="gantt-cell"
+                          [class.weekend]="day.isWeekend"
+                          [class.holiday]="day.isHoliday"
+                          [class.today]="day.isToday"
+                          [class.is-highlighted]="isDayHighlighted(dayIndex)"
+                          (mouseenter)="handleTimelineCellHover(dayIndex)"
+                          (mouseleave)="handleTimelineCellHover(null)"
+                        ></div>
+                        <button
+                          type="button"
+                          class="gantt-bar"
+                          [style.backgroundColor]="getTaskTheme(task, group.issue)"
+                          [style.left]="getTaskOffset(task)"
+                          [style.width]="getTaskWidth(task)"
+                          (click)="selectTask(group, task)"
+                          (mouseenter)="handleTaskHover(task)"
+                          (mouseleave)="handleTaskHover(null)"
+                          [class.is-highlighted]="isTaskHighlighted(task)"
+                        >
+                          <span class="gantt-bar__label">{{ task.title }}</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </ng-container>
                 </ng-container>
-              </ng-container>
-              <ng-template #emptyState>
-                <div class="gantt-empty">
-                  <i class="icon-calendar"></i>
-                  <p>表示できるタスクがありません。プロジェクトの課題とタスクを作成するとガントチャートに表示されます。</p>
-                </div>
-              </ng-template>
-            </div>
-          </div>
+                <ng-template #emptyState>
+                  <div class="gantt-empty">
+                    <i class="icon-calendar"></i>
+                    <p>表示できるタスクがありません。プロジェクトの課題とタスクを作成するとガントチャートに表示されます。</p>
+                  </div>
+                </ng-template>
+              </div>
+            </ng-template>
+          </app-progress-gantt-timeline>
         </div>
       </section>
     </div>
