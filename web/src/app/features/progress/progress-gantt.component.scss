@@ -580,7 +580,7 @@
     position: sticky;
     left: 0;
     z-index: 4;
-    background: #ffffff;
+    background: var(--gantt-label-background, #ffffff);
     padding: 0 18px;
     display: flex;
     flex-direction: column;
@@ -597,9 +597,32 @@
 
   .gantt-row__label.issue {
     cursor: default;
-    border-left: 6px solid #2563eb;
+    border-left: 6px solid var(--issue-theme-color, #2563eb);
     padding-left: 14px;
     box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.2);
+    background: linear-gradient(
+      90deg,
+      var(--issue-theme-soft, rgba(37, 99, 235, 0.18)) 0%,
+      rgba(255, 255, 255, 0.96) 70%
+    );
+    color: #0f172a;
+  }
+
+  .gantt-row-line.issue .issue-toggle {
+    color: #0f172a;
+  }
+
+  .gantt-row-line.issue .gantt-row__chart.issue::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      var(--issue-theme-overlay, rgba(37, 99, 235, 0.15)) 0%,
+      rgba(255, 255, 255, 0) 65%
+    );
+    z-index: 0;
+    pointer-events: none;
   }
 
   .issue-toggle {
@@ -675,6 +698,32 @@
     min-height: 28px;
   }
 
+  .gantt-row-line.task {
+    --gantt-label-background: linear-gradient(
+      90deg,
+      var(--task-theme-soft, rgba(37, 99, 235, 0.12)) 0%,
+      rgba(255, 255, 255, 0.96) 70%
+    );
+  }
+
+  .gantt-row-line.task .gantt-row__label {
+    border-left: 4px solid var(--task-theme-color, #2563eb);
+    padding-left: 16px;
+  }
+
+  .gantt-row-line.task .gantt-row__chart::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      var(--task-theme-overlay, rgba(37, 99, 235, 0.12)) 0%,
+      rgba(255, 255, 255, 0) 65%
+    );
+    z-index: 0;
+    pointer-events: none;
+  }
+
   .gantt-cell {
     position: relative;
     z-index: 2;
@@ -718,12 +767,19 @@
   }
 
   .gantt-row-line.task .gantt-row__label:hover {
-    background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), #ffffff 60%);
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.12), #ffffff 60%);
   }
 
   .gantt-row__label.is-highlighted {
     background: linear-gradient(90deg, rgba(37, 99, 235, 0.16), #ffffff 65%);
     box-shadow: inset 4px 0 0 rgba(37, 99, 235, 0.45);
+  }
+
+  .task-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
   }
 
   .task-title {
@@ -734,6 +790,15 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .task-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--task-theme-color, #2563eb);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+    flex-shrink: 0;
   }
 
   .task-meta {

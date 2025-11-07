@@ -93,8 +93,14 @@
           <div class="gantt-grid__rows">
             <ng-container *ngIf="visibleGanttIssues.length > 0; else emptyState">
               <ng-container *ngFor="let group of visibleGanttIssues">
-                <div class="gantt-row-line issue" [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()">
-                  <div class="gantt-row__label issue" [style.borderLeftColor]="getIssueTheme(group.issue)">
+                <div
+                  class="gantt-row-line issue"
+                  [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()"
+                  [style.--issue-theme-color]="getIssueTheme(group.issue)"
+                  [style.--issue-theme-soft]="getIssueSurfaceColor(group.issue)"
+                  [style.--issue-theme-overlay]="getIssueOverlayColor(group.issue)"
+                >
+                  <div class="gantt-row__label issue">
                     <button class="issue-toggle" type="button" (click)="toggleIssue(group)" [attr.aria-expanded]="!group.collapsed">
                       <i class="icon-chevron" [class.collapsed]="group.collapsed"></i>
                       <span class="issue-name" [title]="group.issue.name">{{ group.issue.name }}</span>
@@ -118,6 +124,9 @@
                     *ngFor="let task of group.tasks"
                     [class.collapsed]="group.collapsed"
                     [style.gridTemplateColumns]="'var(--label-width) ' + getGridTemplate()"
+                    [style.--task-theme-color]="getTaskTheme(task, group.issue)"
+                    [style.--task-theme-soft]="getTaskSurfaceColor(task, group.issue)"
+                    [style.--task-theme-overlay]="getTaskOverlayColor(task, group.issue)"
                   >
                     <div
                       class="gantt-row__label"
@@ -128,7 +137,10 @@
                         (keydown.space)="selectTask(group, task)"
                         [class.is-highlighted]="isTaskHighlighted(task)"
                       >
-                      <span class="task-title" [title]="task.title">{{ task.title }}</span>
+                      <div class="task-label">
+                        <span class="task-color-indicator" aria-hidden="true"></span>
+                        <span class="task-title" [title]="task.title">{{ task.title }}</span>
+                      </div>
                       </div>
                       <div class="gantt-row__chart" [style.gridTemplateColumns]="getGridTemplate()">
                         <div

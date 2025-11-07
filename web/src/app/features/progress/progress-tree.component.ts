@@ -7,6 +7,7 @@ import { Issue, Project, Task } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
+import { resolveIssueThemeColor, tintIssueThemeColor, transparentizeIssueThemeColor } from '../../shared/issue-theme';
 
 registerLocaleData(localeJa);
 
@@ -216,6 +217,27 @@ export class ProgressTreeComponent implements OnInit {
       default:
         return 'status-incomplete';
     }
+  }
+
+  getIssueTheme(issue: Issue): string {
+    const fallbackKey = issue.id ?? issue.projectId ?? issue.name ?? null;
+    return resolveIssueThemeColor(issue.themeColor ?? null, fallbackKey);
+  }
+
+  getIssueSurfaceColor(issue: Issue): string {
+    return tintIssueThemeColor(this.getIssueTheme(issue), 0.82);
+  }
+
+  getIssueOverlayColor(issue: Issue): string {
+    return transparentizeIssueThemeColor(this.getIssueTheme(issue), 0.2);
+  }
+
+  getTaskSurfaceColor(issue: Issue): string {
+    return tintIssueThemeColor(this.getIssueTheme(issue), 0.92);
+  }
+
+  getTaskOverlayColor(issue: Issue): string {
+    return transparentizeIssueThemeColor(this.getIssueTheme(issue), 0.18);
   }
 
   hasDependencies(treeTask: TreeTask): boolean {

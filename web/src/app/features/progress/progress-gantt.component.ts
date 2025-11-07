@@ -15,7 +15,7 @@ import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { ProgressGanttTimelineComponent } from './progress-gantt-timeline.component';
 import { isJapaneseHoliday } from './japanese-holidays';
-import { resolveIssueThemeColor } from '../../shared/issue-theme';
+import { resolveIssueThemeColor, tintIssueThemeColor, transparentizeIssueThemeColor } from '../../shared/issue-theme';
 
 interface GanttIssue {
   project: Project;
@@ -398,12 +398,28 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     return resolveIssueThemeColor(issue.themeColor ?? null, fallbackKey);
   }
 
+  getIssueSurfaceColor(issue: Issue): string {
+    return tintIssueThemeColor(this.getIssueTheme(issue), 0.82);
+  }
+
+  getIssueOverlayColor(issue: Issue): string {
+    return transparentizeIssueThemeColor(this.getIssueTheme(issue), 0.18);
+  }
+
   getTaskTheme(task: Task, issue: Issue): string {
     const candidate = typeof task.themeColor === 'string' ? task.themeColor.trim() : '';
     if (candidate.length > 0) {
       return candidate;
     }
     return this.getIssueTheme(issue);
+  }
+
+  getTaskSurfaceColor(task: Task, issue: Issue): string {
+    return tintIssueThemeColor(this.getTaskTheme(task, issue), 0.9);
+  }
+
+  getTaskOverlayColor(task: Task, issue: Issue): string {
+    return transparentizeIssueThemeColor(this.getTaskTheme(task, issue), 0.22);
   }
 
   getTaskStatusLabel(task: Task): string {
