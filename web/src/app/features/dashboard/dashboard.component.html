@@ -4,7 +4,28 @@
         <div class="dashboard__header-top">
             <div class="dashboard__headline">
                 <h1 id="notifications-page-title">通知一覧</h1>
-                <p>本日確認すべき通知と進捗状況をまとめています。</p>
+                <p>
+                    <ng-container *ngIf="!notificationsLoading() && !notificationsError()">
+                        <ng-container *ngIf="dueTodayGroups().length > 0 || mentionNotifications().length > 0; else noNotifications">
+                            <span>本日確認すべき通知が {{ totalNotificationCount() }} 件あります。</span>
+                            <ng-container *ngIf="dueTodayGroups().length > 0">
+                                <span>本日終了タスク: {{ dueTodayTotalCount() }}件</span>
+                            </ng-container>
+                            <ng-container *ngIf="mentionNotifications().length > 0">
+                                <span>メンション通知: {{ mentionNotifications().length }}件</span>
+                            </ng-container>
+                        </ng-container>
+                        <ng-template #noNotifications>
+                            <span>本日確認すべき通知と進捗状況をまとめています。</span>
+                        </ng-template>
+                    </ng-container>
+                    <ng-container *ngIf="notificationsLoading()">
+                        <span>通知を読み込み中です…</span>
+                    </ng-container>
+                    <ng-container *ngIf="!notificationsLoading() && notificationsError()">
+                        <span>{{ notificationsError() }}</span>
+                    </ng-container>
+                </p>
             </div>
             <div class="dashboard__header-controls">
                 <button type="button" class="button button--accent" (click)="scrollToDailyWork()">
@@ -25,7 +46,6 @@
             <button type="button" class="button button--ghost" (click)="reloadDashboard()" [disabled]="snapshotLoading() || notificationsLoading()">
                 再読み込み
             </button>
-            <a routerLink="/projects" class="button button--primary">プロジェクト一覧</a>
         </div>
     </header>
 
@@ -65,10 +85,10 @@
                         <article class="summary-card">
                             <h3>重要度</h3>
                             <ul class="summary-card__tags">
-                                <li>Critical: {{ summary.importanceCounts.Critical }}</li>
-                                <li>High: {{ summary.importanceCounts.High }}</li>
-                                <li>Medium: {{ summary.importanceCounts.Medium }}</li>
-                                <li>Low: {{ summary.importanceCounts.Low }}</li>
+                                <li>至急重要: {{ summary.importanceCounts.Critical }}</li>
+                                <li>至急: {{ summary.importanceCounts.High }}</li>
+                                <li>重要: {{ summary.importanceCounts.Medium }}</li>
+                                <li>普通: {{ summary.importanceCounts.Low }}</li>
                             </ul>
                         </article>
                     </div>

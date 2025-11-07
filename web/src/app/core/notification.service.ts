@@ -476,25 +476,26 @@ export class NotificationService {
    * 当日終了タスクを抽出し通知形式に整形する
    */
   private async fetchDueTodayNotifications(limitSize: number): Promise<DueTodayNotification[]> {
-    const tasksRef = collectionGroup(this.db, 'tasks');
-    const snapshot = await getDocs(
-      query(
-        tasksRef,
-        where('archived', '==', false),
-        where('status', 'in', ['incomplete', 'in_progress', 'on_hold'])
-      ),
-    );
+    try {
+      const tasksRef = collectionGroup(this.db, 'tasks');
+      const snapshot = await getDocs(
+        query(
+          tasksRef,
+          where('archived', '==', false),
+          where('status', 'in', ['incomplete', 'in_progress', 'on_hold'])
+        ),
+      );
 
-    const now = new Date();
-    const startOfToday = this.getStartOfToday(now);
-    const endOfToday = this.getEndOfToday(now);
-    
-    console.log('[通知デバッグ] 検索条件:', {
-      now: now.toISOString(),
-      startOfToday: startOfToday.toISOString(),
-      endOfToday: endOfToday.toISOString(),
-      totalTasks: snapshot.docs.length,
-    });
+      const now = new Date();
+      const startOfToday = this.getStartOfToday(now);
+      const endOfToday = this.getEndOfToday(now);
+      
+      console.log('[通知デバッグ] 検索条件:', {
+        now: now.toISOString(),
+        startOfToday: startOfToday.toISOString(),
+        endOfToday: endOfToday.toISOString(),
+        totalTasks: snapshot.docs.length,
+      });
 
     const candidateTasks = snapshot.docs
       .map((docSnap) => ({
@@ -583,6 +584,10 @@ export class NotificationService {
     });
 
     return tasks.slice(0, limitSize);
+    } catch (error) {
+      console.error('[通知デバッグ] fetchDueTodayNotifications エラー:', error);
+      throw error;
+    }
   }
 
   /**

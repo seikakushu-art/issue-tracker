@@ -236,7 +236,13 @@ export class DashboardComponent implements OnInit {
       await this.populateAssigneeProfiles(notifications.dueTodayTasks);
     } catch (error) {
       console.error('Failed to load startup notifications', error);
-      this.notificationsError.set('通知の取得に失敗しました。時間をおいて再試行してください。');
+      const errorMessage = error instanceof Error ? error.message : '通知の取得に失敗しました。時間をおいて再試行してください。';
+      console.error('Error details:', {
+        message: errorMessage,
+        error: error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      this.notificationsError.set(errorMessage);
       this.startupNotifications.set({ dueTodayTasks: [], mentions: [] });
     } finally {
       this.notificationsLoading.set(false);
