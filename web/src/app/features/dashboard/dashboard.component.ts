@@ -23,6 +23,19 @@ import { BoardService } from '../board/board.service';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
 
 type ProjectSortKey = 'overdue_first' | 'progress_desc' | 'backlog_desc';
+type NotificationListType = 'mention' | 'due_today' | 'overdue';
+
+interface NotificationListItem {
+  key: string;
+  type: NotificationListType;
+  title: string;
+  description: string;
+  timestamp: Date | null;
+  projectId: string;
+  issueId: string;
+  taskId: string;
+  isUnread: boolean;
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -166,7 +179,7 @@ export class DashboardComponent implements OnInit {
     if (total === 0) {
       return 'まだ通知はありません。';
     }
-    return `本日確認すべき通知が ${total} 件あります。`;
+    return ;
   });
 
   /** 通知総件数 */
@@ -177,6 +190,58 @@ export class DashboardComponent implements OnInit {
     }
     return notifications.dueTodayTasks.length + notifications.mentions.length;
   });
+
+  /** 通知リスト（最大3件） */
+  readonly notificationListItems = computed(() => {
+    const notifications = this.startupNotifications();
+    if (!notifications) {
+      return [] as NotificationListItem[];
+    }
+
+    const now = new Date().getTime();
+
+    const dueTodayItems = notifications.dueTodayTasks.map((task) => {
+      const dueTime = task.dueDate?.getTime() ?? null;
+      const isOverdue = typeof dueTime === 'number' && dueTime < now;
+      const type: NotificationListType = isOverdue ? 'overdue' : 'due_today';
+      return {
+        key: `due:${task.taskId}`,
+        type,
+        title: task.title,
+        description: this.composeProjectLabel(task.projectName, task.issueName),
+        timestamp: task.dueDate,
+        projectId: task.projectId,
+        issueId: task.issueId,
+        taskId: task.taskId,
+        isUnread: type !== 'due_today',
+      } satisfies NotificationListItem;
+    });
+
+    const mentionItems = notifications.mentions.map((mention) => ({
+      key: `mention:${mention.id}`,
+      type: 'mention' as const,
+      title: mention.taskTitle,
+      description: this.buildExcerpt(mention.commentText ?? '', 48),
+      timestamp: mention.createdAt,
+      projectId: mention.projectId,
+      issueId: mention.issueId,
+      taskId: mention.taskId,
+      isUnread: true,
+    } satisfies NotificationListItem));
+
+    const combined = [...mentionItems, ...dueTodayItems];
+    const sorted = combined.sort((a, b) => {
+      const timeA = a.timestamp?.getTime() ?? 0;
+      const timeB = b.timestamp?.getTime() ?? 0;
+      if (timeA === timeB) {
+        return 0;
+      }
+      return timeB - timeA;
+    });
+
+    return sorted.slice(0, 3);
+  });
+
 
   /** アラート対象タスク */
   readonly actionableTasks = signal<ActionableTaskCard[]>([]);
@@ -292,9 +357,13 @@ export class DashboardComponent implements OnInit {
       this.actionableTasks.set(cards);
     } catch (error) {
       console.error('Failed to load actionable tasks', error);
-      this.actionableError.set(
-        'タスクリストの読み込みに失敗しました。時間をおいて再度お試しください。',
-      );
+      const errorMessage = error instanceof Error ? error.message : 'タスクリストの読み込みに失敗しました。時間をおいて再度お試しください。';
+      console.error('Error details:', {
+        message: errorMessage,
+        error: error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      this.actionableError.set(errorMessage);
     } finally {
       this.actionableLoading.set(false);
     }
@@ -441,6 +510,20 @@ export class DashboardComponent implements OnInit {
       .join(':');
   }
 
+  /** 通知アイテムのトラック関数 */
+  trackNotification(_: number, item: NotificationListItem): string {
+    return item.key;
+  }
+
+  /** 通知アイテムの遷移 */
+  openNotification(item: NotificationListItem): void {
+    this.goToTaskDetail({
+      projectId: item.projectId,
+      issueId: item.issueId,
+      taskId: item.taskId,
+    });
+  }
+
   /** 掲示板投稿トラック関数 */
   trackPost(_: number, post: BulletinPreviewItem): string {
     return post.id;
@@ -527,6 +610,10 @@ export class DashboardComponent implements OnInit {
       return normalized;
     }
     return `${normalized.slice(0, maxLength)}…`;
+  }
+
+  private composeProjectLabel(projectName: string, issueName: string | null): string {
+    return issueName ? `${projectName} / ${issueName}` : projectName;
   }
    /** 通知一覧からタスクの詳細へ遷移する */
    goToTaskDetail(task: { projectId: string; issueId: string; taskId: string }): void {

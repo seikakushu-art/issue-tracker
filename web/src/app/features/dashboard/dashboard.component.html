@@ -1,50 +1,84 @@
 <section class="dashboard">
-    <!-- ヘッダー: タイトルとフィルタ操作 -->
+    <!-- ヘッダー: 通知エリアとユーザー -->
     <header class="dashboard__header">
-        <div class="dashboard__header-top">
-            <div class="dashboard__headline">
-                <h1 id="notifications-page-title">通知一覧</h1>
-                <p>
-                    <ng-container *ngIf="!notificationsLoading() && !notificationsError()">
-                        <ng-container *ngIf="dueTodayGroups().length > 0 || mentionNotifications().length > 0; else noNotifications">
-                            <span>本日確認すべき通知が {{ totalNotificationCount() }} 件あります。</span>
-                            <ng-container *ngIf="dueTodayGroups().length > 0">
-                                <span>本日終了タスク: {{ dueTodayTotalCount() }}件</span>
-                            </ng-container>
-                            <ng-container *ngIf="mentionNotifications().length > 0">
-                                <span>メンション通知: {{ mentionNotifications().length }}件</span>
-                            </ng-container>
-                        </ng-container>
-                        <ng-template #noNotifications>
-                            <span>本日確認すべき通知と進捗状況をまとめています。</span>
-                        </ng-template>
-                    </ng-container>
-                    <ng-container *ngIf="notificationsLoading()">
-                        <span>通知を読み込み中です…</span>
-                    </ng-container>
-                    <ng-container *ngIf="!notificationsLoading() && notificationsError()">
-                        <span>{{ notificationsError() }}</span>
-                    </ng-container>
-                </p>
+        <div class="notification-area" aria-labelledby="notifications-page-title">
+            <h1 id="notifications-page-title">通知エリア</h1>
+            <div class="notification-area__summary-row">
+                <div class="notification-area__chips">
+                    <div class="summary-chip summary-chip--alert" role="status" aria-live="polite">
+                        <span class="summary-chip__icon" aria-hidden="true">🔔</span>
+                        <span class="summary-chip__label">本日確認すべき通知</span>
+                        <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : totalNotificationCount() }}件</strong>
+                    </div>
+                    <div class="summary-chip summary-chip--success" role="status" aria-live="polite">
+                        <span class="summary-chip__icon" aria-hidden="true">✅</span>
+                        <span class="summary-chip__label">本日終了タスク</span>
+                        <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : dueTodayTotalCount() }}件</strong>
+                    </div>
+                </div>
+                <button type="button" class="button button--ghost notification-area__reload" (click)="reloadDashboard()"
+                    [disabled]="snapshotLoading() || notificationsLoading()">
+                    再読み込み
+                </button>
             </div>
-            <div class="dashboard__header-controls">
-                <button type="button" class="button button--accent" (click)="scrollToDailyWork()">
-                    本日の仕事
-                </button>
-                <button type="button" class="user-chip" (click)="goToUserSettings()">
-                    <ng-container *ngIf="userPhotoUrl(); else userInitial">
-                        <img [src]="userPhotoUrl()" alt="ユーザーアイコン">
+            <p class="notification-area__headline" [class.notification-area__headline--error]="notificationsError()">
+                {{ notificationHeadline() }}
+            </p>
+            <div class="notification-area__card">
+                <div class="notification-card">
+                    <p class="notification-card__state" *ngIf="notificationsLoading()">通知を読み込み中です…</p>
+                    <p class="notification-card__state notification-card__state--error"
+                        *ngIf="!notificationsLoading() && notificationsError()">
+                        {{ notificationsError() }}
+                    </p>
+                    <ng-container *ngIf="!notificationsLoading() && !notificationsError()">
+                        <ng-container *ngIf="notificationListItems() as notifications">
+                            <p class="notification-card__state notification-card__state--empty"
+                                *ngIf="notifications.length === 0">
+                                本日の通知はありません。
+                            </p>
+                            <div class="notification-card__list" *ngIf="notifications.length > 0">
+                                <button type="button" class="notification-item"
+                                    *ngFor="let item of notifications; trackBy: trackNotification"
+                                    (click)="openNotification(item)">
+                                    <span class="notification-item__marker"
+                                        [ngClass]="{
+                                            'notification-item__marker--mention': item.type === 'mention',
+                                            'notification-item__marker--due-today': item.type === 'due_today',
+                                            'notification-item__marker--overdue': item.type === 'overdue'
+                                        }" aria-hidden="true"></span>
+                                    <div class="notification-item__content">
+                                        <span class="notification-item__title"
+                                            [class.notification-item__title--unread]="item.isUnread">
+                                            {{ item.title }}
+                                        </span>
+                                        <span class="notification-item__description">{{ item.description }}</span>
+                                    </div>
+                                    <div class="notification-item__meta">
+                                        <span class="notification-item__time">
+                                            {{ item.timestamp ? (item.timestamp | date: 'M/d HH:mm') : '時刻未設定' }}
+                                        </span>
+                                        <span class="notification-item__arrow" aria-hidden="true">↗</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </ng-container>
                     </ng-container>
-                    <ng-template #userInitial>
-                        <span class="user-chip__placeholder">{{ userDisplayName().slice(0, 1) }}</span>
-                    </ng-template>
-                    <span class="user-chip__name">{{ userDisplayName() }}</span>
-                </button>
+                </div>
             </div>
         </div>
-        <div class="dashboard__actions">
-            <button type="button" class="button button--ghost" (click)="reloadDashboard()" [disabled]="snapshotLoading() || notificationsLoading()">
-                再読み込み
+        <div class="dashboard__header-controls">
+            <button type="button" class="button button--accent" (click)="scrollToDailyWork()">
+                ⏬本日の仕事
+            </button>
+            <button type="button" class="user-chip" (click)="goToUserSettings()">
+                <ng-container *ngIf="userPhotoUrl(); else userInitial">
+                    <img [src]="userPhotoUrl()" alt="ユーザーアイコン">
+                </ng-container>
+                <ng-template #userInitial>
+                    <span class="user-chip__placeholder">{{ userDisplayName().slice(0, 1) }}</span>
+                </ng-template>
+                <span class="user-chip__name">{{ userDisplayName() }}</span>
             </button>
         </div>
     </header>

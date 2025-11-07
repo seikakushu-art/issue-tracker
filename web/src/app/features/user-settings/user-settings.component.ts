@@ -216,6 +216,11 @@ import { AuthService } from '../../core/auth.service';
       flex-wrap: wrap;
     }
 
+    .form-actions .btn {
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+
     .btn {
       border: none;
       border-radius: 8px;
@@ -297,7 +302,7 @@ import { AuthService } from '../../core/auth.service';
 
     .settings__footer {
       display: flex;
-      justify-content: flex-start;
+      justify-content: space-between;//ログアウトボタン左側寄せ
       gap: 12px; /* ボタン同士が詰まらないよう適度な余白を確保 */
       flex-wrap: wrap; /* 狭い画面でもボタンが折り返せるようにする */
     }

@@ -284,170 +284,231 @@ export class NotificationService {
       return [];
     }
 
-    const take = options.limit ?? 30;
-    const mentionTake = options.mentionTake ?? 3;
-    const now = new Date();
-    const startOfToday = this.getStartOfToday(now);
+    try {
+      const take = options.limit ?? 30;
+      const mentionTake = options.mentionTake ?? 3;
+      const now = new Date();
 
-    const tasksRef = collectionGroup(this.db, 'tasks');
-    const taskQuery = query(
-      tasksRef,
-      where('assigneeIds', 'array-contains', uid),
-      where('archived', '==', false),
-      where('status', 'in', ['incomplete', 'in_progress', 'on_hold'])
-    );
-    const snapshot = await getDocs(taskQuery);
+      const tasksRef = collectionGroup(this.db, 'tasks');
+      const taskQuery = query(
+        tasksRef,
+        where('assigneeIds', 'array-contains', uid),
+        where('archived', '==', false),
+        where('status', 'in', ['incomplete', 'in_progress', 'on_hold'])
+      );
+      const snapshot = await getDocs(taskQuery);
 
-    const candidates = snapshot.docs
-      .map((docSnap) => {
-        const data = docSnap.data() as Task;
-        const dueDate = this.normalizeDate((data as unknown as Record<string, unknown>)['endDate']);
-        const progress = typeof data.progress === 'number' ? data.progress : 0;
-        const highlightReasons: HighlightReason[] = [];
+      const candidates = snapshot.docs
+        .map((docSnap) => {
+          const data = docSnap.data() as Task;
+          const dueDate = this.normalizeDate((data as unknown as Record<string, unknown>)['endDate']);
+          const progress = typeof data.progress === 'number' ? data.progress : 0;
+          const highlightReasons: HighlightReason[] = [];
 
-        if (dueDate) {
-          // 東京時間での日付部分のみを比較
-          const dueDateNormalized = this.normalizeToTokyoDate(dueDate);
-          const startOfTodayNormalized = this.normalizeToTokyoDate(startOfToday);
-          
-          if (dueDateNormalized < startOfTodayNormalized) {
-            highlightReasons.push('overdue');
-          } else if (dueDateNormalized.getTime() === startOfTodayNormalized.getTime()) {
-            highlightReasons.push('due_today');
-          }
-        }
-
-        if (data.status === 'on_hold') {
-          highlightReasons.push('on_hold');
-        }
-
-        if (progress <= 0) {
-          highlightReasons.push('no_progress');
-        }
-
-        return {
-          docSnap,
-          data,
-          dueDate,
-          progress,
-          highlightReasons,
-        };
-      })
-      .filter((entry) => entry.data.projectId && entry.data.issueId);
-
-    const projectIds = new Set<string>();
-
-    // メンションを取得しつつ、最終的に表示対象のみを残す
-    const enriched = (
-      await Promise.all(
-        candidates.map(async (candidate) => {
-          const { data, dueDate, docSnap } = candidate;
-          const mentions = await this.fetchRecentMentions(
-            data.projectId,
-            data.issueId,
-            docSnap.id,
-            uid,
-            mentionTake
-          );
-          const reasons = new Set<HighlightReason>(candidate.highlightReasons);
-          if (mentions.length > 0) {
-            reasons.add('mentioned');
+          if (dueDate) {
+            // 東京時間での日付部分のみを比較
+            const dueDateNormalized = this.normalizeToTokyoDate(dueDate);
+            // startOfTodayは既に正規化済みなので、再度正規化しない
+            const startOfTodayNormalized = this.normalizeToTokyoDate(now);
+            
+            // デバッグログ（開発時のみ）
+            if (data.assigneeIds?.includes(uid)) {
+              console.log('[要対応タスク] 日付比較:', {
+                taskTitle: data.title,
+                taskId: docSnap.id,
+                dueDateRaw: dueDate.toISOString(),
+                dueDateNormalized: dueDateNormalized.toISOString(),
+                startOfTodayNormalized: startOfTodayNormalized.toISOString(),
+                isDueToday: dueDateNormalized.getTime() === startOfTodayNormalized.getTime(),
+                isOverdue: dueDateNormalized < startOfTodayNormalized,
+              });
+            }
+            
+            if (dueDateNormalized < startOfTodayNormalized) {
+              highlightReasons.push('overdue');
+            } else if (dueDateNormalized.getTime() === startOfTodayNormalized.getTime()) {
+              highlightReasons.push('due_today');
+            }
           }
 
-          if (reasons.size === 0) {
-            return null;
+          if (data.status === 'on_hold') {
+            highlightReasons.push('on_hold');
           }
 
-          projectIds.add(data.projectId);
+          if (progress <= 0) {
+            highlightReasons.push('no_progress');
+          }
+
           return {
-            docId: docSnap.id,
-            task: data,
+            docSnap,
+            data,
             dueDate,
-            highlightReasons: Array.from(reasons),
-            mentions,
+            progress,
+            highlightReasons,
           };
         })
-      )
-    ).filter((value): value is {
-      docId: string;
-      task: Task;
-      dueDate: Date | null;
-      highlightReasons: HighlightReason[];
-      mentions: MentionSummary[];
-    } => value !== null);
+        .filter((entry) => entry.data.projectId && entry.data.issueId);
 
-    if (enriched.length === 0) {
-      return [];
-    }
+      const projectIds = new Set<string>();
 
-    const projectMap = new Map<string, Project>();
-    await Promise.all(
-      Array.from(projectIds).map(async (projectId) => {
-        const projectSnap = await getDoc(doc(this.db, 'projects', projectId));
-        if (projectSnap.exists()) {
-          projectMap.set(projectId, projectSnap.data() as Project);
-        }
-      })
-    );
+      // メンションを取得しつつ、最終的に表示対象のみを残す
+      const enriched = (
+        await Promise.all(
+          candidates.map(async (candidate) => {
+            const { data, dueDate, docSnap } = candidate;
+            let mentions: MentionSummary[] = [];
+            try {
+              mentions = await this.fetchRecentMentions(
+                data.projectId,
+                data.issueId,
+                docSnap.id,
+                uid,
+                mentionTake
+              );
+            } catch (error) {
+              console.error('[要対応タスク] メンション取得エラー:', {
+                projectId: data.projectId,
+                issueId: data.issueId,
+                taskId: docSnap.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              // メンション取得に失敗してもタスクは処理を続行
+            }
+            const reasons = new Set<HighlightReason>(candidate.highlightReasons);
+            if (mentions.length > 0) {
+              reasons.add('mentioned');
+            }
 
-    const cards: ActionableTaskCard[] = enriched.map((item) => {
-      const project = projectMap.get(item.task.projectId);
-      const projectName = project?.name ?? '不明なプロジェクト';
-      const primaryReason = this.highlightPriority.find((reason) =>
-        item.highlightReasons.includes(reason)
+            // デバッグログ：ハイライト理由がない場合のログ
+            if (reasons.size === 0 && data.assigneeIds?.includes(uid)) {
+              console.log('[要対応タスク] ハイライト理由なしで除外:', {
+                taskTitle: data.title,
+                taskId: docSnap.id,
+                status: data.status,
+                progress: typeof data.progress === 'number' ? data.progress : 0,
+                dueDate: dueDate?.toISOString() ?? null,
+                highlightReasons: candidate.highlightReasons,
+                mentionCount: mentions.length,
+              });
+            }
+
+            if (reasons.size === 0) {
+              return null;
+            }
+
+            projectIds.add(data.projectId);
+            return {
+              docId: docSnap.id,
+              task: data,
+              dueDate,
+              highlightReasons: Array.from(reasons),
+              mentions,
+            };
+          })
+        )
+      ).filter((value): value is {
+        docId: string;
+        task: Task;
+        dueDate: Date | null;
+        highlightReasons: HighlightReason[];
+        mentions: MentionSummary[];
+      } => value !== null);
+
+      if (enriched.length === 0) {
+        console.log('[要対応タスク] 抽出されたタスクが0件です');
+        return [];
+      }
+
+      console.log('[要対応タスク] 抽出されたタスク数:', enriched.length);
+
+      const projectMap = new Map<string, Project>();
+      await Promise.all(
+        Array.from(projectIds).map(async (projectId) => {
+          try {
+            const projectSnap = await getDoc(doc(this.db, 'projects', projectId));
+            if (projectSnap.exists()) {
+              projectMap.set(projectId, projectSnap.data() as Project);
+            }
+          } catch (error) {
+            console.error('[要対応タスク] プロジェクト情報取得エラー:', {
+              projectId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            // プロジェクト情報取得に失敗しても処理を続行
+          }
+        })
       );
 
-      const latestMentionAt = item.mentions[0]?.createdAt ?? null;
+      const cards: ActionableTaskCard[] = enriched.map((item) => {
+        const project = projectMap.get(item.task.projectId);
+        const projectName = project?.name ?? '不明なプロジェクト';
+        const primaryReason = this.highlightPriority.find((reason) =>
+          item.highlightReasons.includes(reason)
+        );
 
-      return {
-        taskId: item.docId,
-        projectId: item.task.projectId,
-        issueId: item.task.issueId,
-        title: item.task.title,
-        importance: item.task.importance ?? null,
-        status: item.task.status,
-        statusLabel: this.getStatusLabel(item.task.status),
-        dueDate: item.dueDate,
-        projectName,
-        highlightReasons: item.highlightReasons,
-        highlightDetails: item.highlightReasons.map((reason) => ({
-          reason,
-          label: this.highlightLabels[reason],
-        })),
-        badge: {
-          color: primaryReason ? this.highlightColors[primaryReason] : '#6b7280',
-          label: primaryReason ? this.highlightLabels[primaryReason] : '注目',
-          reason: primaryReason ?? null,
-        },
-        mentionCount: item.mentions.length,
-        mentions: item.mentions,
-        latestMentionAt,
-      } satisfies ActionableTaskCard;
-    });
+        const latestMentionAt = item.mentions[0]?.createdAt ?? null;
 
-    cards.sort((a, b) => {
-      const importanceA = a.importance ? this.importanceRank[a.importance] : Number.MAX_SAFE_INTEGER;
-      const importanceB = b.importance ? this.importanceRank[b.importance] : Number.MAX_SAFE_INTEGER;
-      if (importanceA !== importanceB) {
-        return importanceA - importanceB;
-      }
+        return {
+          taskId: item.docId,
+          projectId: item.task.projectId,
+          issueId: item.task.issueId,
+          title: item.task.title,
+          importance: item.task.importance ?? null,
+          status: item.task.status,
+          statusLabel: this.getStatusLabel(item.task.status),
+          dueDate: item.dueDate,
+          projectName,
+          highlightReasons: item.highlightReasons,
+          highlightDetails: item.highlightReasons.map((reason) => ({
+            reason,
+            label: this.highlightLabels[reason],
+          })),
+          badge: {
+            color: primaryReason ? this.highlightColors[primaryReason] : '#6b7280',
+            label: primaryReason ? this.highlightLabels[primaryReason] : '注目',
+            reason: primaryReason ?? null,
+          },
+          mentionCount: item.mentions.length,
+          mentions: item.mentions,
+          latestMentionAt,
+        } satisfies ActionableTaskCard;
+      });
 
-      const dueA = a.dueDate ? a.dueDate.getTime() : Number.POSITIVE_INFINITY;
-      const dueB = b.dueDate ? b.dueDate.getTime() : Number.POSITIVE_INFINITY;
-      if (dueA !== dueB) {
-        return dueA - dueB;
-      }
+      cards.sort((a, b) => {
+        const importanceA = a.importance ? this.importanceRank[a.importance] : Number.MAX_SAFE_INTEGER;
+        const importanceB = b.importance ? this.importanceRank[b.importance] : Number.MAX_SAFE_INTEGER;
+        if (importanceA !== importanceB) {
+          return importanceA - importanceB;
+        }
 
-      const mentionA = a.latestMentionAt ? a.latestMentionAt.getTime() : 0;
-      const mentionB = b.latestMentionAt ? b.latestMentionAt.getTime() : 0;
-      if (mentionA !== mentionB) {
-        return mentionB - mentionA;
-      }
+        const dueA = a.dueDate ? a.dueDate.getTime() : Number.POSITIVE_INFINITY;
+        const dueB = b.dueDate ? b.dueDate.getTime() : Number.POSITIVE_INFINITY;
+        if (dueA !== dueB) {
+          return dueA - dueB;
+        }
 
-      return a.title.localeCompare(b.title);
-    });
+        const mentionA = a.latestMentionAt ? a.latestMentionAt.getTime() : 0;
+        const mentionB = b.latestMentionAt ? b.latestMentionAt.getTime() : 0;
+        if (mentionA !== mentionB) {
+          return mentionB - mentionA;
+        }
 
-    return cards.slice(0, take);
+        return a.title.localeCompare(b.title);
+      });
+
+      const result = cards.slice(0, take);
+      console.log('[要対応タスク] 最終的に返されるタスク:', result.map(card => ({
+        title: card.title,
+        taskId: card.taskId,
+        highlightReasons: card.highlightReasons,
+        dueDate: card.dueDate?.toISOString() ?? null,
+      })));
+      return result;
+    } catch (error) {
+      console.error('[要対応タスク] getActionableTaskCards エラー:', error);
+      const errorMessage = error instanceof Error ? error.message : '要対応タスクの取得に失敗しました';
+      throw new Error(`要対応タスクの取得に失敗しました: ${errorMessage}`);
+    }
   }
 
   /**
