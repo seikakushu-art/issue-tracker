@@ -9,6 +9,7 @@ import {
   where,
   doc,
   getDoc,
+  getCountFromServer,
 } from '@angular/fire/firestore';
 import { Auth, User, authState } from '@angular/fire/auth';
 import { firstValueFrom, TimeoutError } from 'rxjs';
@@ -180,8 +181,22 @@ export class BoardService {
     if (!rawTitle) {
       throw new Error('タイトルを入力してください');
     }
+    if (rawTitle.length > 120) {
+      throw new Error('タイトルは120文字以内で入力してください');
+    }
     if (!rawContent) {
       throw new Error('内容を入力してください');
+    }
+    if (rawContent.length > 20000) {
+      throw new Error('内容は20000文字以内で入力してください');
+    }
+
+    // 投稿数の制限チェック（最大5000件）
+    const collectionRef = collection(this.db, 'bulletinPosts');
+    const countSnapshot = await getCountFromServer(collectionRef);
+    const currentPostCount = countSnapshot.data().count;
+    if (currentPostCount >= 5000) {
+      throw new Error('掲示板の投稿数が上限（5000件）に達しています');
     }
 
     const uniqueProjectIds = Array.from(new Set((input.projectIds ?? []).filter(Boolean)));

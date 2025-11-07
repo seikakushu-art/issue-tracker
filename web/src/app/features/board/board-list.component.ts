@@ -31,6 +31,7 @@ export class BoardListComponent implements OnInit {
 
   readonly accessibleProjects = signal<Project[]>([]);
   private readonly currentUid = signal<string | null>(null);
+  private readonly expandedPosts = signal<Set<string>>(new Set());
 
   postForm: { title: string; content: string; projectIds: string[] } = {
     title: '',
@@ -145,7 +146,9 @@ export class BoardListComponent implements OnInit {
     return (
       !this.submitting() &&
       form.title.trim().length > 0 &&
+      form.title.trim().length <= 120 &&
       form.content.trim().length > 0 &&
+      form.content.trim().length <= 20000 &&
       form.projectIds.length > 0 &&
       form.projectIds.length <= 5
     );
@@ -153,6 +156,15 @@ export class BoardListComponent implements OnInit {
 
   async submit(): Promise<void> {
     if (!this.canSubmit()) {
+      const form = this.postForm;
+      if (form.title.trim().length > 120) {
+        this.formError.set('タイトルは120文字以内で入力してください');
+        return;
+      }
+      if (form.content.trim().length > 20000) {
+        this.formError.set('内容は20000文字以内で入力してください');
+        return;
+      }
       this.formError.set('必要な項目を入力してください');
       return;
     }
@@ -184,6 +196,27 @@ export class BoardListComponent implements OnInit {
 
   trackByPostId(_: number, post: BoardPostView): string {
     return post.id ?? `${post.title}-${post.createdAt?.toISOString() ?? ''}`;
+  }
+
+  isPostExpanded(postId: string | undefined): boolean {
+    if (!postId) {
+      return false;
+    }
+    return this.expandedPosts().has(postId);
+  }
+
+  togglePostExpansion(postId: string | undefined): void {
+    if (!postId) {
+      return;
+    }
+    const current = this.expandedPosts();
+    const next = new Set(current);
+    if (next.has(postId)) {
+      next.delete(postId);
+    } else {
+      next.add(postId);
+    }
+    this.expandedPosts.set(next);
   }
 
   private resolveRole(project: Project): Role | null {

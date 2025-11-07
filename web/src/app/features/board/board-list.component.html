@@ -23,6 +23,7 @@
               [(ngModel)]="postForm.title"
               [disabled]="submitting()"
               required
+              maxlength="120"
               placeholder="例：月次定例のアジェンダ更新のお知らせ"
             />
           </div>
@@ -36,6 +37,7 @@
               [(ngModel)]="postForm.content"
               [disabled]="submitting()"
               required
+              maxlength="20000"
               placeholder="共有したい内容を記載してください"
             ></textarea>
           </div>
@@ -122,7 +124,23 @@
             </ul>
           </header>
           <h3 class="board-post__title">{{ post.title }}</h3>
-          <p class="board-post__content">{{ post.content }}</p>
+          <div class="board-post__content-wrapper">
+            <p
+              class="board-post__content"
+              [class.board-post__content--expanded]="isPostExpanded(post.id)"
+            >
+              {{ post.content }}
+            </p>
+            <button
+              *ngIf="post.content && post.content.length > 200"
+              type="button"
+              class="board-post__expand-button"
+              (click)="togglePostExpansion(post.id)"
+              [attr.aria-expanded]="isPostExpanded(post.id)"
+            >
+              {{ isPostExpanded(post.id) ? '折りたたむ' : '全文を表示' }}
+            </button>
+          </div>
         </li>
       </ul>
     </section>
