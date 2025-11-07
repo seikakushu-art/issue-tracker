@@ -979,14 +979,32 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.showModal = true;
   }
 
-  /** 日付を入力用フォーマットに変換 */
+  private readonly tokyoTimezone = 'Asia/Tokyo';
+
+  /** 東京時間での日付部分を取得するヘルパー */
+  private getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    return {
+      year: parseInt(parts.find((p) => p.type === 'year')!.value, 10),
+      month: parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1, // 0-indexed
+      day: parseInt(parts.find((p) => p.type === 'day')!.value, 10),
+    };
+  }
+
+  /** 日付を入力用フォーマットに変換（東京時間ベース） */
   private formatDateForInput(date: Date | string): string {
     const d = this.normalizeDate(date);
     if (!d) return '';
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const { year, month, day } = this.getTokyoDateParts(d);
+    const monthStr = String(month + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    return `${year}-${monthStr}-${dayStr}`;
   }
 
   /** タスク保存 */

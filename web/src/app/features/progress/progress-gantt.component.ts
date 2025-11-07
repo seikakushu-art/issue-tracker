@@ -88,7 +88,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   selectedProject: Project | null = null;
 
   readonly tokyoTimezone = 'Asia/Tokyo';
-  readonly dayCellWidth = 36;
+  readonly dayCellWidth = 28;
   readonly labelColumnWidth = 280;
 
   projectHierarchy: GanttProjectGroup[] = [];
@@ -478,7 +478,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       const date = new Date(cursor);
       days.push({
         date,
-        isWeekend: cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6,
+        isWeekend: this.getTokyoDayOfWeek(date) === 0 || this.getTokyoDayOfWeek(date) === 6,
         isHoliday: isJapaneseHoliday(date),
         isToday: this.isSameDay(date, today),
         dayLabel: this.formatDayNumber(date),
@@ -602,14 +602,14 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   private startOfWeek(date: Date): Date {
     const result = new Date(date);
-    const day = (result.getUTCDay() + 6) % 7;
+    const day = (this.getTokyoDayOfWeek(result) + 6) % 7;
     result.setUTCDate(result.getUTCDate() - day);
     return result;
   }
 
   private endOfWeek(date: Date): Date {
     const result = new Date(date);
-    const day = result.getUTCDay();
+    const day = this.getTokyoDayOfWeek(result);
     const diff = (7 - day) % 7;
     result.setUTCDate(result.getUTCDate() + diff);
     return result;
@@ -665,17 +665,50 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   private formatDayNumber(date: Date): string {
-    const day = date.getUTCDate();
-    return day.toString().padStart(2, '0');
+    // 東京時間での日付部分を取得
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    const day = parts.find((p) => p.type === 'day')!.value;
+    return day;
+  }
+
+  private getTokyoDayOfWeek(date: Date): number {
+    // 東京時間での曜日を取得（0=日曜日, 6=土曜日）
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      weekday: 'narrow',
+    });
+    const weekday = formatter.format(date);
+    const weekdayMap: Record<string, number> = {
+      日: 0,
+      月: 1,
+      火: 2,
+      水: 3,
+      木: 4,
+      金: 5,
+      土: 6,
+    };
+    return weekdayMap[weekday] ?? 0;
   }
 
   private toTokyoDate(date: Date): Date {
     if (Number.isNaN(date.getTime())) {
       return date;
     }
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
+    // 東京時間での日付部分を取得
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parseInt(parts.find((p) => p.type === 'year')!.value, 10);
+    const month = parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1; // 0-indexed
+    const day = parseInt(parts.find((p) => p.type === 'day')!.value, 10);
     return new Date(Date.UTC(year, month, day));
   }
 

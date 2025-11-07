@@ -475,11 +475,31 @@ export class DashboardService {
     return Math.abs(Math.floor(diff / (1000 * 60 * 60 * 24)));
   }
 
-  /** 現在日時から期限までの日数を計算する（期限が過去の場合は負の値） */
+  private readonly tokyoTimezone = 'Asia/Tokyo';
+
+  /** 東京時間での日付部分を取得するヘルパー */
+  private getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    return {
+      year: parseInt(parts.find((p) => p.type === 'year')!.value, 10),
+      month: parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1, // 0-indexed
+      day: parseInt(parts.find((p) => p.type === 'day')!.value, 10),
+    };
+  }
+
+  /** 現在日時から期限までの日数を計算する（期限が過去の場合は負の値、東京時間ベース） */
   private daysUntilDeadline(now: Date, deadline: Date): number {
-    // 日付のみを比較するため、時刻を00:00:00に設定
-    const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+    // 日付のみを比較するため、時刻を00:00:00に設定（東京時間ベース）
+    const nowParts = this.getTokyoDateParts(now);
+    const deadlineParts = this.getTokyoDateParts(deadline);
+    const nowDate = new Date(Date.UTC(nowParts.year, nowParts.month, nowParts.day));
+    const deadlineDate = new Date(Date.UTC(deadlineParts.year, deadlineParts.month, deadlineParts.day));
     const diff = deadlineDate.getTime() - nowDate.getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   }

@@ -123,8 +123,18 @@ export function isJapaneseHoliday(date: Date): boolean {
   if (Number.isNaN(date.getTime())) {
     return false;
   }
-  const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const year = utcDate.getUTCFullYear();
+  // 東京時間での日付部分を取得
+  const formatter = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find((p) => p.type === 'year')!.value, 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')!.value, 10);
+  const day = parseInt(parts.find((p) => p.type === 'day')!.value, 10);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
   if (!HOLIDAY_CACHE.has(year)) {
     HOLIDAY_CACHE.set(year, buildHolidaySet(year));
   }

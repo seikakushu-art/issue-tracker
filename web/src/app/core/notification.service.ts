@@ -121,6 +121,35 @@ export interface StartupNotifications {
 export class NotificationService {
   private db = inject(Firestore);
   private auth = inject(Auth);
+  private readonly tokyoTimezone = 'Asia/Tokyo';
+
+  /** 東京時間での日付部分を取得するヘルパー */
+  private getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    return {
+      year: parseInt(parts.find((p) => p.type === 'year')!.value, 10),
+      month: parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1, // 0-indexed
+      day: parseInt(parts.find((p) => p.type === 'day')!.value, 10),
+    };
+  }
+
+  /** 東京時間での本日の開始時刻（00:00:00）を取得 */
+  private getStartOfToday(now: Date): Date {
+    const { year, month, day } = this.getTokyoDateParts(now);
+    return new Date(Date.UTC(year, month, day));
+  }
+
+  /** 東京時間での本日の終了時刻（23:59:59.999）を取得 */
+  private getEndOfToday(now: Date): Date {
+    const { year, month, day } = this.getTokyoDateParts(now);
+    return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+  }
 
   /**
    * Firestoreから取得した日時をDate型へ統一する
@@ -252,8 +281,8 @@ export class NotificationService {
     const take = options.limit ?? 30;
     const mentionTake = options.mentionTake ?? 3;
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfToday = this.getStartOfToday(now);
+    const endOfToday = this.getEndOfToday(now);
 
     const tasksRef = collectionGroup(this.db, 'tasks');
     const taskQuery = query(
@@ -448,8 +477,8 @@ export class NotificationService {
     );
 
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfToday = this.getStartOfToday(now);
+    const endOfToday = this.getEndOfToday(now);
 
     const candidateTasks = snapshot.docs
       .map((docSnap) => ({

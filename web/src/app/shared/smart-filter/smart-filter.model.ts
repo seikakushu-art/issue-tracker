@@ -219,37 +219,80 @@ function isDueThisWeek(date: Date): boolean {
   return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
 }
 
+const TOKYO_TIMEZONE = 'Asia/Tokyo';
+
 /**
- * 00:00:00.000 に揃えた日付を取得
+ * 東京時間での日付部分を取得するヘルパー
+ */
+function getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
+  const formatter = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: TOKYO_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = formatter.formatToParts(date);
+  return {
+    year: parseInt(parts.find((p) => p.type === 'year')!.value, 10),
+    month: parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1, // 0-indexed
+    day: parseInt(parts.find((p) => p.type === 'day')!.value, 10),
+  };
+}
+
+/**
+ * 東京時間での曜日を取得するヘルパー（0=日曜日, 6=土曜日）
+ */
+function getTokyoDayOfWeek(date: Date): number {
+  const formatter = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: TOKYO_TIMEZONE,
+    weekday: 'narrow',
+  });
+  const weekday = formatter.format(date);
+  const weekdayMap: Record<string, number> = {
+    日: 0,
+    月: 1,
+    火: 2,
+    水: 3,
+    木: 4,
+    金: 5,
+    土: 6,
+  };
+  return weekdayMap[weekday] ?? 0;
+}
+
+/**
+ * 00:00:00.000 に揃えた日付を取得（東京時間ベース）
  */
 function startOfDay(base: Date): Date {
-  return new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  const { year, month, day } = getTokyoDateParts(base);
+  return new Date(Date.UTC(year, month, day));
 }
 
 /**
- * 23:59:59.999 に揃えた日付を取得
+ * 23:59:59.999 に揃えた日付を取得（東京時間ベース）
  */
 function endOfDay(start: Date): Date {
-  return new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
+  const { year, month, day } = getTokyoDateParts(start);
+  return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
 }
 
 /**
- * 週の開始日（月曜日）を算出
+ * 週の開始日（月曜日）を算出（東京時間ベース）
  */
 function startOfWeek(base: Date): Date {
   const start = startOfDay(base);
-  const day = start.getDay();
+  const day = getTokyoDayOfWeek(start);
   const diff = day === 0 ? -6 : 1 - day; // 日曜は-6、月曜は0
-  start.setDate(start.getDate() + diff);
-  return start;
+  const { year, month, day: startDay } = getTokyoDateParts(start);
+  const adjustedDate = new Date(Date.UTC(year, month, startDay + diff));
+  return adjustedDate;
 }
 
 /**
- * 週の最終日（日曜日）を算出
+ * 週の最終日（日曜日）を算出（東京時間ベース）
  */
 function endOfWeek(start: Date): Date {
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-  end.setHours(23, 59, 59, 999);
+  const { year, month, day } = getTokyoDateParts(start);
+  const end = new Date(Date.UTC(year, month, day + 6, 23, 59, 59, 999));
   return end;
 }

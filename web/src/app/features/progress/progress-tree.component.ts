@@ -336,9 +336,17 @@ export class ProgressTreeComponent implements OnInit {
     if (Number.isNaN(date.getTime())) {
       return date;
     }
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
+    // 東京時間での日付部分を取得
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: this.tokyoTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parseInt(parts.find((p) => p.type === 'year')!.value, 10);
+    const month = parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1; // 0-indexed
+    const day = parseInt(parts.find((p) => p.type === 'day')!.value, 10);
     return new Date(Date.UTC(year, month, day));
   }
 
