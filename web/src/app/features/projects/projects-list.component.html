@@ -76,7 +76,7 @@
         <div class="project-actions" *ngIf="canManage(project)">
           <button class="btn-action" (click)="editProject(project, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
-            <span class="action-label">編集</span>
+            <span class="action-label">📝編集</span>
           </button>
           <button class="btn-action" (click)="archiveProject(project, $event)" title="アーカイブ">
             <i class="icon-archive" aria-hidden="true"></i>
@@ -88,7 +88,7 @@
           </button>
           <button class="btn-action" (click)="openInviteModal(project, $event)" title="招待リンク">
             <i class="icon-link" aria-hidden="true"></i>
-            <span class="action-label">招待</span>
+            <span class="action-label">👥招待</span>
           </button>
           <button class="btn-action" (click)="deleteProject(project, $event)" title="削除">
             <i class="icon-delete" aria-hidden="true"></i>

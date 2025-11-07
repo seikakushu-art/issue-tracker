@@ -24,7 +24,7 @@
       </div>
       <div class="detail-actions">
         <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(task)" (click)="requestEdit()">
-          編集
+          📝編集
         </button>
         <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(task)" (click)="toggleArchive(task)">
           {{ task.archived ? '復元' : 'アーカイブ' }}

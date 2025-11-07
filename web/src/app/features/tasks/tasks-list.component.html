@@ -169,7 +169,7 @@
           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
           <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="editTask(task, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
-            <span class="btn-label">編集</span>
+            <span class="btn-label">📝編集</span>
           </button>
           <!-- アーカイブ状態のトグルもラベル表示 -->
           <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="archiveTask(task, $event)" title="アーカイブ切替">

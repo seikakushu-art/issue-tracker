@@ -3,6 +3,7 @@ import { Component, OnDestroy, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserProfileService } from '../../core/user-profile.service';
+import { AuthService } from '../../core/auth.service';
 
 /**
  * ユーザー設定画面
@@ -81,8 +82,18 @@ import { UserProfileService } from '../../core/user-profile.service';
         </div>
 
         <footer class="settings__footer">
+           <!-- ユーザーがすぐに戻れるよう、ダッシュボードへ戻る導線を配置 -->
           <button type="button" class="btn btn-link" (click)="goBack()" [disabled]="loading">
             ダッシュボードへ戻る
+          </button>
+          <!-- アカウントから離脱するためのログアウトボタンを追加 -->
+          <button
+            type="button"
+            class="btn btn-danger"
+            (click)="logout()"
+            [disabled]="loading"
+          >
+            ログアウト
           </button>
         </footer>
       </div>
@@ -258,6 +269,16 @@ import { UserProfileService } from '../../core/user-profile.service';
       cursor: not-allowed;
     }
 
+    .btn-danger {
+      background: #ef4444; /* 直感的に危険操作と分かる赤色を採用 */
+      color: #ffffff;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: #dc2626;
+    }
+
     .alert {
       padding: 12px 16px;
       border-radius: 8px;
@@ -277,6 +298,8 @@ import { UserProfileService } from '../../core/user-profile.service';
     .settings__footer {
       display: flex;
       justify-content: flex-start;
+      gap: 12px; /* ボタン同士が詰まらないよう適度な余白を確保 */
+      flex-wrap: wrap; /* 狭い画面でもボタンが折り返せるようにする */
     }
 
     @media (max-width: 600px) {
@@ -298,6 +321,7 @@ import { UserProfileService } from '../../core/user-profile.service';
 export class UserSettingsComponent implements OnDestroy {
   private readonly userProfileService = inject(UserProfileService);
   private readonly router = inject(Router);
+  private readonly authService = inject(AuthService); // 認証処理を担当するサービスを注入
 
   username = '';
   iconPreviewUrl: string | null = null;
@@ -378,6 +402,29 @@ export class UserSettingsComponent implements OnDestroy {
    */
   goBack(): void {
     void this.router.navigate(['/dashboard']);
+  }
+
+  /**
+   * Firebase からサインアウトし、ログイン画面へ誘導する
+   */
+  async logout(): Promise<void> {
+    if (this.loading) {
+      return; // 他の処理でビジー状態なら何もしない
+    }
+
+    this.loading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      await this.authService.logout(); // Firebase 側のセッションを終了
+      this.authService.clearRememberMarker(); // 「ログイン状態を保持」を解除し次回は確実にログインを要求
+      void this.router.navigate(['/login']); // ログインページへ移動
+    } catch (error) {
+      console.error('ログアウトに失敗しました', error);
+      this.errorMessage = 'ログアウトに失敗しました。時間をおいて再度お試しください。';
+      this.loading = false;
+    }
   }
 
   /**
