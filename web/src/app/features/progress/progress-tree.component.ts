@@ -8,6 +8,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { resolveIssueThemeColor, tintIssueThemeColor, transparentizeIssueThemeColor } from '../../shared/issue-theme';
+import { TaskDetailPanelComponent } from '../tasks/task-detail-panel/task-detail-panel.component';
 
 registerLocaleData(localeJa);
 
@@ -44,7 +45,7 @@ interface ProjectFilterOption {
 @Component({
   selector: 'app-progress-tree',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TaskDetailPanelComponent],
   templateUrl: './progress-tree.component.html',
   styleUrls: ['./progress-tree.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +63,12 @@ export class ProgressTreeComponent implements OnInit {
 
   treeProjects: TreeProject[] = [];
 
+  // パネル表示用の選択中データを保持
+  selectedTreeTask: TreeTask | null = null;
+  selectedTask: Task | null = null;
+  selectedIssue: Issue | null = null;
+  selectedProject: Project | null = null;
+
   projectFilterId = 'all';
   projectFilterOptions: ProjectFilterOption[] = [
     { id: 'all', label: 'すべてのプロジェクト' },
@@ -78,6 +85,11 @@ export class ProgressTreeComponent implements OnInit {
     this.loadError = null;
     this.sampleNotice = null;
     this.treeProjects = [];
+     // データ再取得時は選択状態も初期化
+     this.selectedTreeTask = null;
+     this.selectedTask = null;
+     this.selectedIssue = null;
+     this.selectedProject = null;
 
     try {
       const projects = (await this.projectsService
@@ -159,10 +171,80 @@ export class ProgressTreeComponent implements OnInit {
   }
 
   selectTask(project: TreeProject, issue: TreeIssue, treeTask: TreeTask): void {
-    const projectId = project.project.id;
-    const issueId = issue.issue.id;
-    const taskId = treeTask.task.id;
-    if (!projectId || !issueId || !taskId) {
+   // 必須情報が欠けている場合は選択処理を行わない
+   if (!project.project.id || !issue.issue.id || !treeTask.task.id) {
+    return;
+  }
+  // 選択中のタスク情報をまとめて保持（詳細パネル描画用）
+  this.selectedTreeTask = treeTask;
+  this.selectedTask = treeTask.task;
+  this.selectedIssue = issue.issue;
+  this.selectedProject = project.project;
+  this.cdr.markForCheck();
+}
+
+closeDetailPanel(): void {
+  // パネルを閉じた際は状態をクリア
+  this.selectedTreeTask = null;
+  this.selectedTask = null;
+  this.selectedIssue = null;
+  this.selectedProject = null;
+  this.cdr.markForCheck();
+}
+
+handleTaskDetailUpdate(updatedTask: Task): void {
+  if (!updatedTask.id) {
+    return;
+  }
+
+  if (this.selectedTask?.id === updatedTask.id) {
+    this.selectedTask = { ...this.selectedTask, ...updatedTask };
+  }
+  if (this.selectedTreeTask?.task.id === updatedTask.id) {
+    this.selectedTreeTask = {
+      ...this.selectedTreeTask,
+      task: { ...this.selectedTreeTask.task, ...updatedTask },
+    };
+  }
+
+  for (const project of this.treeProjects) {
+    if (!project.project.id || project.project.id !== updatedTask.projectId) {
+      continue;
+    }
+    for (const issue of project.issues) {
+      if (!issue.issue.id || issue.issue.id !== updatedTask.issueId) {
+        continue;
+      }
+      const target = issue.tasks.find((treeTask) => treeTask.task.id === updatedTask.id);
+      if (target) {
+        target.task = { ...target.task, ...updatedTask };
+      }
+    }
+  }
+
+  this.cdr.markForCheck();
+}
+
+handleDetailEditRequest(): void {
+  if (!this.selectedProject?.id || !this.selectedIssue?.id || !this.selectedTask?.id) {
+    return;
+  }
+  void this.router.navigate([
+    '/projects',
+    this.selectedProject.id,
+    'issues',
+    this.selectedIssue.id,
+  ], {
+    queryParams: { focus: this.selectedTask.id },
+  });
+}
+
+goToTaskDetail(): void {
+  // 詳細ページ遷移は明示的なアクション時にのみ実施
+  const taskId = this.selectedTask?.id;
+  const issueId = this.selectedIssue?.id;
+  const projectId = this.selectedProject?.id;
+  if (!taskId || !issueId || !projectId) {
       return;
     }
     void this.router.navigate([

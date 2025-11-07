@@ -183,63 +183,14 @@
       </section>
     </div>
   </div>
-
-  <aside *ngIf="selectedTask as task" class="task-detail-panel" role="dialog" aria-modal="true">
-      <div
-        class="task-detail__backdrop"
-        role="button"
-        tabindex="0"
-        aria-label="詳細を閉じる"
-        (click)="closeDetailPanel()"
-        (keydown.enter)="closeDetailPanel()"
-        (keydown.space)="closeDetailPanel()"
-      ></div>
-      <div class="task-detail__body">
-        <header class="task-detail__header">
-          <h2>{{ task.title }}</h2>
-          <button type="button" class="btn-close" (click)="closeDetailPanel()" aria-label="閉じる">
-            <i class="icon-close"></i>
-          </button>
-        </header>
-        <section class="task-detail__section">
-          <h3>基本情報</h3>
-          <dl>
-            <div>
-              <dt>所属</dt>
-              <dd>{{ selectedProject?.name || '未設定のプロジェクト' }} / {{ selectedIssue?.name || '未設定の課題' }}</dd>
-            </div>
-            <div>
-              <dt>ステータス</dt>
-              <dd>{{ getTaskStatusLabel(task) }}</dd>
-            </div>
-            <div>
-              <dt>重要度</dt>
-              <dd>{{ getImportanceLabel(task) }}</dd>
-            </div>
-            <div *ngIf="task.startDate">
-              <dt>開始日</dt>
-              <dd>{{ task.startDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</dd>
-            </div>
-            <div *ngIf="task.endDate">
-              <dt>終了日</dt>
-              <dd>{{ task.endDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</dd>
-            </div>
-          </dl>
-        </section>
-        <section class="task-detail__section" *ngIf="task.goal">
-          <h3>達成目標</h3>
-          <p>{{ task.goal }}</p>
-        </section>
-        <section class="task-detail__section" *ngIf="task.description">
-          <h3>説明</h3>
-          <p class="task-detail__description">{{ task.description }}</p>
-        </section>
-        <div class="task-detail__actions">
-          <button type="button" class="btn-primary" (click)="goToTaskDetail()">
-            <i class="icon-open"></i>
-            <span>タスク詳細で開く</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  </div>
+  <app-task-detail-panel
+    *ngIf="selectedTask?.id && selectedIssue?.id && selectedProject?.id"
+    [visible]="selectedTask !== null"
+    [projectId]="selectedProject?.id ?? null"
+    [issueId]="selectedIssue?.id ?? null"
+    [taskId]="selectedTask?.id ?? null"
+    [allowEditing]="true"
+    (closed)="closeDetailPanel()"
+    (taskChanged)="handleTaskDetailUpdate($event)"
+  ></app-task-detail-panel>
+</div>

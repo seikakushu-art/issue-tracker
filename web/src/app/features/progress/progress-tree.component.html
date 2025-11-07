@@ -80,7 +80,7 @@
                     *ngFor="let treeTask of issue.tasks"
                     class="tree-node task"
                     role="treeitem"
-                    aria-selected="false"
+                    [attr.aria-selected]="selectedTask?.id === treeTask.task.id"
                     tabindex="0"
                     (click)="selectTask(project, issue, treeTask)"
                     (keydown.enter)="selectTask(project, issue, treeTask)"
@@ -88,6 +88,7 @@
                     [style.--issue-theme-color]="getIssueTheme(issue.issue)"
                     [style.--task-theme-soft]="getTaskSurfaceColor(issue.issue)"
                     [style.--task-theme-overlay]="getTaskOverlayColor(issue.issue)"
+                    [class.is-selected]="selectedTask?.id === treeTask.task.id"
                   >
                     <div class="task-body">
                       <div class="task-main">
@@ -135,4 +136,15 @@
         <p>表示できるデータがありません。プロジェクトに課題とタスクを追加するとツリーに表示されます。</p>
       </div>
     </ng-template>
+    <app-task-detail-panel
+    *ngIf="selectedTask?.id && selectedIssue?.id && selectedProject?.id"
+    [visible]="selectedTask !== null"
+    [projectId]="selectedProject?.id ?? null"
+    [issueId]="selectedIssue?.id ?? null"
+    [taskId]="selectedTask?.id ?? null"
+    [allowEditing]="true"
+    (closed)="closeDetailPanel()"
+    (taskChanged)="handleTaskDetailUpdate($event)"
+    (editRequested)="handleDetailEditRequest()"
+  ></app-task-detail-panel>
   </div>

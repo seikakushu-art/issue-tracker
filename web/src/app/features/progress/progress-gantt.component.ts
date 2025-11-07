@@ -14,6 +14,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { ProgressGanttTimelineComponent } from './progress-gantt-timeline.component';
+import { TaskDetailPanelComponent } from '../tasks/task-detail-panel/task-detail-panel.component';
 import { isJapaneseHoliday } from './japanese-holidays';
 import { resolveIssueThemeColor, tintIssueThemeColor, transparentizeIssueThemeColor } from '../../shared/issue-theme';
 
@@ -51,7 +52,7 @@ export interface TimelineMonthSegment {
 @Component({
   selector: 'app-progress-gantt',
   standalone: true,
-  imports: [CommonModule, ProgressGanttTimelineComponent],
+  imports: [CommonModule, ProgressGanttTimelineComponent, TaskDetailPanelComponent],
   templateUrl: './progress-gantt.component.html',
   styleUrls: ['./progress-gantt.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -199,11 +200,11 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   selectTask(issue: GanttIssue, task: Task): void {
+    // クリック時にパネルへ最新情報を反映させる（ナビゲーションは行わない）
     this.selectedTask = task;
     this.selectedIssue = issue.issue;
     this.selectedProject = issue.project;
     this.cdr.markForCheck();
-    this.goToTaskDetail(task, issue.issue, issue.project);
   }
 
   onSidebarTaskSelect(projectId: string | undefined, issueId: string | undefined, task: Task): void {
@@ -235,6 +236,45 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.selectedTask = null;
     this.selectedIssue = null;
     this.selectedProject = null;
+  }
+
+  handleTaskDetailUpdate(updatedTask: Task): void {
+    if (!updatedTask.id) {
+      return;
+    }
+    if (this.selectedTask?.id === updatedTask.id) {
+      this.selectedTask = { ...this.selectedTask, ...updatedTask };
+    }
+
+    for (const group of this.ganttIssues) {
+      if (!group.project.id || !group.issue.id) {
+        continue;
+      }
+      if (group.project.id !== updatedTask.projectId || group.issue.id !== updatedTask.issueId) {
+        continue;
+      }
+      const index = group.tasks.findIndex((task) => task.id === updatedTask.id);
+      if (index >= 0) {
+        group.tasks[index] = { ...group.tasks[index], ...updatedTask };
+      }
+    }
+
+    this.applyProjectFilters();
+    this.cdr.markForCheck();
+  }
+
+  handleDetailEditRequest(): void {
+    if (!this.selectedProject?.id || !this.selectedIssue?.id || !this.selectedTask?.id) {
+      return;
+    }
+    void this.router.navigate([
+      '/projects',
+      this.selectedProject.id,
+      'issues',
+      this.selectedIssue.id,
+    ], {
+      queryParams: { focus: this.selectedTask.id },
+    });
   }
 
   goToTaskDetail(
