@@ -6,17 +6,10 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "public": "dist/web/browser",
+    "ignore": ["**/.*", "**/node_modules/**"],
     "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
+      { "source": "**", "destination": "/index.html" }
     ]
   },
   "storage": {
