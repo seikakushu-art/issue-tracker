@@ -26,9 +26,6 @@
         <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(task)" (click)="requestEdit()">
           📝編集
         </button>
-        <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(task)" (click)="toggleArchive(task)">
-          {{ task.archived ? '復元' : 'アーカイブ' }}
-        </button>
         <button class="btn-icon" (click)="close()" aria-label="閉じる">
           <i class="icon-close"></i>
         </button>
@@ -160,16 +157,6 @@
           <span class="assignee-name">{{ getAssigneeDisplayName(assigneeId) }}</span>
         </li>
       </ul>
-      <div class="assignee-actions" *ngIf="shouldShowJoinButton()">
-        <button
-          type="button"
-          class="btn btn-primary btn-sm"
-          (click)="joinTask()"
-          [disabled]="assigneeActionInProgress"
-        >
-          {{ assigneeActionInProgress ? '参加処理中...' : '参加' }}
-        </button>
-      </div>
       <div
         *ngIf="assigneeActionMessage"
         class="feedback"
@@ -187,20 +174,6 @@
     <section class="detail-section attachments-section">
       <div class="section-header">
         <h3>添付</h3>
-        <div class="attachment-actions" *ngIf="canUploadAttachment(task)">
-          <label class="btn btn-secondary btn-sm attachment-upload-button">
-            <input
-              type="file"
-              multiple
-              (change)="onAttachmentSelected($event)"
-              [disabled]="attachmentUploading || attachmentLimitReached"
-            >
-            {{ attachmentUploading ? 'アップロード中...' : '添付を追加' }}
-          </label>
-          <p class="attachment-limit-message" *ngIf="attachmentLimitReached">
-            添付ファイルは最大{{ attachmentLimit }}件までです。
-          </p>
-        </div>
       </div>
 
       <p *ngIf="attachmentsLoading" class="placeholder-text">添付ファイルを読み込み中です...</p>

@@ -535,6 +535,32 @@ export class TasksService {
     await this.refreshProgress(projectId, issueId);
     return updatedAssignees;
   }
+
+  /**
+   * タスクから退出（担当者から自分を外す）するためのメソッド。
+   */
+  async leaveTask(projectId: string, issueId: string, taskId: string): Promise<string[]> {
+    const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
+    const task = await this.getTask(projectId, issueId, taskId);
+    if (!task) {
+      throw new Error('対象のタスクが見つかりません');
+    }
+
+    const currentAssignees = Array.isArray(task.assigneeIds)
+      ? task.assigneeIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      : [];
+
+    if (!currentAssignees.includes(uid)) {
+      return currentAssignees;
+    }
+
+    const updatedAssignees = currentAssignees.filter((id) => id !== uid);
+    const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
+    await updateDoc(docRef, { assigneeIds: updatedAssignees });
+    await this.refreshProgress(projectId, issueId);
+    return updatedAssignees;
+  }
   /**
    * タスクのアーカイブ状態を切り替える
    * @param projectId プロジェクトID

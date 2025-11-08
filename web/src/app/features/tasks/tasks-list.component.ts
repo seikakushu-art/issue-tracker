@@ -101,6 +101,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   assigneeActionMessage = '';
   assigneeActionMessageType: 'success' | 'error' | 'info' = 'info';
   assigneeActionInProgress = false;
+  assigneeActionInProgressLabel: 'join' | 'leave' | null = null;
 
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
@@ -304,9 +305,27 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return this.currentRole === 'admin' || this.currentRole === 'member';
   }
 
+   /** 選択中のタスクに参加・退出ボタン群を表示するか */
+   shouldShowAssigneeActions(): boolean {
+    return this.selectedTask !== null;
+  }
+
   /** 選択中のタスクに参加ボタンを表示するか判定 */
   shouldShowJoinButton(): boolean {
     return this.canAttemptJoinTask() && this.selectedTask !== null;
+  }
+
+  /** 選択中のタスクに退出ボタンを表示するか判定 */
+  shouldShowLeaveButton(): boolean {
+    return this.selectedTask !== null;
+  }
+
+  /** 現在のユーザーが選択中タスクの担当者かを判定 */
+  private isCurrentUserAssignee(): boolean {
+    if (!this.selectedTask || !this.currentUid) {
+      return false;
+    }
+    return this.selectedTask.assigneeIds.includes(this.currentUid);
   }
 
   /** フィードバックメッセージを初期化する小さなヘルパー */
@@ -362,6 +381,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     this.assigneeActionInProgress = true;
+    this.assigneeActionInProgressLabel = 'join';
     this.setAssigneeActionFeedback('', 'info');
 
     try {
@@ -384,6 +404,49 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.setAssigneeActionFeedback(normalized, 'error');
     } finally {
       this.assigneeActionInProgress = false;
+      this.assigneeActionInProgressLabel = null;
+    }
+  }
+
+  /** 選択中タスクからの退出処理本体 */
+  async leaveSelectedTask(): Promise<void> {
+    if (!this.selectedTask || !this.projectId || !this.issueId || !this.selectedTask.id) {
+      this.setAssigneeActionFeedback('タスク情報を取得できませんでした。', 'error');
+      return;
+    }
+
+    if (!this.currentUid) {
+      this.setAssigneeActionFeedback('サインイン情報を確認できませんでした。', 'error');
+      return;
+    }
+
+    if (!this.canAttemptJoinTask() || !this.isCurrentUserAssignee()) {
+      this.setAssigneeActionFeedback('まだ参加していません', 'info');
+      return;
+    }
+
+    this.assigneeActionInProgress = true;
+    this.assigneeActionInProgressLabel = 'leave';
+    this.setAssigneeActionFeedback('', 'info');
+
+    try {
+      const updatedAssignees = await this.tasksService.leaveTask(this.projectId, this.issueId, this.selectedTask.id);
+      this.setAssigneeActionFeedback('タスクから退出しました。', 'success');
+
+      this.selectedTask = { ...this.selectedTask, assigneeIds: updatedAssignees };
+      this.tasks = this.tasks.map(task =>
+        task.id === this.selectedTaskId ? { ...task, assigneeIds: updatedAssignees } : task
+      );
+      this.filterTasks();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '退出処理に失敗しました。';
+      const normalized = message === 'この操作を行う権限がありません'
+        ? '退出する権限がありません。'
+        : message;
+      this.setAssigneeActionFeedback(normalized, 'error');
+    } finally {
+      this.assigneeActionInProgress = false;
+      this.assigneeActionInProgressLabel = null;
     }
   }
 

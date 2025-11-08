@@ -94,22 +94,6 @@ export class DashboardComponent implements OnInit {
   /** プロジェクトカードのソート状態 */
   readonly selectedSort = signal<ProjectSortKey>('overdue_first');
 
-  /** サマリーメトリクス */
-  readonly summaryMetrics = computed(() => this.snapshot()?.summary ?? null);
-  /** ステータス別棒グラフ（全体） */
-  readonly summaryStatusBars = computed(() => {
-    const summary = this.summaryMetrics();
-    if (!summary) {
-      return [] as { label: string; value: number }[];
-    }
-    return [
-      { label: '未着手', value: summary.statusCounts.incomplete },
-      { label: '進行中', value: summary.statusCounts.in_progress },
-      { label: '保留', value: summary.statusCounts.on_hold },
-      { label: '完了', value: summary.statusCounts.completed },
-    ];
-  });
-
   /** ソート済みプロジェクトカード */
   readonly sortedProjectCards = computed(() =>
     this.sortProjectCards(this.snapshot()?.projectCards ?? []),
@@ -381,9 +365,17 @@ export class DashboardComponent implements OnInit {
     this.selectedSort.set(value);
   }
 
+  /** 再読み込みボタンのローディング状態 */
+  readonly reloadLoading = signal(false);
+
   /** 通知も含めてダッシュボード全体を再読み込み */
   async reloadDashboard(): Promise<void> {
-    await Promise.all([this.refreshDashboard(), this.loadStartupNotifications()]);
+    this.reloadLoading.set(true);
+    try {
+      await Promise.all([this.refreshDashboard(), this.loadStartupNotifications()]);
+    } finally {
+      this.reloadLoading.set(false);
+    }
   }
 
   /** プロジェクトカードのドーナツ表示用 dasharray を計算 */
@@ -409,16 +401,6 @@ export class DashboardComponent implements OnInit {
   /** 警告レベルに応じたクラス名 */
   getWarningClass(level: ProjectCardMetric['warningLevel']): string {
     return `project-card--${level}`;
-  }
-
-  /** 全体サマリーの棒グラフ幅を算出 */
-  getStatusBarWidth(value: number): string {
-    const summary = this.summaryMetrics();
-    const total = summary?.totalTasks ?? 0;
-    if (total === 0) {
-      return '0%';
-    }
-    return `${Math.round((value / total) * 100)}%`;
   }
 
   /** プロジェクト内のステータス棒グラフ幅を算出 */

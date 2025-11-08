@@ -449,14 +449,24 @@
           <span class="assignee-name">{{ getAssigneeDisplayName(assigneeId) }}</span>
         </li>
       </ul>
-      <div class="assignee-actions" *ngIf="shouldShowJoinButton()">
+      <div class="assignee-actions" *ngIf="shouldShowAssigneeActions()">
         <button
           type="button"
           class="btn btn-primary btn-sm"
+          *ngIf="shouldShowJoinButton()"
           (click)="joinSelectedTask()"
           [disabled]="assigneeActionInProgress"
         >
-          {{ assigneeActionInProgress ? '参加処理中...' : '参加' }}
+        {{ assigneeActionInProgress && assigneeActionInProgressLabel === 'join' ? '参加処理中...' : '参加' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm"
+        *ngIf="shouldShowLeaveButton()"
+        (click)="leaveSelectedTask()"
+        [disabled]="assigneeActionInProgress"
+      >
+        {{ assigneeActionInProgress && assigneeActionInProgressLabel === 'leave' ? '退出処理中...' : '退出' }}
         </button>
       </div>
       <div

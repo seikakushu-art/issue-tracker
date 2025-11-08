@@ -3,8 +3,29 @@
     <header class="dashboard__header">
         <div class="notification-area" aria-labelledby="notifications-page-title">
             <div class="notification-area__header-row">
-                <h1 id="notifications-page-title">通知エリア</h1>
+                <div class="notification-area__header-title-section">
+                    <h1 id="notifications-page-title">通知エリア</h1>
+                    <div class="notification-area__chips">
+                        <div class="summary-chip summary-chip--alert" role="status" aria-live="polite">
+                            <span class="summary-chip__icon" aria-hidden="true">🔔</span>
+                            <span class="summary-chip__label">本日確認すべき通知</span>
+                            <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : totalNotificationCount() }}件</strong>
+                        </div>
+                        <div class="summary-chip summary-chip--success" role="status" aria-live="polite">
+                            <span class="summary-chip__icon" aria-hidden="true">✅</span>
+                            <span class="summary-chip__label">本日終了タスク</span>
+                            <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : dueTodayTotalCount() }}件</strong>
+                        </div>
+                    </div>
+                </div>
                 <div class="notification-area__header-controls">
+                    <button type="button" class="button button--reload notification-area__reload" 
+                        [class.notification-area__reload--loading]="reloadLoading()"
+                        (click)="reloadDashboard()"
+                        [disabled]="snapshotLoading() || notificationsLoading() || reloadLoading()"
+                        aria-label="再読み込み">
+                        <span class="notification-area__reload-icon">↻</span>
+                    </button>
                     <button type="button" class="button button--accent" (click)="scrollToDailyWork()">
                         ⏬本日の仕事
                     </button>
@@ -18,24 +39,6 @@
                         <span class="user-chip__name">{{ userDisplayName() }}</span>
                     </button>
                 </div>
-            </div>
-            <div class="notification-area__summary-row">
-                <div class="notification-area__chips">
-                    <div class="summary-chip summary-chip--alert" role="status" aria-live="polite">
-                        <span class="summary-chip__icon" aria-hidden="true">🔔</span>
-                        <span class="summary-chip__label">本日確認すべき通知</span>
-                        <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : totalNotificationCount() }}件</strong>
-                    </div>
-                    <div class="summary-chip summary-chip--success" role="status" aria-live="polite">
-                        <span class="summary-chip__icon" aria-hidden="true">✅</span>
-                        <span class="summary-chip__label">本日終了タスク</span>
-                        <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : dueTodayTotalCount() }}件</strong>
-                    </div>
-                </div>
-                <button type="button" class="button button--ghost notification-area__reload" (click)="reloadDashboard()"
-                    [disabled]="snapshotLoading() || notificationsLoading()">
-                    再読み込み
-                </button>
             </div>
             <p class="notification-area__headline" [class.notification-area__headline--error]="notificationsError()">
                 {{ notificationHeadline() }}
@@ -92,57 +95,7 @@
     </header>
 
     <div class="dashboard__widgets">
-        <!-- ウィジェット①: サマリーメトリクス -->
-        <section class="widget widget--summary" aria-labelledby="summary-title">
-            <div class="widget__header">
-                <h2 id="summary-title">概要サマリー</h2>
-                <span class="widget__hint">進捗率・期限・重要度を自動集計</span>
-            </div>
-            <div class="widget__content widget__content--summary" *ngIf="!snapshotLoading(); else summaryLoading">
-                <ng-container *ngIf="summaryMetrics() as summary; else summaryEmpty">
-                    <div class="summary__chart">
-                        <svg viewBox="0 0 36 36" class="donut">
-                            <circle class="donut__bg" cx="18" cy="18" r="16"></circle>
-                            <circle class="donut__value" cx="18" cy="18" r="16"
-                                [attr.stroke-dasharray]="summary ? Math.round(summary.completionRate) + ' ' + (100 - Math.round(summary.completionRate)) : '0 100'">
-                            </circle>
-                        </svg>
-                        <div class="summary__value">
-                            <strong>{{ summary.completionRate | number: '1.0-0' }}%</strong>
-                            <span>全タスクの完了率</span>
-                        </div>
-                        <p class="summary__caption">平均進捗 {{ summary.averageProgress | number: '1.0-0' }}%</p>
-                    </div>
-                    <div class="summary__cards">
-                        <article class="summary-card">
-                            <h3>期限超過</h3>
-                            <p class="summary-card__value">{{ summary.overdueCount }}</p>
-                            <span class="summary-card__hint">要再調整のタスク</span>
-                        </article>
-                        <article class="summary-card">
-                            <h3>重要度</h3>
-                            <ul class="summary-card__tags">
-                                <li>至急重要: {{ summary.importanceCounts.Critical }}</li>
-                                <li>至急: {{ summary.importanceCounts.High }}</li>
-                                <li>重要: {{ summary.importanceCounts.Medium }}</li>
-                                <li>普通: {{ summary.importanceCounts.Low }}</li>
-                            </ul>
-                        </article>
-                    </div>
-                    <div class="summary__bars">
-                        <div class="status-bar" *ngFor="let bar of summaryStatusBars()">
-                            <span class="status-bar__label">{{ bar.label }}</span>
-                            <div class="status-bar__track">
-                                <div class="status-bar__fill" [style.width]="getStatusBarWidth(bar.value)"></div>
-                            </div>
-                            <span class="status-bar__value">{{ bar.value }}</span>
-                        </div>
-                    </div>
-                </ng-container>
-            </div>
-        </section>
-
-        <!-- ウィジェット②: プロジェクトカード -->
+        <!-- ウィジェット①: プロジェクトカード -->
         <section class="widget widget--projects" aria-labelledby="projects-title">
             <div class="widget__header">
                 <h2 id="projects-title">プロジェクト進捗</h2>
@@ -326,14 +279,3 @@
         </section>
     </div>
 </section>
-
-<ng-template #summaryLoading>
-    <div class="widget__loading">
-        <span class="spinner" aria-hidden="true"></span>
-        <span>読み込み中...</span>
-    </div>
-</ng-template>
-
-<ng-template #summaryEmpty>
-    <p class="widget__empty">まだタスクデータがありません。</p>
-</ng-template>

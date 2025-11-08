@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
-import { Importance, Issue, Project, Role, Task, TaskStatus } from '../../models/schema';
+import { Issue, Project, Role, Task } from '../../models/schema';
 
 /**
  * 課題に紐づくタスク配列を含めた拡張型
@@ -19,19 +19,6 @@ export type ProjectSnapshot = Project & {
   /** クライアント側で参照しやすいようroleを必須化 */
   currentRole: Role;
 };
-
-/**
- * タスクサマリーの統計情報
- */
-export interface DashboardSummaryMetrics {
-  totalTasks: number;
-  statusCounts: Record<TaskStatus, number>;
-  importanceCounts: Record<Importance, number>;
-  averageProgress: number;
-  completionRate: number;
-  overdueCount: number;
-  criticalChecklistBacklog: number;
-}
 
 /**
  * プロジェクトカード向けのメトリクス
@@ -72,7 +59,6 @@ export interface BottleneckInsight {
  */
 export interface DashboardSnapshot {
   projects: ProjectSnapshot[];
-  summary: DashboardSummaryMetrics;
   projectCards: ProjectCardMetric[];
   bottlenecks: BottleneckInsight[];
 }
@@ -137,90 +123,13 @@ export class DashboardService {
       }),
     );
 
-    const summary = this.calculateSummaryMetrics(projectsWithRelations);
     const projectCards = this.buildProjectCards(projectsWithRelations);
     const bottlenecks = this.detectBottlenecks(projectsWithRelations);
 
     return {
       projects: projectsWithRelations,
-      summary,
       projectCards,
       bottlenecks,
-    };
-  }
-
-  /**
-   * タスクサマリーを算出する
-   */
-  private calculateSummaryMetrics(projects: ProjectSnapshot[]): DashboardSummaryMetrics {
-    const statusCounts: Record<TaskStatus, number> = {
-      incomplete: 0,
-      in_progress: 0,
-      completed: 0,
-      on_hold: 0,
-      discarded: 0,
-    };
-    const importanceCounts: Record<Importance, number> = {
-      Critical: 0,
-      High: 0,
-      Medium: 0,
-      Low: 0,
-    };
-
-    let taskTotal = 0;
-    let progressAccum = 0;
-    let completedCount = 0;
-    let overdueCount = 0;
-    let criticalChecklistBacklog = 0;
-
-    const now = new Date();
-
-    for (const project of projects) {
-      for (const issue of project.issues) {
-        for (const task of issue.tasks) {
-          taskTotal += 1;
-          statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
-          if (task.importance) {
-            importanceCounts[task.importance] = (importanceCounts[task.importance] ?? 0) + 1;
-          }
-          const taskProgress = typeof task.progress === 'number' ? task.progress : 0;
-          progressAccum += taskProgress;
-          if (task.status === 'completed' || taskProgress >= 100) {
-            completedCount += 1;
-          }
-          if (task.endDate) {
-            const endDate = this.normalizeDate(task.endDate);
-            if (endDate) {
-              // 締切日を当日の終了時刻（23:59:59.999）に正規化してから比較
-              const endDateEndOfDay = this.normalizeToEndOfDay(endDate);
-              if (endDateEndOfDay < now && task.status !== 'completed' && task.status !== 'discarded') {
-                overdueCount += 1;
-              }
-            }
-          }
-          if (task.importance === 'Critical') {
-            const hasProgress = (task.progress ?? 0) > 0;
-            const checklist = task.checklist ?? [];
-            const completedItems = checklist.filter((item) => item.completed).length;
-            if (!hasProgress && completedItems === 0) {
-              criticalChecklistBacklog += 1;
-            }
-          }
-        }
-      }
-    }
-
-    const averageProgress = taskTotal > 0 ? progressAccum / taskTotal : 0;
-    const completionRate = taskTotal > 0 ? (completedCount / taskTotal) * 100 : 0;
-
-    return {
-      totalTasks: taskTotal,
-      statusCounts,
-      importanceCounts,
-      averageProgress,
-      completionRate,
-      overdueCount,
-      criticalChecklistBacklog,
     };
   }
 
