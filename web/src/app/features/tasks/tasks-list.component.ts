@@ -94,6 +94,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
   mentionableMembers: UserDirectoryProfile[] = [];
   mentionSelectorOpen = false;
   readonly mentionSelectorPanelId = 'task-list-mention-selector';
+  /**
+   * 担当者欄でのフィードバック表示用ステート。
+   * 参加処理時に逐一リセット・設定するため個別に保持しておく。
+   */
+  assigneeActionMessage = '';
+  assigneeActionMessageType: 'success' | 'error' | 'info' = 'info';
+  assigneeActionInProgress = false;
 
   // フィルター設定
   statusFilter: TaskStatus | '' = '';
@@ -290,6 +297,94 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return true;
     }
     return this.currentRole === 'member' && this.currentUid === task.createdBy;
+  }
+
+   /** 参加ボタンを押下できるロールかどうか（admin / member のみ） */
+   canAttemptJoinTask(): boolean {
+    return this.currentRole === 'admin' || this.currentRole === 'member';
+  }
+
+  /** 選択中のタスクに参加ボタンを表示するか判定 */
+  shouldShowJoinButton(): boolean {
+    return this.canAttemptJoinTask() && this.selectedTask !== null;
+  }
+
+  /** フィードバックメッセージを初期化する小さなヘルパー */
+  private resetAssigneeActionFeedback(): void {
+    this.assigneeActionMessage = '';
+    this.assigneeActionMessageType = 'info';
+    this.assigneeActionInProgress = false;
+  }
+
+  /** メッセージと種別をまとめて更新するヘルパー */
+  private setAssigneeActionFeedback(message: string, type: 'success' | 'error' | 'info'): void {
+    this.assigneeActionMessage = message;
+    this.assigneeActionMessageType = type;
+  }
+
+  /** 種別に応じたアイコン用クラス名を返却 */
+  getAssigneeActionIcon(): string {
+    switch (this.assigneeActionMessageType) {
+      case 'success':
+        return 'icon-success';
+      case 'error':
+        return 'icon-error';
+      default:
+        return 'icon-info';
+    }
+  }
+
+  /** 選択中タスクへの参加処理本体 */
+  async joinSelectedTask(): Promise<void> {
+    if (!this.selectedTask || !this.projectId || !this.issueId || !this.selectedTask.id) {
+      this.setAssigneeActionFeedback('タスク情報を取得できませんでした。', 'error');
+      return;
+    }
+
+    if (!this.canAttemptJoinTask()) {
+      this.setAssigneeActionFeedback('ゲストは参加できません。', 'error');
+      return;
+    }
+
+    if (!this.currentUid) {
+      this.setAssigneeActionFeedback('サインイン情報を確認できませんでした。', 'error');
+      return;
+    }
+
+    if (this.selectedTask.assigneeIds.includes(this.currentUid)) {
+      this.setAssigneeActionFeedback('すでに参加しています。', 'info');
+      return;
+    }
+
+    if (this.selectedTask.assigneeIds.length >= 10) {
+      this.setAssigneeActionFeedback('参加人数の上限を超えています。', 'error');
+      return;
+    }
+
+    this.assigneeActionInProgress = true;
+    this.setAssigneeActionFeedback('', 'info');
+
+    try {
+      const updatedAssignees = await this.tasksService.joinTask(this.projectId, this.issueId, this.selectedTask.id);
+      this.setAssigneeActionFeedback('タスクに参加しました。', 'success');
+
+      // 選択中タスクと一覧の両方を最新の担当者リストで更新
+      this.selectedTask = { ...this.selectedTask, assigneeIds: updatedAssignees };
+      this.tasks = this.tasks.map(task =>
+        task.id === this.selectedTaskId ? { ...task, assigneeIds: updatedAssignees } : task
+      );
+      this.filterTasks(); // フィルター済みリストにも即時反映
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '参加処理に失敗しました。';
+      const normalized = message === '参加人数の上限を超えています'
+        ? message
+        : message === 'この操作を行う権限がありません'
+          ? '参加する権限がありません。'
+          : message;
+      this.setAssigneeActionFeedback(normalized, 'error');
+    } finally {
+      this.assigneeActionInProgress = false;
+    }
   }
 
   /** フィルタリング */
@@ -930,6 +1025,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     if (task.id) {
       this.selectedTaskId = task.id;
       this.selectedTask = task;
+      this.resetAssigneeActionFeedback(); // 新しいタスク表示時は前回のメッセージをクリア
       this.resetCommentState();
       this.resetAttachmentState();
       void this.loadTaskComments(task.id);
@@ -942,6 +1038,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.selectedTaskId = null;
     this.selectedTask = null;
     this.newChecklistText = '';
+    this.resetAssigneeActionFeedback(); // 閉じたタイミングでもフィードバックを初期化
     this.resetCommentState();
     this.resetAttachmentState();
   }

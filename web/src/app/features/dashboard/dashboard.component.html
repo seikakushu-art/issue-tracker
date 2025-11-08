@@ -64,15 +64,21 @@
                                             'notification-item__marker--overdue': item.type === 'overdue'
                                         }" aria-hidden="true"></span>
                                     <div class="notification-item__content">
-                                        <span class="notification-item__title"
-                                            [class.notification-item__title--unread]="item.isUnread">
-                                            {{ item.title }}
-                                        </span>
+                                        <div class="notification-item__header">
+                                            <span class="notification-item__title"
+                                                [class.notification-item__title--unread]="item.isUnread">
+                                                {{ item.title }}
+                                            </span>
+                                            <span class="notification-item__tag"
+                                                [ngClass]="'notification-item__tag--' + item.type">
+                                                {{ getNotificationTagLabel(item.type) }}
+                                            </span>
+                                        </div>
                                         <span class="notification-item__description">{{ item.description }}</span>
                                     </div>
                                     <div class="notification-item__meta">
                                         <span class="notification-item__time">
-                                            {{ item.timestamp ? (item.timestamp | date: 'M/d HH:mm') : '時刻未設定' }}
+                                            {{ item.timestamp ? (item.timestamp | date: 'M/d') : '日付未設定' }}
                                         </span>
                                         <span class="notification-item__arrow" aria-hidden="true">↗</span>
                                     </div>

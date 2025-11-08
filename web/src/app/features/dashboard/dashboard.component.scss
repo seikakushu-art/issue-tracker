@@ -208,6 +208,13 @@
   gap: 2px;
 }
 
+.notification-item__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .notification-item__title {
   font-size: 15px;
   font-weight: 600;
@@ -218,6 +225,32 @@
 .notification-item__title--unread {
   font-weight: 700;
   color: #111827;
+}
+
+.notification-item__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.notification-item__tag--mention {
+  background: rgba(245, 158, 11, 0.15);
+  color: #92400e;
+}
+
+.notification-item__tag--due_today {
+  background: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+}
+
+.notification-item__tag--overdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
 }
 
 .notification-item__description {
@@ -235,6 +268,14 @@
   justify-content: flex-end;
   text-align: right;
   white-space: nowrap;
+}
+
+.notification-item__time {
+  font-weight: 700;
+  font-size: 15px;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
 
 .notification-item__arrow {

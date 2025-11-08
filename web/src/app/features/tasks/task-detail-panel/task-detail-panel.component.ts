@@ -106,6 +106,14 @@ import {
     mentionSelectorOpen = false;
     readonly mentionSelectorPanelId = 'task-detail-mention-selector';
   
+    /**
+     * 参加ボタンに関するフィードバックメッセージ（担当者欄用）
+     * こまめに情報を残すため、状態は細分化して持っておく。
+     */
+    assigneeActionMessage = '';
+    assigneeActionMessageType: 'success' | 'error' | 'info' = 'info';
+    assigneeActionInProgress = false;
+  
     private readonly importanceDisplay: Record<Importance, { label: string; weight: number }> = {
       Critical: { label: '至急重要', weight: 4 },
       High: { label: '至急', weight: 3 },
@@ -309,6 +317,117 @@ import {
 
       this.mentionSelectorOpen = !this.mentionSelectorOpen;
     }
+
+    /**
+     * 現在ログイン中ユーザーが参加ボタンを押下できる条件かどうか。
+     * （admin / member のみ、ゲストは不可）
+     */
+    canAttemptJoinTask(): boolean {
+      return this.currentRole === 'admin' || this.currentRole === 'member';
+    }
+
+    /**
+     * 担当者欄に参加ボタンを表示すべきか判定するヘルパー。
+     * 表示は admin / member かつタスク情報が取得できている場合に限定する。
+     */
+    shouldShowJoinButton(): boolean {
+      return this.canAttemptJoinTask() && this.task !== null;
+    }
+
+    /**
+     * 担当者欄のメッセージ種別に応じたアイコン用クラスを決定する。
+     */
+    getAssigneeActionIcon(): string {
+      switch (this.assigneeActionMessageType) {
+        case 'success':
+          return 'icon-success';
+        case 'error':
+          return 'icon-error';
+        default:
+          return 'icon-info';
+      }
+    }
+
+    /**
+     * 担当者欄のフィードバックメッセージをクリアする小さなユーティリティ。
+     */
+    private clearAssigneeMessage(): void {
+      this.assigneeActionMessage = '';
+      this.assigneeActionMessageType = 'info';
+    }
+
+    /**
+     * 担当者欄のフィードバックメッセージを設定する小さなユーティリティ。
+     */
+    private setAssigneeMessage(message: string, type: 'success' | 'error' | 'info'): void {
+      this.assigneeActionMessage = message;
+      this.assigneeActionMessageType = type;
+    }
+
+    /**
+     * 参加ボタン押下時の処理本体。
+     * 複数の条件チェックを行い、上限や権限違反があれば早期に案内を出す。
+     */
+    async joinTask(): Promise<void> {
+      if (!this.task || !this.projectId || !this.issueId || !this.task.id) {
+        this.setAssigneeMessage('タスク情報を取得できませんでした。', 'error');
+        this.cdr.markForCheck();
+        return;
+      }
+
+      if (!this.canAttemptJoinTask()) {
+        this.setAssigneeMessage('ゲストは参加できません。', 'error');
+        this.cdr.markForCheck();
+        return;
+      }
+
+      if (!this.currentUid) {
+        this.setAssigneeMessage('サインイン情報を確認できませんでした。', 'error');
+        this.cdr.markForCheck();
+        return;
+      }
+
+      const alreadyAssignee = this.task.assigneeIds.includes(this.currentUid);
+      if (alreadyAssignee) {
+        this.setAssigneeMessage('すでに参加しています。', 'info');
+        this.cdr.markForCheck();
+        return;
+      }
+
+      const projectMemberIds = this.project?.memberIds ?? [];
+      if (!projectMemberIds.includes(this.currentUid) && projectMemberIds.length >= 50) {
+        this.setAssigneeMessage('参加人数の上限を超えています。', 'error');
+        this.cdr.markForCheck();
+        return;
+      }
+
+      if (this.task.assigneeIds.length >= 10) {
+        this.setAssigneeMessage('参加人数の上限を超えています。', 'error');
+        this.cdr.markForCheck();
+        return;
+      }
+
+      this.assigneeActionInProgress = true;
+      this.clearAssigneeMessage();
+      this.cdr.markForCheck();
+
+      try {
+        await this.tasksService.joinTask(this.projectId, this.issueId, this.task.id);
+        this.setAssigneeMessage('タスクに参加しました。', 'success');
+        await this.refreshTask();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '参加処理に失敗しました。';
+        const normalized = message === '参加人数の上限を超えています'
+          ? message
+          : message === 'この操作を行う権限がありません'
+            ? '参加する権限がありません。'
+            : message;
+        this.setAssigneeMessage(normalized, 'error');
+      } finally {
+        this.assigneeActionInProgress = false;
+        this.cdr.markForCheck();
+      }
+    }
   
     async toggleChecklistItem(itemId: string, completed: boolean): Promise<void> {
       if (!this.task || !this.canEditTask(this.task)) {
@@ -479,6 +598,7 @@ import {
         return;
       }
       try {
+        this.clearAssigneeMessage();
         const [task, issue, project, tags, uid] = await Promise.all([
           this.tasksService.getTask(this.projectId, this.issueId, this.taskId),
           this.issuesService.getIssue(this.projectId, this.issueId),

@@ -499,6 +499,42 @@ export class TasksService {
     await updateDoc(docRef, updates as any);
     await this.refreshProgress(projectId, issueId);
   }
+
+  /**
+   * タスクに参加（担当者として自身を追加）するための専用メソッド。
+   * 編集権限をまだ持たないメンバーでも、ここからなら参加できるようにする。
+   */
+  async joinTask(projectId: string, issueId: string, taskId: string): Promise<string[]> {
+    const { project, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
+    const task = await this.getTask(projectId, issueId, taskId);
+    if (!task) {
+      throw new Error('対象のタスクが見つかりません');
+    }
+
+    const memberIds = Array.isArray(project.memberIds) ? project.memberIds : [];
+    if (!memberIds.includes(uid) && memberIds.length >= 50) {
+      throw new Error('参加人数の上限を超えています');
+    }
+
+    const currentAssignees = Array.isArray(task.assigneeIds)
+      ? task.assigneeIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      : [];
+
+    if (currentAssignees.includes(uid)) {
+      return currentAssignees;
+    }
+
+    if (currentAssignees.length >= 10) {
+      throw new Error('参加人数の上限を超えています');
+    }
+
+    const updatedAssignees = [...currentAssignees, uid];
+    const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
+    await updateDoc(docRef, { assigneeIds: updatedAssignees });
+    await this.refreshProgress(projectId, issueId);
+    return updatedAssignees;
+  }
   /**
    * タスクのアーカイブ状態を切り替える
    * @param projectId プロジェクトID

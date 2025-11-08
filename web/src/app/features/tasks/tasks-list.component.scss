@@ -220,6 +220,12 @@
   color: #b92424;
 }
 
+.feedback--info {
+  background: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  color: #1d4ed8;
+}
+
 .filter-group {
   display: flex;
   align-items: center;
@@ -1149,6 +1155,10 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.assignee-actions {
+  margin-top: 12px;
 }
 
 .assignee-item {

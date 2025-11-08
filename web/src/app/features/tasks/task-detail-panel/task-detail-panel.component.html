@@ -160,6 +160,28 @@
           <span class="assignee-name">{{ getAssigneeDisplayName(assigneeId) }}</span>
         </li>
       </ul>
+      <div class="assignee-actions" *ngIf="shouldShowJoinButton()">
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          (click)="joinTask()"
+          [disabled]="assigneeActionInProgress"
+        >
+          {{ assigneeActionInProgress ? '参加処理中...' : '参加' }}
+        </button>
+      </div>
+      <div
+        *ngIf="assigneeActionMessage"
+        class="feedback"
+        [ngClass]="{
+          'feedback--success': assigneeActionMessageType === 'success',
+          'feedback--error': assigneeActionMessageType === 'error',
+          'feedback--info': assigneeActionMessageType === 'info'
+        }"
+      >
+        <i [class]="getAssigneeActionIcon()" aria-hidden="true"></i>
+        {{ assigneeActionMessage }}
+      </div>
     </section>
 
     <section class="detail-section attachments-section">

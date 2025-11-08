@@ -157,6 +157,21 @@ export class NotificationService {
     return new Date(Date.UTC(year, month, day));
   }
 
+  /** 締切日を当日の終了時刻（23:59:59.999）に正規化する */
+  private normalizeToEndOfDay(date: Date): Date {
+    const { year, month, day } = this.getTokyoDateParts(date);
+    return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+  }
+
+  /** 締切日が期限超過かどうかを判定する（当日の終了時刻まで有効） */
+  isOverdue(dueDate: Date | null, now: Date = new Date()): boolean {
+    if (!dueDate) {
+      return false;
+    }
+    const dueDateEndOfDay = this.normalizeToEndOfDay(dueDate);
+    return dueDateEndOfDay < now;
+  }
+
   /**
    * Firestoreから取得した日時をDate型へ統一する
    */
@@ -306,10 +321,9 @@ export class NotificationService {
           const highlightReasons: HighlightReason[] = [];
 
           if (dueDate) {
-            // 東京時間での日付部分のみを比較
-            const dueDateNormalized = this.normalizeToTokyoDate(dueDate);
-            // startOfTodayは既に正規化済みなので、再度正規化しない
-            const startOfTodayNormalized = this.normalizeToTokyoDate(now);
+            // 締切日を当日の終了時刻（23:59:59.999）に正規化
+            const dueDateEndOfDay = this.normalizeToEndOfDay(dueDate);
+            const nowEndOfDay = this.normalizeToEndOfDay(now);
             
             // デバッグログ（開発時のみ）
             if (data.assigneeIds?.includes(uid)) {
@@ -317,16 +331,17 @@ export class NotificationService {
                 taskTitle: data.title,
                 taskId: docSnap.id,
                 dueDateRaw: dueDate.toISOString(),
-                dueDateNormalized: dueDateNormalized.toISOString(),
-                startOfTodayNormalized: startOfTodayNormalized.toISOString(),
-                isDueToday: dueDateNormalized.getTime() === startOfTodayNormalized.getTime(),
-                isOverdue: dueDateNormalized < startOfTodayNormalized,
+                dueDateEndOfDay: dueDateEndOfDay.toISOString(),
+                nowEndOfDay: nowEndOfDay.toISOString(),
+                isDueToday: this.normalizeToTokyoDate(dueDate).getTime() === this.normalizeToTokyoDate(now).getTime(),
+                isOverdue: dueDateEndOfDay < now,
               });
             }
             
-            if (dueDateNormalized < startOfTodayNormalized) {
+            // 締切日の終了時刻が現在時刻より前ならoverdue
+            if (dueDateEndOfDay < now) {
               highlightReasons.push('overdue');
-            } else if (dueDateNormalized.getTime() === startOfTodayNormalized.getTime()) {
+            } else if (this.normalizeToTokyoDate(dueDate).getTime() === this.normalizeToTokyoDate(now).getTime()) {
               highlightReasons.push('due_today');
             }
           }

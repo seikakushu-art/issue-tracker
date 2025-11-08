@@ -322,6 +322,10 @@
   gap: 4px;
 }
 
+.assignee-actions {
+  margin-top: 12px;
+}
+
 .assignee-item {
   display: flex;
   align-items: center;
@@ -479,6 +483,11 @@
 .feedback--error {
   background: #fef2f2;
   color: #b91c1c;
+}
+
+.feedback--info {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .comments-section {

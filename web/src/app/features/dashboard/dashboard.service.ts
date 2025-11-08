@@ -190,8 +190,12 @@ export class DashboardService {
           }
           if (task.endDate) {
             const endDate = this.normalizeDate(task.endDate);
-            if (endDate && endDate < now && task.status !== 'completed' && task.status !== 'discarded') {
-              overdueCount += 1;
+            if (endDate) {
+              // 締切日を当日の終了時刻（23:59:59.999）に正規化してから比較
+              const endDateEndOfDay = this.normalizeToEndOfDay(endDate);
+              if (endDateEndOfDay < now && task.status !== 'completed' && task.status !== 'discarded') {
+                overdueCount += 1;
+              }
             }
           }
           if (task.importance === 'Critical') {
@@ -240,7 +244,12 @@ export class DashboardService {
         task.status !== 'discarded',
       ).length;
 
-      const overdue = Boolean(project.endDate && this.normalizeDate(project.endDate) && this.normalizeDate(project.endDate)! < now && progress < 100);
+      const overdue = Boolean(
+        project.endDate &&
+        this.normalizeDate(project.endDate) &&
+        this.normalizeToEndOfDay(this.normalizeDate(project.endDate)!) < now &&
+        progress < 100
+      );
 
       const elapsedRatio = this.calculateElapsedRatio(project.startDate ?? null, project.endDate ?? null, now);
       const warningLevel = this.resolveWarningLevel(progress, elapsedRatio);
@@ -491,6 +500,12 @@ export class DashboardService {
       month: parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1, // 0-indexed
       day: parseInt(parts.find((p) => p.type === 'day')!.value, 10),
     };
+  }
+
+  /** 締切日を当日の終了時刻（23:59:59.999）に正規化する */
+  private normalizeToEndOfDay(date: Date): Date {
+    const { year, month, day } = this.getTokyoDateParts(date);
+    return new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
   }
 
   /** 現在日時から期限までの日数を計算する（期限が過去の場合は負の値、東京時間ベース） */

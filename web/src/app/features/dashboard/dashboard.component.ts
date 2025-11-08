@@ -198,11 +198,10 @@ export class DashboardComponent implements OnInit {
       return [] as NotificationListItem[];
     }
 
-    const now = new Date().getTime();
+    const now = new Date();
 
     const dueTodayItems = notifications.dueTodayTasks.map((task) => {
-      const dueTime = task.dueDate?.getTime() ?? null;
-      const isOverdue = typeof dueTime === 'number' && dueTime < now;
+      const isOverdue = task.dueDate ? this.notificationService.isOverdue(task.dueDate, now) : false;
       const type: NotificationListType = isOverdue ? 'overdue' : 'due_today';
       return {
         key: `due:${task.taskId}`,
@@ -513,6 +512,16 @@ export class DashboardComponent implements OnInit {
   /** 通知アイテムのトラック関数 */
   trackNotification(_: number, item: NotificationListItem): string {
     return item.key;
+  }
+
+  /** 通知タイプに応じたタグラベルを返す */
+  getNotificationTagLabel(type: NotificationListType): string {
+    const labels: Record<NotificationListType, string> = {
+      mention: 'メンション',
+      due_today: '本日締切',
+      overdue: '期限超過',
+    };
+    return labels[type];
   }
 
   /** 通知アイテムの遷移 */
