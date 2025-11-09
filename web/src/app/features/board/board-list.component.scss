@@ -9,8 +9,13 @@
   
   .board__header {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+  }
+  
+  .board__header h1 {
+    margin: 0;
   }
   
   .board__description {
@@ -85,6 +90,30 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+  
+  .form-field__checkboxes::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .form-field__checkboxes::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  
+  .form-field__checkboxes::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  
+  .form-field__checkboxes::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
   }
   
   .checkbox-option {
@@ -357,6 +386,11 @@
   @media (max-width: 768px) {
     .board {
       padding: 16px;
+    }
+  
+    .board__header {
+      flex-direction: column;
+      gap: 4px;
     }
   
     .board__form,

@@ -225,6 +225,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   handleTaskHover(task: Task | null): void {
     this.hoveredTask = task;
     this.hoveredTaskRange = task ? this.getTaskDayRange(task) : null;
+    if (task !== null) {
+      this.hoveredDayIndex = null;
+    }
+    this.cdr.markForCheck();
   }
 
   selectTask(issue: GanttIssue, task: Task): void {

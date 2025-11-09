@@ -1576,7 +1576,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return endA - endB;
     });
 
-    this.taskPreview = sortedTasks.slice(0, 3);
+    this.taskPreview = sortedTasks.slice(0, 1);
   }
 
   /** 選択中タスクを最新情報に更新 */

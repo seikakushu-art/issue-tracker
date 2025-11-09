@@ -879,6 +879,7 @@
   font-size: 14px;
   color: #475569;
   font-weight: 500;
+  transition: color 0.2s ease;
 }
 
 .actionable-card__body {
@@ -887,11 +888,46 @@
   gap: 12px;
 }
 
-.actionable-card__body h3 {
+.actionable-card__title-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actionable-card__title-accent {
+  height: 3px;
+  width: 60px;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.actionable-card__title {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: #0f172a;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  
+  &:hover {
+    color: #2563eb;
+    text-decoration: underline;
+    
+    + .actionable-card__title-accent {
+      width: 100px;
+    }
+  }
+  
+  &:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  
+  &:focus:not(:focus-visible) {
+    outline: none;
+  }
 }
 
 .actionable-card__meta {

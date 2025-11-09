@@ -9,6 +9,8 @@ import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { resolveIssueThemeColor, tintIssueThemeColor, transparentizeIssueThemeColor } from '../../shared/issue-theme';
 import { TaskDetailPanelComponent } from '../tasks/task-detail-panel/task-detail-panel.component';
+import { UserDirectoryService, UserDirectoryProfile } from '../../core/user-directory.service';
+import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 
 registerLocaleData(localeJa);
 
@@ -56,12 +58,16 @@ export class ProgressTreeComponent implements OnInit {
   private tasksService = inject(TasksService);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
+  private userDirectoryService = inject(UserDirectoryService);
 
   loading = false;
   loadError: string | null = null;
   sampleNotice: string | null = null;
 
   treeProjects: TreeProject[] = [];
+
+  // 担当者プロフィール情報を保持
+  assigneeProfiles: Record<string, UserDirectoryProfile> = {};
 
   // パネル表示用の選択中データを保持
   selectedTreeTask: TreeTask | null = null;
@@ -146,6 +152,9 @@ export class ProgressTreeComponent implements OnInit {
         }
       }
 
+      // 担当者のプロフィール情報を取得
+      await this.loadAssigneeProfiles(treeProjects);
+
       if (this.hasAnyTasks(treeProjects)) {
         this.treeProjects = treeProjects;
         this.updateProjectFilterOptions(treeProjects);
@@ -220,6 +229,11 @@ handleTaskDetailUpdate(updatedTask: Task): void {
         target.task = { ...target.task, ...updatedTask };
       }
     }
+  }
+
+  // 新しい担当者のプロフィール情報を取得
+  if (updatedTask.assigneeIds && updatedTask.assigneeIds.length > 0) {
+    void this.loadAssigneeProfilesForTask(updatedTask);
   }
 
   this.cdr.markForCheck();
@@ -430,6 +444,93 @@ goToTaskDetail(): void {
     const month = parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1; // 0-indexed
     const day = parseInt(parts.find((p) => p.type === 'day')!.value, 10);
     return new Date(Date.UTC(year, month, day));
+  }
+
+  /** 担当者のプロフィール情報を取得 */
+  private async loadAssigneeProfiles(treeProjects: TreeProject[]): Promise<void> {
+    const assigneeIds = new Set<string>();
+    for (const project of treeProjects) {
+      for (const issue of project.issues) {
+        for (const treeTask of issue.tasks) {
+          if (treeTask.task.assigneeIds) {
+            for (const assigneeId of treeTask.task.assigneeIds) {
+              if (assigneeId) {
+                assigneeIds.add(assigneeId);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (assigneeIds.size === 0) {
+      this.assigneeProfiles = {};
+      return;
+    }
+
+    try {
+      const profiles = await this.userDirectoryService.getProfiles(Array.from(assigneeIds));
+      const profileMap: Record<string, UserDirectoryProfile> = {};
+      for (const profile of profiles) {
+        profileMap[profile.uid] = profile;
+      }
+      this.assigneeProfiles = profileMap;
+    } catch (error) {
+      console.error('担当者プロフィールの取得に失敗しました:', error);
+      this.assigneeProfiles = {};
+    }
+  }
+
+  /** 特定タスクの担当者プロフィール情報を取得（更新時用） */
+  private async loadAssigneeProfilesForTask(task: Task): Promise<void> {
+    if (!task.assigneeIds || task.assigneeIds.length === 0) {
+      return;
+    }
+
+    // 既に取得済みの担当者はスキップ
+    const missingIds = task.assigneeIds.filter((id) => !this.assigneeProfiles[id]);
+    if (missingIds.length === 0) {
+      return;
+    }
+
+    try {
+      const profiles = await this.userDirectoryService.getProfiles(missingIds);
+      const updatedProfiles = { ...this.assigneeProfiles };
+      for (const profile of profiles) {
+        updatedProfiles[profile.uid] = profile;
+      }
+      this.assigneeProfiles = updatedProfiles;
+      this.cdr.markForCheck();
+    } catch (error) {
+      console.error('担当者プロフィールの取得に失敗しました:', error);
+    }
+  }
+
+  /** 担当者の表示名を取得 */
+  getAssigneeDisplayName(uid: string): string {
+    const profile = this.assigneeProfiles[uid];
+    if (profile?.username && profile.username.trim().length > 0) {
+      return profile.username;
+    }
+    return uid;
+  }
+
+  /** 担当者の写真URLを取得 */
+  getAssigneePhotoUrl(uid: string): string | null {
+    const photoUrl = this.assigneeProfiles[uid]?.photoURL;
+    return typeof photoUrl === 'string' && photoUrl.trim().length > 0 ? photoUrl : null;
+  }
+
+  /** 担当者のイニシャルを取得 */
+  getAssigneeInitial(uid: string): string {
+    const profile = this.assigneeProfiles[uid];
+    const source = profile?.username && profile.username.trim().length > 0 ? profile.username : uid;
+    return getAvatarInitial(source, '?');
+  }
+
+  /** 担当者のアバター色を取得 */
+  getAssigneeAvatarColor(uid: string): string {
+    return getAvatarColor(uid);
   }
 
   private createSampleDate(base: Date, offset: number): Date {

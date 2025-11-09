@@ -196,6 +196,9 @@
 
 .filter-group--smart {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .search-button {
@@ -204,17 +207,22 @@
   gap: 6px;
   padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid #0f172a;
-  background: #0f172a;
-  color: #ffffff;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: all 0.2s ease;
+  height: fit-content;
+  box-sizing: border-box;
+  line-height: 1.5;
+  min-height: 36px;
 
   &:hover,
   &:focus {
-    background: #1e293b;
-    color: #ffffff;
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #334155;
   }
 }
 
@@ -234,6 +242,10 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  height: fit-content;
+  box-sizing: border-box;
+  line-height: 1.5;
+  min-height: 36px;
 
   &:hover,
   &:focus {

@@ -51,6 +51,9 @@
 
 .filter-group--smart {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .search-button {
@@ -59,17 +62,22 @@
   gap: 6px;
   padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid #0f172a;
-  background: #0f172a;
-  color: #ffffff;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: all 0.2s ease;
+  height: fit-content;
+  box-sizing: border-box;
+  line-height: 1.5;
+  min-height: 36px;
 
   &:hover,
   &:focus {
-    background: #1e293b;
-    color: #ffffff;
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #334155;
   }
 }
 
@@ -90,6 +98,10 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  height: fit-content;
+  box-sizing: border-box;
+  line-height: 1.5;
+  min-height: 36px;
 
   &:hover,
   &:focus {
@@ -121,23 +133,40 @@
 }
 
 .project-card {
-  background: white;
-  border: 1px solid #e1e5e9;
-  border-radius: 8px;
-  padding: 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.project-card__accent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 100%;
+  background: linear-gradient(180deg, #2563eb, #0ea5e9);
+  transition: width 0.3s ease;
 }
 
 .project-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transform: translateY(-2px);
+  border-color: #2563eb;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12), 0 0 0 4px rgba(37, 99, 235, 0.15);
+  transform: translateY(-4px);
+}
+
+.project-card:hover .project-card__accent {
+  width: 10px;
 }
 
 .project-card.archived {
   opacity: 0.6;
-  background: #f8f9fa;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 }
 
 .project-header {
@@ -147,12 +176,45 @@
   margin-bottom: 16px;
 }
 
+.project-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.project-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.project-card:hover .project-icon {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
 .project-title {
   margin: 0;
-  color: #333;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.4; // 改行時にも余裕を持たせる
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  flex: 1;
+  letter-spacing: -0.01em;
+  transition: color 0.2s ease;
+}
+
+.project-card:hover .project-title {
+  color: #2563eb;
 }
 
 .project-actions {
@@ -178,17 +240,48 @@
 }
 
 .btn-action {
-  background: none;
-  border: none;
-  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   cursor: pointer;
-  color: #666;
-  border-radius: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
 }
 
 .btn-action:hover {
-  background: #f0f0f0;
-  color: #333;
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #1e293b;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.btn-action:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-action .action-label {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.btn-action i {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.btn-action:hover i {
+  opacity: 1;
 }
 
 // テンプレート保存ボタン用の星アイコンを表示
@@ -262,11 +355,16 @@
 }
 
 .meta-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: #666;
-  font-size: 14px;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .progress-section {
@@ -286,16 +384,40 @@
 }
 
 .progress-bar {
-  height: 8px;
-  background: #e9ecef;
-  border-radius: 4px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
   overflow: hidden;
+  position: relative;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #28a745, #20c997);
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, #2563eb, #0ea5e9);
+  border-radius: inherit;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.25);
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .project-stats {

@@ -1004,13 +1004,64 @@ private async loadTags(): Promise<void> {
   }
 }
 
-private createEmptyProjectForm(): { name: string; description: string; startDate: string; endDate: string; goal: string } {
-  return {
-    name: '',
-    description: '',
-    startDate: '',
-    endDate: '',
-    goal: '',
-  };
-}
+  private createEmptyProjectForm(): { name: string; description: string; startDate: string; endDate: string; goal: string } {
+    return {
+      name: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      goal: '',
+    };
+  }
+
+  /**
+   * プロジェクトIDから決定論的にカラフルな色を生成する
+   */
+  getProjectColor(projectId: string | undefined): string {
+    if (!projectId) {
+      return '#6366f1';
+    }
+    // カラフルなパレット
+    const colors = [
+      '#6366f1', // indigo
+      '#8b5cf6', // violet
+      '#ec4899', // pink
+      '#f43f5e', // rose
+      '#ef4444', // red
+      '#f97316', // orange
+      '#f59e0b', // amber
+      '#eab308', // yellow
+      '#84cc16', // lime
+      '#22c55e', // green
+      '#10b981', // emerald
+      '#14b8a6', // teal
+      '#06b6d4', // cyan
+      '#0ea5e9', // sky
+      '#3b82f6', // blue
+      '#6366f1', // indigo
+    ];
+    // プロジェクトIDのハッシュから色を選択
+    let hash = 0;
+    for (let i = 0; i < projectId.length; i++) {
+      hash = projectId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  }
+
+  /**
+   * プロジェクト色を薄くしたバージョンを取得
+   */
+  getProjectColorLight(projectId: string | undefined): string {
+    const color = this.getProjectColor(projectId);
+    // HEXカラーをrgbaに変換（15%の透明度）
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, 0.15)`;
+    }
+    return color;
+  }
 }

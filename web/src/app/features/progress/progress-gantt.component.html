@@ -112,6 +112,7 @@
                         class="gantt-cell"
                         [class.weekend]="day.isWeekend"
                         [class.holiday]="day.isHoliday"
+                        [class.today]="day.isToday"
                         [class.is-highlighted]="isDayHighlighted(dayIndex)"
                         (mouseenter)="handleTimelineCellHover(dayIndex)"
                         (mouseleave)="handleTimelineCellHover(null)"
@@ -135,6 +136,8 @@
                         (click)="selectTask(group, task)"
                         (keydown.enter)="selectTask(group, task)"
                         (keydown.space)="selectTask(group, task)"
+                        (mouseenter)="handleTaskHover(task)"
+                        (mouseleave)="handleTaskHover(null)"
                         [class.is-highlighted]="isTaskHighlighted(task)"
                       >
                       <div class="task-label">

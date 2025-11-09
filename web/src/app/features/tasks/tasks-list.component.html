@@ -37,8 +37,14 @@
         </div>
       </div>
       <div class="summary-deadline">
-        <span *ngIf="issueDetails.startDate">開始: {{ issueDetails.startDate | date:'yyyy/MM/dd' }}</span>
-        <span *ngIf="issueDetails.endDate">期限: {{ issueDetails.endDate | date:'yyyy/MM/dd' }}</span>
+        <span class="deadline-item deadline-item--start" *ngIf="issueDetails.startDate">
+          <span class="deadline-label">開始</span>
+          <span class="deadline-value">{{ issueDetails.startDate | date:'yyyy/MM/dd' }}</span>
+        </span>
+        <span class="deadline-item deadline-item--end" *ngIf="issueDetails.endDate">
+          <span class="deadline-label">期限</span>
+          <span class="deadline-value">{{ issueDetails.endDate | date:'yyyy/MM/dd' }}</span>
+        </span>
       </div>
     </div>
 
@@ -55,22 +61,6 @@
       </div>
       <span class="value">{{ issueProgress | number:'1.0-1' }}%</span>
     </div>
-
-    <div class="summary-tasks" *ngIf="taskPreview.length > 0; else noTaskPreview">
-      <h4>代表タスク</h4>
-      <ul>
-        <li *ngFor="let previewTask of taskPreview">
-          <span class="task-title">{{ previewTask.title }}</span>
-          <span class="task-progress">{{ (previewTask.progress || 0) | number:'1.0-0' }}%</span>
-          <span class="task-status" [class]="'status-' + previewTask.status">
-            {{ getStatusLabel(previewTask.status) }}
-          </span>
-        </li>
-      </ul>
-    </div>
-    <ng-template #noTaskPreview>
-      <p class="summary-empty">まだタスクが登録されていません。</p>
-    </ng-template>
   </section>
 
   <!-- フィルター・並び替え -->

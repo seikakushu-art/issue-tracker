@@ -3,7 +3,7 @@
       <div class="tree-header__titles">
         <h1>進行状況（ツリー）</h1>
         <p class="tree-header__caption">
-          プロジェクト → 課題 → タスクの階層のツリー表示です。
+          プロジェクト → 課題 → タスクの階層のツリー表示
         </p>
       </div>
       <div class="tree-header__actions">
@@ -94,11 +94,32 @@
                       <div class="task-main">
                         <span class="task-color-chip" aria-hidden="true"></span>
                         <span class="task-title">{{ treeTask.task.title }}</span>
+                        <span class="task-progress" *ngIf="treeTask.task.progress !== undefined">{{ treeTask.task.progress }}%</span>
                       </div>
                       <div class="task-sub">
-                        <span>{{ getImportanceLabel(treeTask.task) }}</span>
+                        <span class="importance-badge" [class]="'importance-badge--' + (treeTask.task.importance?.toLowerCase() || 'low')">{{ getImportanceLabel(treeTask.task) }}</span>
                         <span *ngIf="treeTask.task.startDate">{{ treeTask.task.startDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</span>
                         <span *ngIf="treeTask.task.endDate">→ {{ treeTask.task.endDate | date:'yyyy/MM/dd':tokyoTimezone:'ja-JP' }}</span>
+                        <div class="task-assignees" *ngIf="treeTask.task.assigneeIds && treeTask.task.assigneeIds.length > 0">
+                          <ul class="task-assignees__list">
+                            <li *ngFor="let assigneeId of treeTask.task.assigneeIds" class="task-assignee">
+                              <ng-container *ngIf="getAssigneePhotoUrl(assigneeId) as photoUrl; else assigneeFallback">
+                                <span class="task-assignee__avatar task-assignee__avatar--image">
+                                  <img [src]="photoUrl" [alt]="getAssigneeDisplayName(assigneeId) + 'のアイコン'">
+                                </span>
+                              </ng-container>
+                              <ng-template #assigneeFallback>
+                                <span
+                                  class="task-assignee__avatar task-assignee__avatar--fallback"
+                                  [style.backgroundColor]="getAssigneeAvatarColor(assigneeId)"
+                                >
+                                  {{ getAssigneeInitial(assigneeId) }}
+                                </span>
+                              </ng-template>
+                              <span class="task-assignee__name">{{ getAssigneeDisplayName(assigneeId) }}</span>
+                            </li>
+                          </ul>
+                        </div>
                       </div>
                       <div class="dependency-visual" *ngIf="hasDependencies(treeTask)">
                         <div class="dependency-group" *ngIf="treeTask.dependencies.length > 0">

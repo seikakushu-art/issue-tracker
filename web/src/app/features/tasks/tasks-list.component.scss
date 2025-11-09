@@ -99,9 +99,66 @@
 .summary-deadline {
   display: flex;
   gap: 12px;
-  color: #555;
-  font-size: 13px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.deadline-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid var(--issue-color-soft, rgba(0, 123, 255, 0.2));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.deadline-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.deadline-item--start {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.deadline-item--end {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.deadline-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.deadline-item--start .deadline-label {
+  color: #15803d;
+}
+
+.deadline-item--end .deadline-label {
+  color: #dc2626;
+}
+
+.deadline-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+  font-variant-numeric: tabular-nums;
+}
+
+.deadline-item--start .deadline-value {
+  color: #15803d;
+}
+
+.deadline-item--end .deadline-value {
+  color: #dc2626;
 }
 
 .summary-description {
@@ -234,6 +291,9 @@
 
 .filter-group--smart {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .search-button {
@@ -242,17 +302,22 @@
   gap: 6px;
   padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid #0f172a;
-  background: #0f172a;
-  color: #ffffff;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: all 0.2s ease;
+  height: fit-content;
+  box-sizing: border-box;
+  line-height: 1.5;
+  min-height: 36px;
 
   &:hover,
   &:focus {
-    background: #1e293b;
-    color: #ffffff;
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #334155;
   }
 }
 
@@ -272,6 +337,10 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  height: fit-content;
+  box-sizing: border-box;
+  line-height: 1.5;
+  min-height: 36px;
 
   &:hover,
   &:focus {

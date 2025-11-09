@@ -242,10 +242,25 @@
                             <span class="actionable-card__badge" [style.background-color]="card.badge.color">
                                 {{ card.badge.label }}
                             </span>
-                            <span class="actionable-card__project">{{ card.projectName }}</span>
+                            <span class="actionable-card__project" 
+                                  [style.color]="getIssueThemeColorAccent(card.projectId, card.issueId)">
+                                {{ card.projectName }}
+                            </span>
                         </div>
                         <div class="actionable-card__body">
-                            <h3>{{ card.title }}</h3>
+                            <div class="actionable-card__title-wrapper">
+                                <h3 class="actionable-card__title" 
+                                    tabindex="0"
+                                    role="button"
+                                    (click)="goToTaskDetail(card)"
+                                    (keydown.enter)="goToTaskDetail(card)"
+                                    (keydown.space)="goToTaskDetail(card); $event.preventDefault()">
+                                    {{ card.title }}
+                                </h3>
+                                <div class="actionable-card__title-accent" 
+                                     [style.background-color]="getIssueThemeColorAccent(card.projectId, card.issueId)">
+                                </div>
+                            </div>
                             <div class="actionable-card__meta">
                                 <div class="actionable-card__meta-left">
                                     <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">

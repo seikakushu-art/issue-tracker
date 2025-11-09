@@ -72,6 +72,7 @@
       (click)="selectProject(project)"
       (keydown.enter)="selectProject(project)"
     >
+      <div class="project-card__accent"></div>
       <div class="project-header">
         <div class="project-actions" *ngIf="canManage(project)">
           <button class="btn-action" (click)="editProject(project, $event)" title="編集">
@@ -95,7 +96,10 @@
             <span class="action-label">削除</span>
           </button>
         </div>
-        <h3 class="project-title">{{ project.name }}</h3>
+        <div class="project-title-wrapper">
+          <div class="project-icon">📁</div>
+          <h3 class="project-title">{{ project.name }}</h3>
+        </div>
       </div>
       
       <div class="project-content">
