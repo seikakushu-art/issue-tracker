@@ -153,10 +153,6 @@
                         </div>
                         <div class="project-card__footer">
                             <a class="button button--ghost" [routerLink]="['/projects', project.projectId]">詳細へ</a>
-                            <button type="button" class="button button--primary"
-                                (click)="openProjectSmartFilter(project.projectId)">
-                                スマートフィルター
-                            </button>
                         </div>
                     </li>
                 </ul>
@@ -172,15 +168,21 @@
             <div class="widget__content widget__content--bottlenecks">
                 <p class="widget__empty" *ngIf="bottlenecks().length === 0">現在検出されたボトルネックはありません。</p>
                 <ul class="bottleneck-list" *ngIf="bottlenecks().length > 0">
-                    <li class="bottleneck-item" *ngFor="let insight of bottlenecks(); trackBy: trackBottleneck">
+                    <li class="bottleneck-item" *ngFor="let insight of bottlenecks(); trackBy: trackBottleneck"
+                        [style.background-color]="getIssueThemeColorLight(insight.projectId, insight.issueId) || '#ffffff'"
+                        [style.border-left-color]="getIssueThemeColorAccent(insight.projectId, insight.issueId)">
                         <div class="bottleneck-item__body">
-                            <span class="bottleneck-item__type">{{ insight.label }}</span>
-                            <span class="bottleneck-item__id">PJ {{ insight.projectId }}<ng-container
-                                    *ngIf="insight.issueId"> / Issue {{ insight.issueId }}</ng-container><ng-container
-                                    *ngIf="insight.taskId"> / Task {{ insight.taskId }}</ng-container></span>
+                            <span class="bottleneck-item__type" [class.bottleneck-item__type--danger]="insight.severity === 'danger'"
+                                [class.bottleneck-item__type--warning]="insight.severity === 'warning'"
+                                [class.bottleneck-item__type--info]="insight.severity === 'info'">
+                                <span class="bottleneck-item__badge">{{ insight.label }}</span>
+                            </span>
+                            <span class="bottleneck-item__id">{{ getProjectName(insight.projectId) }}<ng-container
+                                    *ngIf="insight.issueId && getIssueName(insight.projectId, insight.issueId)"> / {{ getIssueName(insight.projectId, insight.issueId) }}</ng-container><ng-container
+                                    *ngIf="insight.taskId && getTaskName(insight.projectId, insight.issueId, insight.taskId)"> / <span class="bottleneck-item__task-name">{{ getTaskName(insight.projectId, insight.issueId, insight.taskId) }}</span></ng-container></span>
                         </div>
                         <button type="button" class="button button--ghost" (click)="goToSmartFilter(insight)">
-                            スマートフィルター
+                            確認へ
                         </button>
                     </li>
                 </ul>
@@ -233,7 +235,9 @@
                     現在対応が必要なタスクはありません。
                 </p>
                 <ul class="actionable-list" *ngIf="!actionableLoading() && actionableTasks().length > 0">
-                    <li class="actionable-card" *ngFor="let card of actionableTasks(); trackBy: trackTask">
+                    <li class="actionable-card" *ngFor="let card of actionableTasks(); trackBy: trackTask"
+                        [style.background-color]="getIssueThemeColorLight(card.projectId, card.issueId) || '#ffffff'"
+                        [style.border-left-color]="getIssueThemeColorAccent(card.projectId, card.issueId)">
                         <div class="actionable-card__header">
                             <span class="actionable-card__badge" [style.background-color]="card.badge.color">
                                 {{ card.badge.label }}
@@ -243,15 +247,27 @@
                         <div class="actionable-card__body">
                             <h3>{{ card.title }}</h3>
                             <div class="actionable-card__meta">
-                                <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
-                                    {{ getImportanceLabel(card.importance) }}
-                                </span>
-                                <span class="status-badge" [ngClass]="'status-' + card.status">
-                                    {{ card.statusLabel }}
-                                </span>
-                                <span class="due-label" *ngIf="card.dueDate">
-                                    期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
-                                </span>
+                                <div class="actionable-card__meta-left">
+                                    <span class="importance-chip" [ngClass]="getImportanceClass(card.importance)">
+                                        {{ getImportanceLabel(card.importance) }}
+                                    </span>
+                                    <span class="status-badge" [ngClass]="'status-' + card.status">
+                                        {{ card.statusLabel }}
+                                    </span>
+                                    <span class="due-label" *ngIf="card.dueDate">
+                                        期限: {{ card.dueDate | date: 'yyyy/MM/dd' }}
+                                    </span>
+                                </div>
+                                <div class="actionable-card__actions">
+                                    <button type="button" class="button button--ghost" (click)="markOnHold(card)"
+                                        [disabled]="isUpdating(card)">
+                                        保留
+                                    </button>
+                                    <button type="button" class="button button--primary" (click)="markCompleted(card)"
+                                        [disabled]="isUpdating(card)">
+                                        完了
+                                    </button>
+                                </div>
                             </div>
                             <div class="actionable-card__mentions" *ngIf="card.mentionCount > 0">
                                 <h4>メンション {{ card.mentionCount }}件</h4>
@@ -262,16 +278,6 @@
                                     </li>
                                 </ul>
                             </div>
-                        </div>
-                        <div class="actionable-card__actions">
-                            <button type="button" class="button button--ghost" (click)="markOnHold(card)"
-                                [disabled]="isUpdating(card)">
-                                保留
-                            </button>
-                            <button type="button" class="button button--primary" (click)="markCompleted(card)"
-                                [disabled]="isUpdating(card)">
-                                完了
-                            </button>
                         </div>
                     </li>
                 </ul>

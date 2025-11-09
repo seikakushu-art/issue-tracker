@@ -533,13 +533,23 @@ export class NotificationService {
     const dueLimit = options.dueLimit ?? 50;
     const mentionLimit = options.mentionLimit ?? 20;
 
-    // 当日終了タスクの抽出
-    const dueTodayTasks = await this.fetchDueTodayNotifications(dueLimit);
+    const uid = this.auth.currentUser?.uid ?? null;
+    if (!uid) {
+      return {
+        dueTodayTasks: [],
+        mentions: [],
+      } satisfies StartupNotifications;
+    }
 
-    // メンション通知はログインユーザーが存在する場合のみ取得する
-    const uid = this.auth.currentUser?.uid;
-    const mentionNotifications = uid
-      ? await this.fetchMentionNotifications(uid, mentionLimit)
+    // アクセス可能なプロジェクトだけを対象にすることで、不要な通知を抑える。
+    const accessibleProjects = await this.fetchAccessibleProjectIds(uid);
+
+    // 当日終了タスクの抽出（担当タスクのみ）
+    const dueTodayTasks = await this.fetchDueTodayNotifications(uid, accessibleProjects, dueLimit);
+
+    // メンション通知は閲覧権限のあるプロジェクトに限定して取得する
+    const mentionNotifications = accessibleProjects.size > 0
+      ? await this.fetchMentionNotifications(uid, accessibleProjects, mentionLimit)
       : [];
 
     return {
@@ -551,14 +561,22 @@ export class NotificationService {
   /**
    * 当日終了タスクを抽出し通知形式に整形する
    */
-  private async fetchDueTodayNotifications(limitSize: number): Promise<DueTodayNotification[]> {
+  private async fetchDueTodayNotifications(
+    uid: string,
+    accessibleProjects: Set<string>,
+    limitSize: number,
+  ): Promise<DueTodayNotification[]> {
+    if (accessibleProjects.size === 0) {
+      return [];
+    }
     try {
       const tasksRef = collectionGroup(this.db, 'tasks');
       const snapshot = await getDocs(
         query(
           tasksRef,
           where('archived', '==', false),
-          where('status', 'in', ['incomplete', 'in_progress', 'on_hold'])
+          where('status', 'in', ['incomplete', 'in_progress', 'on_hold']),
+          where('assigneeIds', 'array-contains', uid),
         ),
       );
 
@@ -573,7 +591,7 @@ export class NotificationService {
         totalTasks: snapshot.docs.length,
       });
 
-    const candidateTasks = snapshot.docs
+      const candidateTasks = snapshot.docs
       .map((docSnap) => ({
         id: docSnap.id,
         data: docSnap.data() as Task,
@@ -587,7 +605,7 @@ export class NotificationService {
         // 東京時間での日付部分のみを比較
         const dueDateNormalized = this.normalizeToTokyoDate(dueDateRaw);
         const startOfTodayNormalized = this.normalizeToTokyoDate(startOfToday);
-        
+
         // デバッグログ
         console.log('[通知デバッグ] タスク:', {
           title: data.title,
@@ -600,11 +618,15 @@ export class NotificationService {
           status: data.status,
           archived: data.archived,
         });
-        
+
+        const projectId = data.projectId;
+        const assignees = Array.isArray(data.assigneeIds) ? data.assigneeIds : [];
         return (
           Boolean(data.projectId) &&
           Boolean(data.issueId) &&
-          dueDateNormalized.getTime() === startOfTodayNormalized.getTime()
+          dueDateNormalized.getTime() === startOfTodayNormalized.getTime() &&
+          accessibleProjects.has(projectId) &&
+          assignees.includes(uid)
         );
       });
 
@@ -612,7 +634,7 @@ export class NotificationService {
       console.log('[通知デバッグ] 本日終了タスクが見つかりませんでした');
       return [];
     }
-    
+
     console.log('[通知デバッグ] 本日終了タスク候補:', candidateTasks.length, '件');
 
     const projectIds = new Set<string>();
@@ -669,7 +691,14 @@ export class NotificationService {
   /**
    * メンション通知を抽出して整形する
    */
-  private async fetchMentionNotifications(uid: string, limitSize: number): Promise<MentionNotification[]> {
+  private async fetchMentionNotifications(
+    uid: string,
+    accessibleProjects: Set<string>,
+    limitSize: number,
+  ): Promise<MentionNotification[]> {
+    if (accessibleProjects.size === 0) {
+      return [];
+    }
     const commentsRef = collectionGroup(this.db, 'comments');
     const commentQuery = query(
       commentsRef,
@@ -694,6 +723,9 @@ export class NotificationService {
         continue;
       }
       const projectId = pathSegments[1];
+      if (!accessibleProjects.has(projectId)) {
+        continue;
+      }
       const issueId = pathSegments[3];
       const taskId = pathSegments[5];
       projectIds.add(projectId);
@@ -751,6 +783,18 @@ export class NotificationService {
       });
   }
 
+
+  /** メンバーに閲覧権限があるプロジェクトID一覧を取得する。 */
+  private async fetchAccessibleProjectIds(uid: string): Promise<Set<string>> {
+    try {
+      const projectsRef = collection(this.db, 'projects');
+      const snapshot = await getDocs(query(projectsRef, where('memberIds', 'array-contains', uid)));
+      return new Set(snapshot.docs.map((docSnap) => docSnap.id));
+    } catch (error) {
+      console.error('アクセス可能なプロジェクトの取得に失敗しました:', error);
+      return new Set();
+    }
+  }
   /**
    * タスクのスナップショットを取得する
    */

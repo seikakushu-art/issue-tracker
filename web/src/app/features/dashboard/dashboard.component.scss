@@ -713,10 +713,26 @@
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  background: #f8fafc;
-  border-radius: 16px;
+  background: #ffffff;
+  border-radius: 12px;
   padding: 16px;
   border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  border-left-color: #e2e8f0;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  &:hover {
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .button {
+    height: 36px;
+    padding: 8px 16px;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
 }
 
 .bottleneck-item__body {
@@ -726,14 +742,59 @@
 }
 
 .bottleneck-item__type {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
   color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  display: inline-block;
+
+  &--danger {
+    color: #dc2626;
+  }
+
+  &--warning {
+    color: #ea580c;
+  }
+
+  &--info {
+    color: #0284c7;
+  }
+}
+
+.bottleneck-item__badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+
+  .bottleneck-item__type--danger & {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+  }
+
+  .bottleneck-item__type--warning & {
+    background-color: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+  }
+
+  .bottleneck-item__type--info & {
+    background-color: rgba(2, 132, 199, 0.1);
+    color: #0284c7;
+  }
 }
 
 .bottleneck-item__id {
   font-size: 12px;
   color: #64748b;
+}
+
+.bottleneck-item__task-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 13px;
 }
 
 .widget__loading {
@@ -788,6 +849,7 @@
 
 .actionable-card {
   border: 1px solid #e2e8f0;
+  border-left-width: 4px;
   border-radius: 18px;
   padding: 20px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), #ffffff 60%);
@@ -836,7 +898,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
@@ -1054,6 +1116,56 @@
 }
 
 .widget--board .widget__content--board::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.widget--projects .widget__content--projects {
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+.widget--projects .widget__content--projects::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget--projects .widget__content--projects::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.widget--projects .widget__content--projects::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.widget--projects .widget__content--projects::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.widget--bottlenecks .widget__content--bottlenecks {
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+
+.widget--bottlenecks .widget__content--bottlenecks::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget--bottlenecks .widget__content--bottlenecks::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.widget--bottlenecks .widget__content--bottlenecks::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.widget--bottlenecks .widget__content--bottlenecks::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 

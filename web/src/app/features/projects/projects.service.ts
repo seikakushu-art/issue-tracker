@@ -72,6 +72,32 @@ export class ProjectsService {
     };
   }
 
+  private async ensureProjectStartCoversDescendants(projectId: string, projectStart: Date): Promise<void> {
+    const issuesSnap = await getDocs(collection(this.db, `projects/${projectId}/issues`));
+    for (const issueDoc of issuesSnap.docs) {
+      const record = issueDoc.data() as Record<string, unknown>;
+      const issueStart = this.normalizeDate(record['startDate']);
+      if (issueStart && issueStart < projectStart) {
+        throw new Error('プロジェクトの開始日は配下の課題・タスクの開始日をカバーするよう設定してください');
+      }
+    }
+
+    const tasksSnap = await getDocs(
+      query(
+        collectionGroup(this.db, 'tasks'),
+        where('projectId', '==', projectId),
+      ),
+    );
+
+    for (const taskDoc of tasksSnap.docs) {
+      const record = taskDoc.data() as Record<string, unknown>;
+      const taskStart = this.normalizeDate(record['startDate']);
+      if (taskStart && taskStart < projectStart) {
+        throw new Error('プロジェクトの開始日は配下の課題・タスクの開始日をカバーするよう設定してください');
+      }
+    }
+  }
+
   private async ensureProjectEndCoversDescendants(projectId: string, projectEnd: Date): Promise<void> {
     const issuesSnap = await getDocs(collection(this.db, `projects/${projectId}/issues`));
     for (const issueDoc of issuesSnap.docs) {
@@ -349,6 +375,9 @@ export class ProjectsService {
     // --- 期間の整合性チェック（開始日 <= 終了日） ---
     if (startDate && endDate && startDate > endDate) {
       throw new Error('開始日は終了日以前である必要があります');
+    }
+    if (startDate) {
+      await this.ensureProjectStartCoversDescendants(id, startDate);
     }
     if (endDate) {
       await this.ensureProjectEndCoversDescendants(id, endDate);

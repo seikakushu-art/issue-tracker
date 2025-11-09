@@ -3,6 +3,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
 import { Issue, Project, Role, Task } from '../../models/schema';
+import { UserProfileService } from '../../core/user-profile.service';
 
 /**
  * 課題に紐づくタスク配列を含めた拡張型
@@ -84,6 +85,7 @@ export class DashboardService {
   private readonly projectsService = inject(ProjectsService);
   private readonly issuesService = inject(IssuesService);
   private readonly tasksService = inject(TasksService);
+  private readonly userProfileService = inject(UserProfileService);
 
   /** 期限間近扱いとする閾値（日単位） */
   private static readonly DEADLINE_ALERT_THRESHOLD_DAYS = 3;
@@ -124,7 +126,8 @@ export class DashboardService {
     );
 
     const projectCards = this.buildProjectCards(projectsWithRelations);
-    const bottlenecks = this.detectBottlenecks(projectsWithRelations);
+    const currentUserId = this.userProfileService.user()?.uid ?? null;
+    const bottlenecks = this.detectBottlenecks(projectsWithRelations, currentUserId);
 
     return {
       projects: projectsWithRelations,
@@ -188,15 +191,26 @@ export class DashboardService {
 
   /**
    * ボトルネック検知ロジック
+   * 現在のユーザーが担当しているタスクのみを対象とする
    */
-  private detectBottlenecks(projects: ProjectSnapshot[]): BottleneckInsight[] {
+  private detectBottlenecks(projects: ProjectSnapshot[], currentUserId: string | null): BottleneckInsight[] {
     const now = new Date();
     const insights: BottleneckInsight[] = [];
+
+    // ユーザーIDが取得できない場合は空配列を返す
+    if (!currentUserId) {
+      return insights;
+    }
 
     for (const project of projects) {
       for (const issue of project.issues) {
         const issueUpdatedAt = issue.createdAt ? this.normalizeDate(issue.createdAt) : null;
         for (const task of issue.tasks) {
+          // 現在のユーザーが担当しているタスクのみを対象とする
+          if (!task.assigneeIds || !task.assigneeIds.includes(currentUserId)) {
+            continue;
+          }
+
           const endDate = task.endDate ? this.normalizeDate(task.endDate) : null;
           const createdAt = task.createdAt ? this.normalizeDate(task.createdAt) : null;
 
@@ -235,11 +249,16 @@ export class DashboardService {
           }
         }
 
+        // 進捗が停滞している課題の判定は、現在のユーザーが担当しているタスクを含む課題のみを対象とする
+        const userTasks = issue.tasks.filter((task) => 
+          task.assigneeIds && task.assigneeIds.includes(currentUserId)
+        );
+        
         if (
-          issue.tasks.length > 0 &&
-          (issue.progress ?? this.calculateAverageProgress(issue.tasks)) <= 25
+          userTasks.length > 0 &&
+          (issue.progress ?? this.calculateAverageProgress(userTasks)) <= 25
         ) {
-          const referenceDate = issueUpdatedAt ?? issue.tasks
+          const referenceDate = issueUpdatedAt ?? userTasks
             .map((task) => task.createdAt ? this.normalizeDate(task.createdAt) : null)
             .filter((date): date is Date => Boolean(date))
             .sort((a, b) => b.getTime() - a.getTime())[0];

@@ -21,6 +21,7 @@ import { BoardPreviewComponent } from './components/board-preview/board-preview.
 import { UserProfileService } from '../../core/user-profile.service';
 import { BoardService } from '../board/board.service';
 import { UserDirectoryProfile, UserDirectoryService } from '../../core/user-directory.service';
+import { resolveIssueThemeColor } from '../../shared/issue-theme';
 
 type ProjectSortKey = 'overdue_first' | 'progress_desc' | 'backlog_desc';
 type NotificationListType = 'mention' | 'due_today' | 'overdue';
@@ -489,6 +490,128 @@ export class DashboardComponent implements OnInit {
     return [insight.projectId, insight.issueId, insight.taskId, insight.type]
       .filter(Boolean)
       .join(':');
+  }
+
+  /** プロジェクトIDからプロジェクト名を取得 */
+  getProjectName(projectId: string): string {
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return projectId;
+    }
+    // projectCardsから取得を試みる
+    const card = snapshot.projectCards.find((c) => c.projectId === projectId);
+    if (card) {
+      return card.name;
+    }
+    // フォールバック: projectsから取得
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    return project?.name ?? projectId;
+  }
+
+  /** 課題IDから課題名を取得 */
+  getIssueName(projectId: string, issueId: string | undefined): string | null {
+    if (!issueId) {
+      return null;
+    }
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return null;
+    }
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    if (!project) {
+      return null;
+    }
+    const issue = project.issues.find((i) => i.id === issueId);
+    return issue?.name ?? null;
+  }
+
+  /** タスクIDからタスク名を取得 */
+  getTaskName(projectId: string, issueId: string | undefined, taskId: string | undefined): string | null {
+    if (!issueId || !taskId) {
+      return null;
+    }
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return null;
+    }
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    if (!project) {
+      return null;
+    }
+    const issue = project.issues.find((i) => i.id === issueId);
+    if (!issue) {
+      return null;
+    }
+    const task = issue.tasks.find((t) => t.id === taskId);
+    return task?.title ?? null;
+  }
+
+  /** 課題IDからテーマカラーを取得 */
+  getIssueThemeColor(projectId: string, issueId: string | undefined): string | null {
+    if (!issueId) {
+      return null;
+    }
+    const snapshot = this.snapshot();
+    if (!snapshot) {
+      return null;
+    }
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    if (!project) {
+      return null;
+    }
+    const issue = project.issues.find((i) => i.id === issueId);
+    if (!issue) {
+      return null;
+    }
+    // テーマカラーが設定されていない場合でも、課題IDから決定論的に色を生成
+    return resolveIssueThemeColor(issue.themeColor ?? null, issueId);
+  }
+
+  /** テーマカラーを背景色用に薄くした色を取得 */
+  getIssueThemeColorLight(projectId: string, issueId: string | undefined): string | null {
+    const themeColor = this.getIssueThemeColor(projectId, issueId);
+    if (!themeColor) {
+      return null; // デフォルトの白背景を使用
+    }
+    // テーマカラーに透明度を加えて非常に薄くする（5%の透明度）
+    return this.lightenColor(themeColor, 0.05);
+  }
+
+  /** テーマカラーを左側アクセントボーダー用に取得 */
+  getIssueThemeColorAccent(projectId: string, issueId: string | undefined): string {
+    const themeColor = this.getIssueThemeColor(projectId, issueId);
+    if (!themeColor) {
+      return '#e2e8f0';
+    }
+    return themeColor;
+  }
+
+  /** 色を薄くする（透明度を加える） */
+  private lightenColor(color: string, opacity: number): string {
+    // HEXカラーの場合
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    // 既にrgba/rgbの場合はそのまま返す
+    return color;
+  }
+
+  /** 色を濃くする */
+  private darkenColor(color: string, factor: number): string {
+    // HEXカラーの場合
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      const r = Math.max(0, Math.min(255, parseInt(hex.slice(0, 2), 16) * (1 - factor)));
+      const g = Math.max(0, Math.min(255, parseInt(hex.slice(2, 4), 16) * (1 - factor)));
+      const b = Math.max(0, Math.min(255, parseInt(hex.slice(4, 6), 16) * (1 - factor)));
+      return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+    }
+    // 既にrgba/rgbの場合はそのまま返す
+    return color;
   }
 
   /** 通知アイテムのトラック関数 */
