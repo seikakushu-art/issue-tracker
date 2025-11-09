@@ -24,6 +24,7 @@ import {
   isSmartFilterEmpty,
 } from '../../shared/smart-filter/smart-filter.model';
 import { resolveIssueThemeColor } from '../../shared/issue-theme';
+import { FirebaseError } from '@angular/fire/app';
 
 interface TaskCommentView extends Comment {
   authorUsername: string;
@@ -1245,10 +1246,33 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.refreshSelectedTask();
     } catch (error) {
       console.error('タスクの保存に失敗しました:', error);
-      alert('タスクの保存に失敗しました');
+      alert(this.buildTaskSaveErrorMessage(error));
     } finally {
       this.saving = false;
     }
+  }
+
+  /**
+   * Firestoreエラーを人間にわかりやすいメッセージへ変換する
+   * バージョン衝突（FAILED_PRECONDITION/ABORTED）を検出して案内を表示
+   */
+  private buildTaskSaveErrorMessage(error: unknown): string {
+    // FirebaseErrorかどうかを判定し、バージョン違反コードを優先的に扱う
+    if (error instanceof FirebaseError) {
+      const conflictCodes = ['aborted', 'failed-precondition'];
+      if (conflictCodes.includes(error.code) || error.message.includes('FAILED_PRECONDITION')) {
+        return '最新の情報と競合したため保存できませんでした。画面を再読み込みしてからもう一度お試しください。';
+      }
+      if (error.message) {
+        return error.message;
+      }
+    }
+
+    // 通常のErrorであればメッセージを返却し、その他は汎用文を表示
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+    return '予期しないエラーが発生しました。時間をおいて再度お試しください。';
   }
 
   /** モーダルを閉じる */
