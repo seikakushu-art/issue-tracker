@@ -17,7 +17,7 @@ import {
   where,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Task, TaskStatus, ChecklistItem, Importance, Comment, Attachment } from '../../models/schema';
+import {  Project, Task, TaskStatus, ChecklistItem, Importance, Comment, Attachment } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
@@ -121,6 +121,34 @@ export class TasksService {
     return attachment;
   }
 
+  private async ensureTaskDeadlineWithinHierarchy(
+    project: Project,
+    projectId: string,
+    issueId: string,
+    taskEnd: Date | null,
+  ): Promise<void> {
+    if (!taskEnd) {
+      return;
+    }
+
+    const projectEnd = this.normalizeDate(project.endDate ?? null);
+    if (projectEnd && taskEnd > projectEnd) {
+      throw new Error('タスクの終了日はプロジェクトの終了日を超えないように設定してください');
+    }
+
+    const issueRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
+    const issueSnap = await getDoc(issueRef);
+    if (!issueSnap.exists()) {
+      throw new Error('対象の課題が見つかりません');
+    }
+
+    const issueRecord = issueSnap.data() as Record<string, unknown>;
+    const issueEnd = this.normalizeDate(issueRecord['endDate']);
+    if (issueEnd && taskEnd > issueEnd) {
+      throw new Error('タスクの終了日は課題の終了日を超えないように設定してください');
+    }
+  }
+
   private buildAttachmentStoragePath(
     projectId: string,
     issueId: string,
@@ -201,7 +229,7 @@ export class TasksService {
       checklist?: ChecklistItem[];
     }
   ): Promise<string> {
-    const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+    const { project, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     
     // 名称重複チェック
     await this.checkTitleUniqueness(projectId, issueId, input.title);
@@ -256,14 +284,12 @@ export class TasksService {
       payload['importance'] = input.importance;
     }
 
-    // バリデーション: 開始日は終了日以前
-    if (payload['startDate'] && payload['endDate']) {
-      const start = payload['startDate'] as Date;
-      const end = payload['endDate'] as Date;
-      if (start > end) {
-        throw new Error('開始日は終了日以前である必要があります');
-      }
+    const startDate = this.normalizeDate(payload['startDate'] ?? null);
+    const endDate = this.normalizeDate(payload['endDate'] ?? null);
+    if (startDate && endDate && startDate > endDate) {
+      throw new Error('開始日は終了日以前である必要があります');
     }
+    await this.ensureTaskDeadlineWithinHierarchy(project, projectId, issueId, endDate);
 
     // Firestoreサブコレクションとして登録: projects/{projectId}/issues/{issueId}/tasks/{taskId}
     const ref = await addDoc(
@@ -455,7 +481,7 @@ export class TasksService {
       archived: boolean;
     }>
   ): Promise<void> {
-    const { role, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+    const { project, role, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
 
     // タイトル変更の場合、重複チェック
     if (updates.title !== undefined) {
@@ -481,8 +507,12 @@ export class TasksService {
           throw new Error('このタスクを編集する権限がありません');
         }
       }
-      const startDate = updates.startDate !== undefined ? updates.startDate : task.startDate;
-      const endDate = updates.endDate !== undefined ? updates.endDate : task.endDate;
+      const startDate = updates.startDate !== undefined
+      ? this.normalizeDate(updates.startDate)
+      : this.normalizeDate(task.startDate ?? null);
+    const endDate = updates.endDate !== undefined
+      ? this.normalizeDate(updates.endDate)
+      : this.normalizeDate(task.endDate ?? null);
       if (startDate && endDate && startDate > endDate) {
         throw new Error('開始日は終了日以前である必要があります');
       }
@@ -492,6 +522,12 @@ export class TasksService {
         const progress = this.calculateProgressFromChecklist(updates.checklist);
         updates = { ...updates, progress };
       }
+      await this.ensureTaskDeadlineWithinHierarchy(project, projectId, issueId, endDate);
+    }
+
+    if (!task) {
+      const endDate = updates.endDate !== undefined ? this.normalizeDate(updates.endDate) : null;
+      await this.ensureTaskDeadlineWithinHierarchy(project, projectId, issueId, endDate);
     }
 
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);

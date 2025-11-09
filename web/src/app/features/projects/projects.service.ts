@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
   collection,
+  collectionGroup,
   addDoc,
   query,
   where,
@@ -70,6 +71,33 @@ export class ProjectsService {
       archived: (dataRecord['archived'] as boolean) ?? false,
     };
   }
+
+  private async ensureProjectEndCoversDescendants(projectId: string, projectEnd: Date): Promise<void> {
+    const issuesSnap = await getDocs(collection(this.db, `projects/${projectId}/issues`));
+    for (const issueDoc of issuesSnap.docs) {
+      const record = issueDoc.data() as Record<string, unknown>;
+      const issueEnd = this.normalizeDate(record['endDate']);
+      if (issueEnd && issueEnd > projectEnd) {
+        throw new Error('プロジェクトの終了日は配下の課題・タスクの終了日をカバーするよう設定してください');
+      }
+    }
+
+    const tasksSnap = await getDocs(
+      query(
+        collectionGroup(this.db, 'tasks'),
+        where('projectId', '==', projectId),
+      ),
+    );
+
+    for (const taskDoc of tasksSnap.docs) {
+      const record = taskDoc.data() as Record<string, unknown>;
+      const taskEnd = this.normalizeDate(record['endDate']);
+      if (taskEnd && taskEnd > projectEnd) {
+        throw new Error('プロジェクトの終了日は配下の課題・タスクの終了日をカバーするよう設定してください');
+      }
+    }
+  }
+
 
   private resolveRoleForUser(project: Project, uid: string): Role | null {
     const roles = project.roles ?? {};
@@ -316,12 +344,14 @@ export class ProjectsService {
     // --- 更新後の開始・終了日を算出（未指定の場合は既存値を利用） ---
     const currentStart = normalizeDate(current.startDate ?? null);
     const currentEnd = normalizeDate(current.endDate ?? null);
-    const startDate = updates.startDate !== undefined ? updates.startDate ?? null : currentStart;
-    const endDate = updates.endDate !== undefined ? updates.endDate ?? null : currentEnd;
-
+    const startDate = updates.startDate !== undefined ? normalizeDate(updates.startDate ?? null) : currentStart;
+    const endDate = updates.endDate !== undefined ? normalizeDate(updates.endDate ?? null) : currentEnd;
     // --- 期間の整合性チェック（開始日 <= 終了日） ---
     if (startDate && endDate && startDate > endDate) {
       throw new Error('開始日は終了日以前である必要があります');
+    }
+    if (endDate) {
+      await this.ensureProjectEndCoversDescendants(id, endDate);
     }
 
     // --- Firestoreへ更新を反映（undefinedは送らず、nullは許容） ---

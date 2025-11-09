@@ -113,6 +113,21 @@ export class IssuesService {
     }
   }
 
+  private async ensureIssueEndCoversTasks(
+    projectId: string,
+    issueId: string,
+    issueEnd: Date,
+  ): Promise<void> {
+    const tasksSnap = await getDocs(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
+    for (const docSnap of tasksSnap.docs) {
+      const record = docSnap.data() as Record<string, unknown>;
+      const taskEnd = this.normalizeDate(record['endDate']);
+      if (taskEnd && taskEnd > issueEnd) {
+        throw new Error('課題の終了日は配下のタスクの終了日をカバーするよう設定してください');
+      }
+    }
+  }
+
   private async waitForUser(): Promise<User | null> {
 
     const current = this.auth.currentUser;
@@ -304,25 +319,26 @@ export class IssuesService {
       await this.checkNameUniqueness(projectId, updates.name, issueId);
     }
 
-    // バリデーション: 開始日は終了日以前
-    if (updates.startDate !== undefined && updates.endDate !== undefined) {
-      if (updates.startDate && updates.endDate && updates.startDate > updates.endDate) {
-        throw new Error('開始日は終了日以前である必要があります');
-      }
-      await this.validateWithinProjectPeriod(
-        projectId,
-        this.normalizeDate(updates.startDate) ?? null,
-        this.normalizeDate(updates.endDate) ?? null,
-      );
-    }
-
-    // 日付の大小をチェック（既存の開始日・終了日との比較）
     const issue = await this.getIssue(projectId, issueId);
     if (issue) {
-      const startDate = updates.startDate !== undefined ? updates.startDate : issue.startDate;
-      const endDate = updates.endDate !== undefined ? updates.endDate : issue.endDate;
-      if (startDate && endDate && startDate > endDate) {
+      const currentStart = this.normalizeDate(issue.startDate ?? null);
+      const currentEnd = this.normalizeDate(issue.endDate ?? null);
+      const nextStart = updates.startDate !== undefined
+        ? this.normalizeDate(updates.startDate)
+        : currentStart;
+      const nextEnd = updates.endDate !== undefined
+        ? this.normalizeDate(updates.endDate)
+        : currentEnd;
+
+      if (nextStart && nextEnd && nextStart > nextEnd) {
         throw new Error('開始日は終了日以前である必要があります');
+      }
+      if (updates.startDate !== undefined || updates.endDate !== undefined) {
+        await this.validateWithinProjectPeriod(projectId, nextStart ?? null, nextEnd ?? null);
+      }
+
+      if (nextEnd) {
+        await this.ensureIssueEndCoversTasks(projectId, issueId, nextEnd);
       }
     }
 
