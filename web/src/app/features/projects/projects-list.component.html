@@ -67,6 +67,7 @@
       *ngFor="let project of filteredProjects" 
       class="project-card"
       [class.archived]="project.archived"
+      [class.pinned]="isPinned(project)"
       role="button"
       tabindex="0"
       (click)="selectProject(project)"
@@ -74,27 +75,32 @@
     >
       <div class="project-card__accent"></div>
       <div class="project-header">
-        <div class="project-actions" *ngIf="canManage(project)">
-          <button class="btn-action" (click)="editProject(project, $event)" title="編集">
-            <i class="icon-edit" aria-hidden="true"></i>
-            <span class="action-label">📝編集</span>
+        <div class="project-actions">
+          <button class="btn-action" (click)="togglePin(project, $event)" [title]="isPinned(project) ? 'ピン止め解除' : 'ピン止め'" [class.pinned]="isPinned(project)">
+            <i class="icon-pin" aria-hidden="true"></i>
           </button>
-          <button class="btn-action" (click)="archiveProject(project, $event)" title="アーカイブ">
-            <i class="icon-archive" aria-hidden="true"></i>
-            <span class="action-label">{{ project.archived ? '復元' : 'アーカイブ' }}</span>
-          </button>
-          <button class="btn-action" (click)="saveAsTemplate(project, $event)" title="テンプレートとして保存">
-            <i class="icon-template" aria-hidden="true"></i>
-            <span class="action-label">テンプレート</span>
-          </button>
-          <button class="btn-action" (click)="openInviteModal(project, $event)" title="招待リンク">
-            <i class="icon-link" aria-hidden="true"></i>
-            <span class="action-label">👥招待</span>
-          </button>
-          <button class="btn-action" (click)="deleteProject(project, $event)" title="削除">
-            <i class="icon-delete" aria-hidden="true"></i>
-            <span class="action-label">削除</span>
-          </button>
+          <ng-container *ngIf="canManage(project)">
+            <button class="btn-action" (click)="editProject(project, $event)" title="編集">
+              <i class="icon-edit" aria-hidden="true"></i>
+              <span class="action-label">📝編集</span>
+            </button>
+            <button class="btn-action" (click)="archiveProject(project, $event)" title="アーカイブ">
+              <i class="icon-archive" aria-hidden="true"></i>
+              <span class="action-label">{{ project.archived ? '復元' : 'アーカイブ' }}</span>
+            </button>
+            <button class="btn-action" (click)="saveAsTemplate(project, $event)" title="テンプレートとして保存">
+              <i class="icon-template" aria-hidden="true"></i>
+              <span class="action-label">テンプレート</span>
+            </button>
+            <button class="btn-action" (click)="openInviteModal(project, $event)" title="招待リンク">
+              <i class="icon-link" aria-hidden="true"></i>
+              <span class="action-label">👥招待</span>
+            </button>
+            <button class="btn-action" (click)="deleteProject(project, $event)" title="削除">
+              <i class="icon-delete" aria-hidden="true"></i>
+              <span class="action-label">削除</span>
+            </button>
+          </ng-container>
         </div>
         <div class="project-title-wrapper">
           <div class="project-icon">📁</div>

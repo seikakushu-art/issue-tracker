@@ -281,6 +281,16 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   sortProjects() {
     this.filteredProjects.sort((a, b) => {
+      // ピン止めされたプロジェクトを先頭に表示
+      const aPinned = this.isPinned(a);
+      const bPinned = this.isPinned(b);
+      if (aPinned && !bPinned) {
+        return -1;
+      }
+      if (!aPinned && bPinned) {
+        return 1;
+      }
+
       let aValue: string | number | Date;
       let bValue: string | number | Date;
 
@@ -1063,5 +1073,33 @@ private async loadTags(): Promise<void> {
       return `rgba(${r}, ${g}, ${b}, 0.15)`;
     }
     return color;
+  }
+
+  /**
+   * プロジェクトが現在のユーザーによってピン止めされているか確認
+   */
+  isPinned(project: Project): boolean {
+    if (!this.currentUid || !project.pinnedBy) {
+      return false;
+    }
+    return project.pinnedBy.includes(this.currentUid);
+  }
+
+  /**
+   * プロジェクトのピン止めを切り替え
+   */
+  async togglePin(project: Project, event: Event) {
+    event.stopPropagation();
+    if (!project.id) {
+      return;
+    }
+    const currentlyPinned = this.isPinned(project);
+    try {
+      await this.projectsService.togglePin(project.id, !currentlyPinned);
+      await this.loadProjects();
+    } catch (error) {
+      console.error('ピン止めの切り替えに失敗しました:', error);
+      alert('ピン止めの切り替えに失敗しました');
+    }
   }
 }

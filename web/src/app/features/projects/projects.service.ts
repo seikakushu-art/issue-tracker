@@ -69,6 +69,7 @@ export class ProjectsService {
       createdAt: this.normalizeDate(dataRecord['createdAt']),
       progress: (dataRecord['progress'] as number) ?? 0,
       archived: (dataRecord['archived'] as boolean) ?? false,
+      pinnedBy: (dataRecord['pinnedBy'] as string[] | undefined) ?? [],
     };
   }
 
@@ -406,5 +407,39 @@ export class ProjectsService {
     if (duplicate) {
       throw new Error(`プロジェクト名 "${name}" は既に使用されています`);
     }
+  }
+
+  /**
+   * プロジェクトをピン止め/解除する
+   * @param projectId プロジェクトID
+   * @param pinned ピン止めする場合はtrue、解除する場合はfalse
+   */
+  async togglePin(projectId: string, pinned: boolean): Promise<void> {
+    const uid = await this.getSignedInUid();
+    const projectSnap = await getDoc(doc(this.db, 'projects', projectId));
+    
+    if (!projectSnap.exists()) {
+      throw new Error('プロジェクトが見つかりません');
+    }
+
+    const project = this.hydrateProject(projectSnap.id, projectSnap.data() as Project);
+    const currentPinnedBy = project.pinnedBy ?? [];
+    
+    let nextPinnedBy: string[];
+    if (pinned) {
+      // ピン止め: 既に含まれていなければ追加
+      if (!currentPinnedBy.includes(uid)) {
+        nextPinnedBy = [...currentPinnedBy, uid];
+      } else {
+        return; // 既にピン止め済み
+      }
+    } else {
+      // 解除: ユーザーIDを削除
+      nextPinnedBy = currentPinnedBy.filter(id => id !== uid);
+    }
+
+    await updateDoc(doc(this.db, 'projects', projectId), {
+      pinnedBy: nextPinnedBy,
+    });
   }
 }

@@ -39,6 +39,7 @@ export interface Project {
   archived: boolean;  // アーカイブ状態
   progress?: number;  // 進捗率（0-100、配下課題の加重平均から自動集計）
   createdAt?: Date | null;
+  pinnedBy?: string[];  // ピン止めしたユーザーID配列
   /** 現在ログイン中ユーザーの役割（クライアント用） */
   currentRole?: Role;
 }
