@@ -199,25 +199,28 @@
         </div>
         <div
           class="representative-task"
-          *ngIf="getRepresentativeTask(issue.id!) as representativeTask"
+          *ngFor="let task of getAllTasks(issue.id!)"
           [style.border-left-color]="getIssueThemeColorValue(issue)"
+          (click)="goToTaskDetail(issue.id!, task.id!, $event)"
+          (keydown.enter)="goToTaskDetail(issue.id!, task.id!, $event)"
+          role="button"
+          tabindex="0"
         >
-          <span class="task-label">代表タスク</span>
           <div class="representative-task-main">
-            <span class="task-title">{{ representativeTask.title }}</span>
+            <span class="task-title">{{ task.title }}</span>
             <span
-              *ngIf="representativeTask?.importance as importance"
+              *ngIf="task.importance"
               class="importance-chip"
-              [ngClass]="getImportanceClass(importance)"
+              [ngClass]="getImportanceClass(task.importance)"
             >
-              {{ getImportanceLabel(importance) }}
+              {{ getImportanceLabel(task.importance) }}
             </span>
           </div>
-          <!-- タグは代表タスクの情報から取得し、課題カードでも視認できるようにする -->
-          <ng-container *ngIf="getRepresentativeTags(issue.id!) as representativeTags">
-            <div class="representative-tags" *ngIf="representativeTags.length > 0">
+          <!-- タグはタスクの情報から取得し、課題カードでも視認できるようにする -->
+          <ng-container *ngIf="getTaskTags(task) as taskTags">
+            <div class="representative-tags" *ngIf="taskTags.length > 0">
               <span
-                *ngFor="let tag of representativeTags"
+                *ngFor="let tag of taskTags"
                 class="representative-tag"
                 [style.background-color]="tag.color || '#4c6ef5'"
               >

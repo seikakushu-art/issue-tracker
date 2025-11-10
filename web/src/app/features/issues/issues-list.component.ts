@@ -397,6 +397,19 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
   }
 
   /**
+   * タスク詳細画面に遷移
+   */
+  goToTaskDetail(issueId: string, taskId: string | null | undefined, event: Event): void {
+    event.stopPropagation(); // 課題カードのクリックイベントを阻止
+    if (!taskId) {
+      return;
+    }
+    void this.router.navigate(['/projects', this.projectId, 'issues', issueId], {
+      queryParams: { focus: taskId },
+    });
+  }
+
+  /**
    * 新規課題作成モーダルを開く
    */
   openCreateModal() {
@@ -630,19 +643,23 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     }
     return summary.representativeTask;
   }
-/**
-   * 代表タスクに紐づくタグ情報を取得し、カードに表示できる形式で返却
-   */
-getRepresentativeTags(issueId: string): Tag[] {
-  const task = this.getRepresentativeTask(issueId);
-  if (!task) {
-    return [];
+
+  /** 課題配下のすべてのタスクを取得（アーカイブ済みは除外） */
+  getAllTasks(issueId: string): Task[] {
+    const tasks = this.issueTasksMap[issueId] ?? [];
+    return tasks.filter(task => !task.archived);
   }
 
-  return task.tagIds
-    .map(tagId => this.tagMap[tagId])
-    .filter((tag): tag is Tag => Boolean(tag)); // 情報が揃っているタグのみ表示
-}
+  /** タスクに紐づくタグ情報を取得し、カードに表示できる形式で返却 */
+  getTaskTags(task: Task): Tag[] {
+    if (!task.tagIds || task.tagIds.length === 0) {
+      return [];
+    }
+
+    return task.tagIds
+      .map(tagId => this.tagMap[tagId])
+      .filter((tag): tag is Tag => Boolean(tag)); // 情報が揃っているタグのみ表示
+  }
   /** 重要度の日本語ラベルを取得 */
   getImportanceLabel(importance?: Importance | null): string {
     const key = importance ?? 'Low';
