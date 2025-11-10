@@ -89,6 +89,21 @@
   color: var(--issue-color, #333);
 }
 
+.summary-text h3 .issue-label {
+  color: #64748b;
+  font-weight: 500;
+  font-size: 16px;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.summary-text h3 .issue-name {
+  color: var(--issue-color, #0f172a);
+  font-weight: 700;
+  font-size: 20px;
+  display: inline-block;
+}
+
 
 .summary-goal {
   margin: 4px 0 0;
@@ -382,11 +397,6 @@
   border-top: 4px solid transparent;
 }
 
-.task-card.representative-task {
-  border-color: #f5c542;
-  box-shadow: 0 6px 20px rgba(245, 197, 66, 0.25);
-}
-
 .task-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transform: translateY(-2px);
@@ -421,17 +431,6 @@
   gap: 8px;
   flex: 1;
   flex-wrap: wrap;
-}
-
-.representative-badge {
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #ffd54f, #f9a825);
-  color: #4a3600;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .task-theme-marker {
@@ -1300,14 +1299,6 @@
 .btn-icon--labeled:hover {
   background: rgba(0, 0, 0, 0.05);
   color: #222;
-}
-
-.icon-star::before {
-  content: '⭐';
-}
-
-.icon-remove-star::before {
-  content: '✖️';
 }
 
 .icon-success::before {

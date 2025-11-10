@@ -84,10 +84,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
   selectedTask: Task | null = null;
   pendingFocusTaskId: string | null = null;
   newChecklistText = '';
-  representativeTaskUpdatingId: string | null = null; // 代表タスク更新中のタスクID
-  representativeTaskMessage = '';
-  representativeTaskError = '';
-  private representativeFeedbackTimeout: ReturnType<typeof setTimeout> | null = null;
   currentRole: Role | null = null;
   currentUid: string | null = null;
   currentUserProfile: UserDirectoryProfile | null = null;
@@ -186,10 +182,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-    if (this.representativeFeedbackTimeout) {
-      clearTimeout(this.representativeFeedbackTimeout);
-      this.representativeFeedbackTimeout = null;
-    }
   }
 
   goToIssuesList(): void {
@@ -1595,88 +1587,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * 課題内で代表タスクに設定されているかを判定
-   */
-  isRepresentativeTask(task: Task): boolean {
-    if (!task.id) {
-      return false;
-    }
-    return this.issueDetails?.representativeTaskId === task.id;
-  }
-
-  /**
-   * 代表タスク設定操作の完了メッセージを一定時間表示
-   */
-  private showRepresentativeFeedback(message: string, isError = false): void {
-    if (this.representativeFeedbackTimeout) {
-      clearTimeout(this.representativeFeedbackTimeout);
-      this.representativeFeedbackTimeout = null;
-    }
-
-    if (isError) {
-      this.representativeTaskError = message;
-      this.representativeTaskMessage = '';
-    } else {
-      this.representativeTaskMessage = message;
-      this.representativeTaskError = '';
-    }
-
-    this.representativeFeedbackTimeout = setTimeout(() => {
-      this.representativeTaskMessage = '';
-      this.representativeTaskError = '';
-      this.representativeFeedbackTimeout = null;
-    }, 4000);
-  }
-
-  /**
-   * 指定タスクを代表タスクとして登録
-   */
-  async markAsRepresentative(task: Task, event: Event): Promise<void> {
-    event.stopPropagation();
-    if (!task.id || !this.issueDetails?.id) {
-      return;
-    }
-
-    this.representativeTaskUpdatingId = task.id;
-    try {
-      await this.issuesService.setRepresentativeTask(this.projectId, this.issueId, task.id);
-      this.issueDetails = { ...this.issueDetails, representativeTaskId: task.id };
-      this.showRepresentativeFeedback(`タスク「${task.title}」を代表に設定しました。`);
-    } catch (error) {
-      console.error('代表タスクの設定に失敗しました:', error);
-      this.showRepresentativeFeedback('代表タスクの設定に失敗しました。時間を置いて再度お試しください。', true);
-    } finally {
-      this.representativeTaskUpdatingId = null;
-    }
-  }
-
-  /**
-   * 代表タスク設定を解除
-   */
-  async clearRepresentativeTask(task: Task, event: Event): Promise<void> {
-    event.stopPropagation();
-    if (!this.issueDetails?.id) {
-      return;
-    }
-
-    const currentTaskId = this.issueDetails.representativeTaskId ?? null;
-    if (!currentTaskId) {
-      return;
-    }
-
-    this.representativeTaskUpdatingId = currentTaskId;
-    try {
-      await this.issuesService.setRepresentativeTask(this.projectId, this.issueId, null);
-      this.issueDetails = { ...this.issueDetails, representativeTaskId: null };
-      this.showRepresentativeFeedback(`タスク「${task.title}」の代表設定を解除しました。`);
-    } catch (error) {
-      console.error('代表タスクの解除に失敗しました:', error);
-      this.showRepresentativeFeedback('代表タスクの解除に失敗しました。時間を置いて再度お試しください。', true);
-    } finally {
-      this.representativeTaskUpdatingId = null;
-    }
-  }
    /**
    * 課題サマリーに適用するCSSカスタムプロパティを生成
    * テンプレート側でテーマカラーを強調表示するために使用

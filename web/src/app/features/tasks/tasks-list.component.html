@@ -4,20 +4,6 @@
 
   <!-- タスク画面本体を右側に配置 -->
   <div class="tasks-container">
-  <!-- ヘッダー -->
-  <div class="header">
-    <div class="header-left">
-      <button class="btn btn-secondary back-button" type="button" (click)="goToIssuesList()">
-        <span class="back-button__icon" aria-hidden="true">←</span>
-        課題へ戻る
-      </button>
-      <h2>タスク一覧</h2>
-    </div>
-    <button class="btn btn-primary" *ngIf="canCreateTask()" (click)="openCreateModal()">
-      <i class="icon-plus"></i> 新規タスク
-    </button>
-  </div>
-
   <!-- 課題のサマリーパネル -->
   <!-- テーマカラー強調用のスタイル変数を注入 -->
   <section
@@ -32,7 +18,7 @@
           [style.background-color]="getIssueThemeColor()"
         ></span>
         <div class="summary-text">
-          <h3>{{ issueDetails.name }}</h3>
+          <h3><span class="issue-label">課題:</span> <span class="issue-name">{{ issueDetails.name }}</span></h3>
           <p class="summary-goal" *ngIf="issueDetails.goal">{{ issueDetails.goal }}</p>
         </div>
       </div>
@@ -62,6 +48,20 @@
       <span class="value">{{ issueProgress | number:'1.0-1' }}%</span>
     </div>
   </section>
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-left">
+      <button class="btn btn-secondary back-button" type="button" (click)="goToIssuesList()">
+        <span class="back-button__icon" aria-hidden="true">←</span>
+        課題一覧
+      </button>
+      <h2>タスク一覧</h2>
+    </div>
+    <button class="btn btn-primary" *ngIf="canCreateTask()" (click)="openCreateModal()">
+      <i class="icon-plus"></i> 新規タスク
+    </button>
+  </div>
 
   <!-- フィルター・並び替え -->
   <div class="filters">
@@ -130,15 +130,6 @@
     </div>
   </div>
 
-   <!-- 代表タスク操作のフィードバックメッセージ -->
-   <div *ngIf="representativeTaskMessage" class="feedback feedback--success">
-    <i class="icon-success"></i>
-    {{ representativeTaskMessage }}
-  </div>
-  <div *ngIf="representativeTaskError" class="feedback feedback--error">
-    <i class="icon-error"></i>
-    {{ representativeTaskError }}
-  </div>
   <!-- タスク一覧 -->
   <div class="tasks-grid">
     <div
@@ -147,7 +138,6 @@
       [class.completed]="task.status === 'completed'"
       [class.discarded]="task.status === 'discarded'"
       [class.archived]="task.archived"
-      [class.representative-task]="isRepresentativeTask(task)"
       [style.borderTopColor]="getIssueThemeColor()"
       (click)="selectTask(task)"
       (keydown.enter)="selectTask(task)"
@@ -166,26 +156,6 @@
             <i class="icon-archive" aria-hidden="true"></i>
             <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
           </button>
-          <button
-          class="btn-icon btn-icon--labeled"
-          *ngIf="isAdmin() && !isRepresentativeTask(task)"
-          (click)="markAsRepresentative(task, $event)"
-          [disabled]="representativeTaskUpdatingId === task.id"
-          title="代表タスクに設定"
-        >
-          <i class="icon-star" aria-hidden="true"></i>
-          <span class="btn-label">代表に設定</span>
-        </button>
-        <button
-          class="btn-icon btn-icon--labeled"
-          *ngIf="isAdmin() && isRepresentativeTask(task)"
-          (click)="clearRepresentativeTask(task, $event)"
-          [disabled]="representativeTaskUpdatingId === task.id"
-          title="代表タスクを解除"
-        >
-          <i class="icon-remove-star" aria-hidden="true"></i>
-          <span class="btn-label">代表解除</span>
-        </button>
         <button class="btn-icon btn-icon--labeled" *ngIf="canDeleteTask(task)" (click)="deleteTask(task, $event)" title="削除">
           <i class="icon-delete" aria-hidden="true"></i>
           <span class="btn-label">削除</span>
@@ -196,7 +166,6 @@
             class="task-theme-marker"
             [style.background-color]="getIssueThemeColor()"
           ></div>
-          <span *ngIf="isRepresentativeTask(task)" class="representative-badge">代表</span>
           <h3>{{ task.title }}</h3>
           <span class="importance-chip" [ngClass]="getImportanceClass(task.importance)">
             {{ getImportanceLabel(task.importance) }}

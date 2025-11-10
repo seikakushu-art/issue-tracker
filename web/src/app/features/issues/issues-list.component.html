@@ -4,25 +4,11 @@
 
   <!-- 右側メインカラム（既存の課題一覧UI） -->
   <div class="issues-container">
-  <!-- ヘッダー -->
-  <div class="header">
-    <div class="header-left">
-      <button class="btn btn-secondary back-button" type="button" (click)="goToProjectsList()">
-        <span class="back-button__icon" aria-hidden="true">←</span>
-        プロジェクトへ戻る
-      </button>
-      <h2>課題一覧</h2>
-    </div>
-    <button class="btn btn-primary" *ngIf="isAdmin()" (click)="openCreateModal()">
-      <i class="icon-plus"></i> 新規課題
-    </button>
-  </div>
-
   <!-- フィルター・並び替え -->
   <section *ngIf="projectDetails" class="project-summary">
     <div class="summary-header">
       <div class="summary-title">
-        <h3>{{ projectDetails.name }}</h3>
+        <h3><span class="project-label">プロジェクト:</span> <span class="project-name">{{ projectDetails.name }}</span></h3>
         <p class="summary-goal" *ngIf="projectDetails.goal">{{ projectDetails.goal }}</p>
       </div>
       <div class="summary-dates">
@@ -79,6 +65,20 @@
       </span>
     </div>
   </section>
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="header-left">
+      <button class="btn btn-secondary back-button" type="button" (click)="goToProjectsList()">
+        <span class="back-button__icon" aria-hidden="true">←</span>
+        プロジェクト一覧
+      </button>
+      <h2>課題一覧</h2>
+    </div>
+    <button class="btn btn-primary" *ngIf="isAdmin()" (click)="openCreateModal()">
+      <i class="icon-plus"></i> 新規課題
+    </button>
+  </div>
 
   <div class="filters">
     <div class="filter-group filter-group--smart">
