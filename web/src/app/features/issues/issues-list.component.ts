@@ -549,8 +549,25 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
       alert('課題を変更する権限がありません');
       return;
     }
-    if (!this.issueForm.name.trim()) {
+    const trimmedName = this.issueForm.name.trim();
+    if (!trimmedName) {
       alert('課題名を入力してください');
+      return;
+    }
+    if (trimmedName.length > 80) {
+      alert('課題名は80文字以内で入力してください');
+      return;
+    }
+
+    const trimmedDescription = this.issueForm.description?.trim() || '';
+    if (trimmedDescription.length > 500) {
+      alert('説明は500文字以内で入力してください');
+      return;
+    }
+
+    const trimmedGoal = this.issueForm.goal?.trim() || '';
+    if (trimmedGoal.length > 500) {
+      alert('達成目標は500文字以内で入力してください');
       return;
     }
 
@@ -559,10 +576,10 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
       const targetProjectId = this.editingIssue ? (this.issueForm.projectId || this.projectId) : this.projectId;
       const issueData = {
         name: this.issueForm.name.trim(),
-        description: this.issueForm.description.trim() || undefined,
+        description: trimmedDescription || undefined,
         startDate: this.issueForm.startDate ? new Date(this.issueForm.startDate) : undefined,
         endDate: this.issueForm.endDate ? new Date(this.issueForm.endDate) : undefined,
-        goal: this.issueForm.goal.trim() || undefined,
+        goal: trimmedGoal || undefined,
         themeColor: this.issueForm.themeColor || undefined
       };
 

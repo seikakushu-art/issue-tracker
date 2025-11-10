@@ -408,6 +408,7 @@
           type="text"
           [(ngModel)]="newChecklistText"
           placeholder="新しい項目を入力"
+          maxlength="100"
           (keydown.enter)="addChecklistItemFromDetail()"
           [disabled]="!canEditTask(selectedTask)"
         >
@@ -731,6 +732,7 @@
           [(ngModel)]="taskForm.title" 
           name="title"
           required
+          maxlength="80"
           placeholder="タスクのタイトルを入力"
         >
       </div>
@@ -741,6 +743,7 @@
           id="description"
           [(ngModel)]="taskForm.description" 
           name="description"
+          maxlength="500"
           placeholder="タスクの説明を入力"
           rows="3"
         ></textarea>
@@ -796,6 +799,7 @@
           id="goal"
           [(ngModel)]="taskForm.goal" 
           name="goal"
+          maxlength="500"
           placeholder="タスクの達成目標を入力"
           rows="2"
         ></textarea>
@@ -882,6 +886,7 @@
               [(ngModel)]="item.text"
               [name]="'checklist-text-' + i"
               placeholder="チェック項目を入力"
+              maxlength="100"
               class="checklist-input"
             >
             <button 

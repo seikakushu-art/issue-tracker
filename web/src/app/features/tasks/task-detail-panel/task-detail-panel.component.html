@@ -23,9 +23,6 @@
         <h2>{{ task.title }}</h2>
       </div>
       <div class="detail-actions">
-        <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(task)" (click)="requestEdit()">
-          編集
-        </button>
         <button class="btn btn-secondary btn-sm" (click)="goToTaskDetail()">
           タスクへ
         </button>
@@ -117,6 +114,7 @@
           type="text"
           [(ngModel)]="newChecklistText"
           placeholder="新しい項目を入力"
+          maxlength="100"
           (keydown.enter)="addChecklistItem()"
           [disabled]="!canEditTask(task)"
         >

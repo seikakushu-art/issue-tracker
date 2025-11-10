@@ -831,8 +831,25 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    * プロジェクトを保存
    */
   async saveProject() {
-    if (!this.projectForm.name.trim()) {
+    const trimmedName = this.projectForm.name.trim();
+    if (!trimmedName) {
       alert('プロジェクト名を入力してください');
+      return;
+    }
+    if (trimmedName.length > 80) {
+      alert('プロジェクト名は80文字以内で入力してください');
+      return;
+    }
+
+    const trimmedDescription = this.projectForm.description?.trim() || '';
+    if (trimmedDescription.length > 500) {
+      alert('説明は500文字以内で入力してください');
+      return;
+    }
+
+    const trimmedGoal = this.projectForm.goal?.trim() || '';
+    if (trimmedGoal.length > 500) {
+      alert('達成目標は500文字以内で入力してください');
       return;
     }
 
@@ -840,10 +857,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     try {
       const projectData = {
         name: this.projectForm.name.trim(),
-        description: this.projectForm.description.trim() || undefined,
+        description: trimmedDescription || undefined,
         startDate: this.projectForm.startDate ? new Date(this.projectForm.startDate) : undefined,
         endDate: this.projectForm.endDate ? new Date(this.projectForm.endDate) : undefined,
-        goal: this.projectForm.goal.trim() || undefined
+        goal: trimmedGoal || undefined
       };
 
       if (this.editingProject) {

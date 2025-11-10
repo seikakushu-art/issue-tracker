@@ -1328,16 +1328,45 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.taskForm.title) return;
+    const trimmedTitle = this.taskForm.title?.trim() || '';
+    if (!trimmedTitle) {
+      alert('タスクのタイトルを入力してください');
+      return;
+    }
+    if (trimmedTitle.length > 80) {
+      alert('タスクのタイトルは80文字以内で入力してください');
+      return;
+    }
+
+    const trimmedDescription = this.taskForm.description?.trim() || '';
+    if (trimmedDescription.length > 500) {
+      alert('説明は500文字以内で入力してください');
+      return;
+    }
+
+    const trimmedGoal = this.taskForm.goal?.trim() || '';
+    if (trimmedGoal.length > 500) {
+      alert('達成目標は500文字以内で入力してください');
+      return;
+    }
+
+    // チェックリスト項目の文字数チェック
+    for (const item of this.taskForm.checklist) {
+      const trimmedText = item.text?.trim() || '';
+      if (trimmedText.length > 100) {
+        alert('チェックリスト項目は100文字以内で入力してください');
+        return;
+      }
+    }
 
     this.saving = true;
     try {
       const taskData = {
-        title: this.taskForm.title,
-        description: this.taskForm.description || null,
+        title: trimmedTitle,
+        description: trimmedDescription || null,
         startDate: this.taskForm.startDate ? this.normalizeDate(this.taskForm.startDate) : null,
         endDate: this.taskForm.endDate ? this.normalizeDate(this.taskForm.endDate) : null,
-        goal: this.taskForm.goal || null,
+        goal: trimmedGoal || null,
         importance: this.taskForm.importance,
         status: this.taskForm.status,
         tagIds: this.taskForm.tagIds,
@@ -1898,6 +1927,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
   async addChecklistItemFromDetail() {
     const text = this.newChecklistText.trim();
     if (!text || !this.selectedTask) {
+      return;
+    }
+    if (text.length > 100) {
+      alert('チェックリスト項目は100文字以内で入力してください');
       return;
     }
     if (!this.canEditTask(this.selectedTask)) {

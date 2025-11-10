@@ -376,6 +376,7 @@
           [(ngModel)]="projectForm.name" 
           name="name"
           required
+          maxlength="80"
           placeholder="プロジェクト名を入力"
         >
       </div>
@@ -386,6 +387,7 @@
           id="description"
           [(ngModel)]="projectForm.description" 
           name="description"
+          maxlength="500"
           placeholder="プロジェクトの説明を入力"
           rows="3"
         ></textarea>
@@ -418,6 +420,7 @@
             id="goal"
             [(ngModel)]="projectForm.goal" 
             name="goal"
+            maxlength="500"
             placeholder="プロジェクトの達成目標を入力"
             rows="2"
           ></textarea>

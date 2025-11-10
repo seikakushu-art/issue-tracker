@@ -70,7 +70,6 @@ import {
   
     @Output() closed = new EventEmitter<void>();
     @Output() taskChanged = new EventEmitter<Task>();
-    @Output() editRequested = new EventEmitter<void>();
   
     project: Project | null = null;
     issue: Issue | null = null;
@@ -141,10 +140,6 @@ import {
   
     close(): void {
       this.closed.emit();
-    }
-  
-    requestEdit(): void {
-      this.editRequested.emit();
     }
 
     goToTaskDetail(): void {
@@ -526,6 +521,10 @@ import {
       }
       const text = this.newChecklistText.trim();
       if (!text) {
+        return;
+      }
+      if (text.length > 100) {
+        alert('チェックリスト項目は100文字以内で入力してください');
         return;
       }
       const nextChecklist: ChecklistItem[] = [
