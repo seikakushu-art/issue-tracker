@@ -24,7 +24,10 @@
       </div>
       <div class="detail-actions">
         <button class="btn btn-secondary btn-sm" *ngIf="canEditTask(task)" (click)="requestEdit()">
-          📝編集
+          編集
+        </button>
+        <button class="btn btn-secondary btn-sm" (click)="goToTaskDetail()">
+          タスクへ
         </button>
         <button class="btn-icon" (click)="close()" aria-label="閉じる">
           <i class="icon-close"></i>
@@ -61,7 +64,7 @@
           <dt>終了日</dt>
           <dd>{{ task.endDate | date:'yyyy/MM/dd' }}</dd>
         </div>
-        <div *ngIf="task.goal">
+        <div *ngIf="task.goal" class="goal-item">
           <dt>達成目標</dt>
           <dd>{{ task.goal }}</dd>
         </div>
@@ -280,12 +283,14 @@
               <span class="comment-author">{{ comment.authorUsername }}</span>
               <time class="comment-time">{{ comment.createdAt | date:'yyyy/MM/dd HH:mm' }}</time>
             </div>
-            <p class="comment-text">{{ comment.text }}</p>
-            <div class="comment-mentions" *ngIf="comment.mentions?.length">
-              <span class="mention-chip" *ngFor="let mentionId of comment.mentions">
-                {{ '@' + getMentionLabel(mentionId) }}
-              </span>
-            </div>
+            <p class="comment-text">
+              <ng-container *ngFor="let segment of parseCommentText(comment.text, comment.mentions || [])">
+                <ng-container *ngIf="segment.type === 'text'">{{ segment.content }}</ng-container>
+                <span *ngIf="segment.type === 'mention'" class="mention-chip">
+                  {{ segment.content }}
+                </span>
+              </ng-container>
+            </p>
           </div>
         </article>
       </div>

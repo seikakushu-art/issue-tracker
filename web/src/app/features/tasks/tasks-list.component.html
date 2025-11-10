@@ -212,14 +212,16 @@
         <div class="progress-section">
           <div class="progress-label">
             <span>進捗</span>
-            <span class="progress-value">{{ getTaskProgress(task) | number:'1.0-0' }}%</span>
           </div>
-          <div class="progress-bar">
-          <div
-              class="progress-fill"
-              [style.width.%]="getTaskProgress(task)"
-              [style.background-color]="getIssueThemeColor()"
-            ></div>
+          <div class="detail-progress">
+            <div class="progress-bar">
+              <div
+                class="progress-fill"
+                [style.width.%]="getTaskProgress(task)"
+                [style.background-color]="getIssueThemeColor()"
+              ></div>
+            </div>
+            <span class="progress-value">{{ getTaskProgress(task) | number:'1.0-0' }}%</span>
           </div>
         </div>
 
@@ -325,7 +327,7 @@
           <dt>終了日</dt>
           <dd>{{ selectedTask.endDate | date:'yyyy/MM/dd' }}</dd>
         </div>
-        <div *ngIf="selectedTask.goal">
+        <div *ngIf="selectedTask.goal" class="goal-item">
           <dt>達成目標</dt>
           <dd>{{ selectedTask.goal }}</dd>
         </div>
@@ -578,12 +580,14 @@
               <span class="comment-author">{{ comment.authorUsername }}</span>
               <time class="comment-time">{{ comment.createdAt | date:'yyyy/MM/dd HH:mm' }}</time>
             </div>
-            <p class="comment-text">{{ comment.text }}</p>
-            <div class="comment-mentions" *ngIf="comment.mentions?.length">
-              <span class="mention-chip" *ngFor="let mentionId of comment.mentions">
-                {{ '@' + getMentionLabel(mentionId) }}
-              </span>
-            </div>
+            <p class="comment-text">
+              <ng-container *ngFor="let segment of parseCommentText(comment.text, comment.mentions || [])">
+                <ng-container *ngIf="segment.type === 'text'">{{ segment.content }}</ng-container>
+                <span *ngIf="segment.type === 'mention'" class="mention-chip">
+                  {{ segment.content }}
+                </span>
+              </ng-container>
+            </p>
           </div>
         </article>
       </div>

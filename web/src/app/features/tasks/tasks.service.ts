@@ -377,12 +377,8 @@ export class TasksService {
       normalized.themeColor = null;
     }
 
-    if (record['startDate']) {
-      normalized.startDate = this.normalizeDate(record['startDate']);
-    }
-    if (record['endDate']) {
-      normalized.endDate = this.normalizeDate(record['endDate']);
-    }
+    normalized.startDate = this.normalizeDate(record['startDate'] ?? null);
+    normalized.endDate = this.normalizeDate(record['endDate'] ?? null);
     if (record['createdAt']) {
       normalized.createdAt = this.normalizeDate(record['createdAt']);
     }
@@ -495,14 +491,7 @@ export class TasksService {
     
     if (docSnap.exists()) {
       const data = docSnap.data() as Task;
-      return {
-        id: docSnap.id,
-        ...data,
-        assigneeIds: data.assigneeIds ?? [],
-        tagIds: data.tagIds ?? [],
-        checklist: data.checklist ?? [],
-        archived: data.archived ?? false,
-      };
+      return this.hydrateTask(docSnap.id, data);
     }
     return null;
   }

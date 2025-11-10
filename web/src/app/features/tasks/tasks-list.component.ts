@@ -1071,6 +1071,69 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return this.projectMemberProfiles[uid]?.username ?? uid;
   }
 
+  /**
+   * コメントテキストを解析して、テキスト部分とメンション部分を分離する
+   */
+  parseCommentText(text: string, mentionIds: string[]): Array<{ type: 'text' | 'mention'; content: string; mentionId?: string }> {
+    if (!text) {
+      return [];
+    }
+
+    const segments: Array<{ type: 'text' | 'mention'; content: string; mentionId?: string }> = [];
+    const mentionMap = new Map<string, string>();
+    
+    // メンションIDからユーザー名のマップを作成
+    for (const uid of mentionIds) {
+      const username = this.getMentionLabel(uid);
+      mentionMap.set(`@${username}`, uid);
+    }
+
+    // 正規表現で@usernameパターンを検出
+    const mentionPattern = /@(\S+)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = mentionPattern.exec(text)) !== null) {
+      // メンションの前のテキスト部分
+      if (match.index > lastIndex) {
+        segments.push({
+          type: 'text',
+          content: text.substring(lastIndex, match.index),
+        });
+      }
+
+      // メンション部分
+      const mentionText = match[0];
+      const mentionId = mentionMap.get(mentionText);
+      
+      if (mentionId) {
+        segments.push({
+          type: 'mention',
+          content: mentionText,
+          mentionId,
+        });
+      } else {
+        // メンションIDが見つからない場合は通常のテキストとして扱う
+        segments.push({
+          type: 'text',
+          content: mentionText,
+        });
+      }
+
+      lastIndex = mentionPattern.lastIndex;
+    }
+
+    // 残りのテキスト部分
+    if (lastIndex < text.length) {
+      segments.push({
+        type: 'text',
+        content: text.substring(lastIndex),
+      });
+    }
+
+    return segments;
+  }
+
   getCommentInitial(comment: TaskCommentView): string {
     return getAvatarInitial(comment.authorUsername || comment.createdBy, '?');
   }

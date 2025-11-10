@@ -236,6 +236,28 @@
   word-break: break-word;
 }
 
+// 達成目標欄の特別なスタイル
+.detail-meta .goal-item {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.detail-meta .goal-item dt {
+  font-size: 12px;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detail-meta .goal-item dd {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+  word-break: break-word;
+  width: 100%;
+  max-width: 100%;
+}
+
 .detail-progress {
   display: flex;
   align-items: center;
@@ -400,6 +422,38 @@
 
 .btn-label {
   white-space: nowrap;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #0056b3;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #545b62;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .status-badge {
