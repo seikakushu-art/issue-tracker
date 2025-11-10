@@ -245,6 +245,13 @@ export class TasksService {
   ): Promise<string> {
     const { project, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     
+    // アクティブなタスク数の上限チェック（300件）
+    const activeTaskCount = await this.countActiveTasks(projectId, issueId);
+    const MAX_ACTIVE_TASKS = 300;
+    if (activeTaskCount >= MAX_ACTIVE_TASKS) {
+      throw new Error(`アクティブなタスクの上限（${MAX_ACTIVE_TASKS}件）に達しています。新しいタスクを作成するには、既存のタスクをアーカイブするか削除してください。`);
+    }
+    
     // 名称重複チェック
     await this.checkTitleUniqueness(projectId, issueId, input.title);
 
@@ -398,6 +405,26 @@ export class TasksService {
       return snap.docs.length;
     } catch (error) {
       console.error('Error counting tasks:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * アクティブなタスク数をカウントする
+   * @param projectId プロジェクトID
+   * @param issueId 課題ID
+   * @returns アクティブなタスク数（アーカイブされていないもの）
+   */
+  private async countActiveTasks(projectId: string, issueId: string): Promise<number> {
+    try {
+      const q = query(
+        collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`),
+        where('archived', '==', false)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.length;
+    } catch (error) {
+      console.error('Error counting active tasks:', error);
       return 0;
     }
   }

@@ -1639,6 +1639,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // タグ名の文字数上限チェック（10文字）
+    const MAX_TAG_NAME_LENGTH = 10;
+    if (name.length > MAX_TAG_NAME_LENGTH) {
+      alert(`タグ名は最大${MAX_TAG_NAME_LENGTH}文字までです`);
+      return;
+    }
+
     if (this.creatingTag) {
       return; // 二重クリックによる多重送信を防止
     }

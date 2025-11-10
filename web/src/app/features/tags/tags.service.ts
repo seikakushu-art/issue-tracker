@@ -183,13 +183,24 @@ export class TagsService {
   }): Promise<string> {
     const user = await this.requireUser();
 
+    const trimmedName = input.name.trim();
+    if (!trimmedName) {
+      throw new Error('タグ名を入力してください');
+    }
+
+    // タグ名の文字数上限チェック（10文字）
+    const MAX_TAG_NAME_LENGTH = 10;
+    if (trimmedName.length > MAX_TAG_NAME_LENGTH) {
+      throw new Error(`タグ名は最大${MAX_TAG_NAME_LENGTH}文字までです`);
+    }
+
     const tags = await this.fetchTagsRaw();
-    this.ensureUniqueName(input.name, tags);
+    this.ensureUniqueName(trimmedName, tags);
 
     const resolvedColor = this.resolveUniqueColor(input.color ?? null, tags);
 
     const payload: Record<string, unknown> = {
-      name: input.name,
+      name: trimmedName,
       color: resolvedColor,
       createdAt: serverTimestamp(),
       createdBy: user.uid,
@@ -294,7 +305,19 @@ export class TagsService {
     }
 
     if (updates.name !== undefined && cachedTags) {
-      this.ensureUniqueName(updates.name, cachedTags, tagId);
+      const trimmedName = updates.name.trim();
+      if (!trimmedName) {
+        throw new Error('タグ名を入力してください');
+      }
+
+      // タグ名の文字数上限チェック（10文字）
+      const MAX_TAG_NAME_LENGTH = 10;
+      if (trimmedName.length > MAX_TAG_NAME_LENGTH) {
+        throw new Error(`タグ名は最大${MAX_TAG_NAME_LENGTH}文字までです`);
+      }
+
+      updates.name = trimmedName;
+      this.ensureUniqueName(trimmedName, cachedTags, tagId);
     }
 
     if (updates.color !== undefined) {

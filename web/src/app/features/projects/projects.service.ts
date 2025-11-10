@@ -194,6 +194,13 @@ export class ProjectsService {
     console.log('●●●createProject called with:', input);
     const uid = (await this.requireUser()).uid;
     
+    // アクティブなプロジェクト数の上限チェック（30件）
+    const activeProjectCount = await this.countActiveProjects();
+    const MAX_ACTIVE_PROJECTS = 30;
+    if (activeProjectCount >= MAX_ACTIVE_PROJECTS) {
+      throw new Error(`アクティブなプロジェクトの上限（${MAX_ACTIVE_PROJECTS}件）に達しています。新しいプロジェクトを作成するには、既存のプロジェクトをアーカイブするか削除してください。`);
+    }
+    
     // プロジェクト名重複チェック（アクティブ内で一意）
     await this.checkNameUniqueness(input.name);
     
@@ -390,6 +397,15 @@ export class ProjectsService {
     await updateDoc(docRef, updates as any);
   }
 
+
+  /**
+   * アクティブなプロジェクト数をカウントする
+   * @returns アクティブなプロジェクト数（アーカイブされていないもの）
+   */
+  private async countActiveProjects(): Promise<number> {
+    const projects = await this.listMyProjects();
+    return projects.filter(project => !project.archived).length;
+  }
 
   /**
    * プロジェクト名の重複をチェックする

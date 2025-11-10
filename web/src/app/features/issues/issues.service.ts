@@ -178,6 +178,13 @@ export class IssuesService {
   }): Promise<string> {
     await this.projectsService.ensureProjectRole(projectId, ['admin']);
     
+    // アクティブな課題数の上限チェック（50件）
+    const activeIssueCount = await this.countActiveIssues(projectId);
+    const MAX_ACTIVE_ISSUES = 50;
+    if (activeIssueCount >= MAX_ACTIVE_ISSUES) {
+      throw new Error(`アクティブな課題の上限（${MAX_ACTIVE_ISSUES}件）に達しています。新しい課題を作成するには、既存の課題をアーカイブするか削除してください。`);
+    }
+    
     // 名称重複チェック
     await this.checkNameUniqueness(projectId, input.name);
 
@@ -275,6 +282,15 @@ export class IssuesService {
       console.error('Error counting issues:', error);
       return 0;
     }
+  }
+
+  /**
+   * アクティブな課題数をカウントする
+   * @param projectId プロジェクトID
+   * @returns アクティブな課題数（アーカイブされていないもの）
+   */
+  private async countActiveIssues(projectId: string): Promise<number> {
+    return await this.countIssues(projectId, false);
   }
 
 
