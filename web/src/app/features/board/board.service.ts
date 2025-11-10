@@ -7,6 +7,8 @@ import {
   getDocs,
   query,
   where,
+  orderBy,
+  limit,
   doc,
   getDoc,
   getCountFromServer,
@@ -192,13 +194,6 @@ export class BoardService {
       throw new Error('内容は20000文字以内で入力してください');
     }
 
-    // 投稿数の制限チェック（最大5000件）
-    const collectionRef = collection(this.db, 'bulletinPosts');
-    const countSnapshot = await getCountFromServer(collectionRef);
-    const currentPostCount = countSnapshot.data().count;
-    if (currentPostCount >= 5000) {
-      throw new Error('掲示板の投稿数が上限（5000件）に達しています');
-    }
 
     const uniqueProjectIds = Array.from(new Set((input.projectIds ?? []).filter(Boolean)));
     if (uniqueProjectIds.length === 0) {
@@ -253,13 +248,21 @@ export class BoardService {
 
     const chunks = this.chunkProjectIds(accessibleIds);
     const collectionRef = collection(this.db, 'bulletinPosts');
+    const requestedLimit = options?.limit ?? 500;
 
+    // 各チャンククエリでorderByとlimitを使用して効率的に取得
+    // 複数チャンクがある場合に備えて、各チャンクでrequestedLimit件取得
     const snapshots = await Promise.all(
       chunks.map((ids) => {
         if (ids.length === 0) {
           return Promise.resolve(null);
         }
-        const q = query(collectionRef, where('projectIds', 'array-contains-any', ids));
+        const q = query(
+          collectionRef,
+          where('projectIds', 'array-contains-any', ids),
+          orderBy('createdAt', 'desc'),
+          limit(requestedLimit),
+        );
         return getDocs(q);
       }),
     );
@@ -278,6 +281,7 @@ export class BoardService {
       });
     }
 
+    // マージ後の投稿を日付順にソート（クエリで既にソート済みだが、複数チャンクのマージのため再ソート）
     const posts = Array.from(postsMap.values());
     posts.sort((a, b) => {
       const left = a.createdAt ? a.createdAt.getTime() : 0;
@@ -285,11 +289,8 @@ export class BoardService {
       return right - left;
     });
 
-    if (options?.limit && options.limit > 0) {
-      return posts.slice(0, options.limit);
-    }
-
-    return posts;
+    // 最終的にrequestedLimit件に制限
+    return posts.slice(0, requestedLimit);
   }
 
   async deletePost(postId: string): Promise<void> {

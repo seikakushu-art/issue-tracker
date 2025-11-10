@@ -552,7 +552,7 @@ export class NotificationService {
     // アクセス可能なプロジェクトだけを対象にすることで、不要な通知を抑える。
     const accessibleProjects = await this.fetchAccessibleProjectIds(uid);
 
-    // 当日終了タスクの抽出（担当タスクのみ）
+    // 本日締切・期限超過タスクの抽出（担当タスクのみ）
     const dueTodayTasks = await this.fetchDueTodayNotifications(uid, accessibleProjects, dueLimit);
 
     // メンション通知は閲覧権限のあるプロジェクトに限定して取得する
@@ -571,7 +571,7 @@ export class NotificationService {
   }
 
   /**
-   * 当日終了タスクを抽出し通知形式に整形する
+   * 本日締切・期限超過タスクを抽出し通知形式に整形する
    */
   private async fetchDueTodayNotifications(
     uid: string,
@@ -619,12 +619,16 @@ export class NotificationService {
         const startOfTodayNormalized = this.normalizeToTokyoDate(startOfToday);
 
         // デバッグログ
+        const isDueToday = dueDateNormalized.getTime() === startOfTodayNormalized.getTime();
+        const isOverdue = dueDateNormalized.getTime() < startOfTodayNormalized.getTime();
         console.log('[通知デバッグ] タスク:', {
           title: data.title,
           endDateRaw: dueDateRaw.toISOString(),
           endDateNormalized: dueDateNormalized.toISOString(),
           startOfTodayNormalized: startOfTodayNormalized.toISOString(),
-          isMatch: dueDateNormalized.getTime() === startOfTodayNormalized.getTime(),
+          isDueToday,
+          isOverdue,
+          isMatch: isDueToday || isOverdue,
           projectId: data.projectId,
           issueId: data.issueId,
           status: data.status,
@@ -633,21 +637,22 @@ export class NotificationService {
 
         const projectId = data.projectId;
         const assignees = Array.isArray(data.assigneeIds) ? data.assigneeIds : [];
+        // 本日以前の締切日を持つタスクを抽出（本日締切 + 期限超過）
         return (
           Boolean(data.projectId) &&
           Boolean(data.issueId) &&
-          dueDateNormalized.getTime() === startOfTodayNormalized.getTime() &&
+          dueDateNormalized.getTime() <= startOfTodayNormalized.getTime() &&
           accessibleProjects.has(projectId) &&
           assignees.includes(uid)
         );
       });
 
     if (candidateTasks.length === 0) {
-      console.log('[通知デバッグ] 本日終了タスクが見つかりませんでした');
+      console.log('[通知デバッグ] 本日締切・期限超過タスクが見つかりませんでした');
       return [];
     }
 
-    console.log('[通知デバッグ] 本日終了タスク候補:', candidateTasks.length, '件');
+    console.log('[通知デバッグ] 本日締切・期限超過タスク候補:', candidateTasks.length, '件');
 
     const projectIds = new Set<string>();
     const issueRefs = new Map<string, { projectId: string; issueId: string }>();

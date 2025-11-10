@@ -129,7 +129,7 @@
                     表示できるプロジェクトがありません。
                 </p>
                 <ul class="project-list" *ngIf="!snapshotLoading() && sortedProjectCards().length > 0">
-                    <li class="project-card" *ngFor="let project of (sortedProjectCards() | slice:0:2)"
+                    <li class="project-card" *ngFor="let project of sortedProjectCards()"
                         [ngClass]="getWarningClass(project.warningLevel)">
                         <div class="project-card__header">
                             <h3>{{ project.name }}</h3>

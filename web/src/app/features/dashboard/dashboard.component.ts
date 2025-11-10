@@ -149,10 +149,23 @@ export class DashboardComponent implements OnInit {
   /** メンション通知一覧 */
   readonly mentionNotifications = computed(() => this.startupNotifications()?.mentions ?? []);
 
-  /** 当日終了タスク件数 */
-  readonly dueTodayTotalCount = computed(() =>
-    this.dueTodayGroups().reduce((sum, group) => sum + group.tasks.length, 0),
-  );
+  /** 当日終了タスク件数（期限超過を除く） */
+  readonly dueTodayTotalCount = computed(() => {
+    const notifications = this.startupNotifications();
+    if (!notifications) {
+      return 0;
+    }
+    const now = new Date();
+    // 期限超過タスクを除外して、ユニークなタスク数をカウント
+    const uniqueTasks = new Set<string>();
+    for (const task of notifications.dueTodayTasks) {
+      const isOverdue = task.dueDate ? this.notificationService.isOverdue(task.dueDate, now) : false;
+      if (!isOverdue) {
+        uniqueTasks.add(task.taskId);
+      }
+    }
+    return uniqueTasks.size;
+  });
 
   /** ヘッダーに表示する通知の要約文 */
   readonly notificationHeadline = computed(() => {

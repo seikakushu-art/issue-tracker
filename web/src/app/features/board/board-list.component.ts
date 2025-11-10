@@ -83,7 +83,8 @@ export class BoardListComponent implements OnInit {
     this.loadingPosts.set(true);
     this.postsError.set(null);
     try {
-      const posts = await this.boardService.listAccessiblePosts();
+      // 最大500件まで閲覧可能
+      const posts = await this.boardService.listAccessiblePosts({ limit: 500 });
       const nameMap = new Map(
         this.accessibleProjects()
           .filter((project): project is Project & { id: string } => Boolean(project.id))

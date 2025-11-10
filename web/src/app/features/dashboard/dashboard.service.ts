@@ -100,8 +100,10 @@ export class DashboardService {
   async loadSnapshot(): Promise<DashboardSnapshot> {
     const projects = await this.projectsService.listMyProjects();
     // currentRole がオプションのため、未設定時は読み替える
+    // アーカイブ以外のプロジェクトのみを対象とする
     const resolvedRoleProjects = projects
       .filter((project): project is Project & { id: string } => Boolean(project.id))
+      .filter((project) => !project.archived)
       .map((project) => ({
         ...project,
         currentRole: project.currentRole ?? 'guest',
