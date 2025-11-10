@@ -41,6 +41,7 @@ export class AttachmentsListComponent implements OnInit {
   readonly error = signal<string>('');
   readonly lastUpdated = signal<Date | null>(null);
   readonly projects = signal<Project[]>([]);
+  readonly activeProjects = signal<Project[]>([]); // アーカイブされていないプロジェクトのみ
   readonly selectedProjectId = signal<string>('');
 
   async ngOnInit(): Promise<void> {
@@ -52,6 +53,17 @@ export class AttachmentsListComponent implements OnInit {
     try {
       const projects = await this.projectsService.listMyProjects();
       this.projects.set(projects);
+      // アーカイブされていないプロジェクトのみをフィルタリング
+      this.activeProjects.set(projects.filter(p => !p.archived));
+      
+      // 選択されているプロジェクトがアーカイブされている場合は選択をクリア
+      const selectedProjectId = this.selectedProjectId();
+      if (selectedProjectId) {
+        const selectedProject = projects.find(p => p.id === selectedProjectId);
+        if (selectedProject?.archived) {
+          this.selectedProjectId.set('');
+        }
+      }
     } catch (error) {
       console.error('プロジェクト一覧の取得に失敗しました:', error);
     }
@@ -66,8 +78,13 @@ export class AttachmentsListComponent implements OnInit {
       const selectedProjectId = this.selectedProjectId();
       
       // プロジェクトが選択されている場合はそのプロジェクトのみ、そうでなければ全て
+      // アーカイブされたプロジェクトは除外
       const projectIds = selectedProjectId
-        ? [selectedProjectId]
+        ? (() => {
+            const selectedProject = projects.find(p => p.id === selectedProjectId);
+            // 選択されたプロジェクトがアーカイブされている場合は除外
+            return selectedProject && !selectedProject.archived ? [selectedProjectId] : [];
+          })()
         : this.extractProjectIds(projects);
 
       if (projectIds.length === 0) {
@@ -84,8 +101,7 @@ export class AttachmentsListComponent implements OnInit {
       }
 
       const profileMap = await this.buildProfileMap(attachments);
-      const projectNameMap = new Map(projects.filter((project): project is Project & { id: string } => Boolean(project.id))
-        .map(project => [project.id!, project.name] as const));
+      const projectNameMap = new Map<string, string>(); // 使用されなくなったが、型の互換性のため残す
 
       const rows = attachments.map(attachment => this.composeRow(attachment, {
         profileMap,
@@ -137,6 +153,7 @@ export class AttachmentsListComponent implements OnInit {
   private extractProjectIds(projects: Project[]): string[] {
     return Array.from(new Set(
       projects
+        .filter(project => !project.archived) // アーカイブされたプロジェクトを除外
         .map(project => project.id)
         .filter((id): id is string => typeof id === 'string' && id.trim().length > 0),
     ));
@@ -161,13 +178,28 @@ export class AttachmentsListComponent implements OnInit {
     return profileMap;
   }
 
+  private getProjectDisplayName(projectId: string | undefined, allProjects: Project[]): string | null {
+    if (!projectId) {
+      return null;
+    }
+    const project = allProjects.find(p => p.id === projectId);
+    if (!project) {
+      return '削除されたプロジェクト';
+    }
+    if (project.archived) {
+      return 'アーカイブされたプロジェクト';
+    }
+    return project.name;
+  }
+
   private composeRow(
     attachment: Attachment,
     context: { profileMap: Map<string, string>; projectNameMap: Map<string, string> },
   ): AttachmentRow {
     const uploaderName = context.profileMap.get(attachment.uploadedBy) ?? attachment.uploadedBy ?? '不明なユーザー';
+    const projects = this.projects();
     const projectName = attachment.projectName
-      ?? (attachment.projectId ? context.projectNameMap.get(attachment.projectId) ?? null : null);
+      ?? this.getProjectDisplayName(attachment.projectId, projects);
 
     return {
       id: attachment.id,

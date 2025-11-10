@@ -208,6 +208,7 @@ export class BoardService {
     const allowedProjectIds = new Set(
       projects
         .filter((project): project is Project & { id: string } => Boolean(project.id))
+        .filter((project) => !project.archived) // アーカイブされたプロジェクトは投稿対象外
         .filter((project) => {
           const role = this.resolveRole(project, uid);
           return role === 'admin' || role === 'member';
@@ -239,7 +240,10 @@ export class BoardService {
 
   async listAccessiblePosts(options?: ListOptions): Promise<BulletinPost[]> {
     const projects = await this.projectsService.listMyProjects();
-    const accessibleProjects = projects.filter((project): project is Project & { id: string } => Boolean(project.id));
+    // アーカイブされていないプロジェクトのみを対象とする
+    const accessibleProjects = projects
+      .filter((project): project is Project & { id: string } => Boolean(project.id))
+      .filter((project) => !project.archived);
     if (accessibleProjects.length === 0) {
       return [];
     }

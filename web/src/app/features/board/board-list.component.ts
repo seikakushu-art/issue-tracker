@@ -72,11 +72,23 @@ export class BoardListComponent implements OnInit {
 
     try {
       const projects = await this.projectsService.listMyProjects();
-      this.accessibleProjects.set(projects);
+      // アーカイブされていないプロジェクトのみを表示対象とする
+      this.accessibleProjects.set(projects.filter(p => !p.archived));
     } catch (error) {
       console.error('Failed to load projects for board', error);
       this.accessibleProjects.set([]);
     }
+  }
+
+  private getProjectDisplayName(projectId: string, allProjects: Project[]): string {
+    const project = allProjects.find(p => p.id === projectId);
+    if (!project) {
+      return '削除されたプロジェクト';
+    }
+    if (project.archived) {
+      return 'アーカイブされたプロジェクト';
+    }
+    return project.name;
   }
 
   private async loadPosts(): Promise<void> {
@@ -85,14 +97,11 @@ export class BoardListComponent implements OnInit {
     try {
       // 最大500件まで閲覧可能
       const posts = await this.boardService.listAccessiblePosts({ limit: 500 });
-      const nameMap = new Map(
-        this.accessibleProjects()
-          .filter((project): project is Project & { id: string } => Boolean(project.id))
-          .map((project) => [project.id!, project.name] as const),
-      );
+      // 全てのプロジェクト（アーカイブ含む）を取得してプロジェクト名を解決
+      const allProjects = await this.projectsService.listMyProjects();
       const enriched = posts.map((post) => ({
         ...post,
-        projectNames: post.projectIds.map((projectId) => nameMap.get(projectId) ?? '不明なプロジェクト'),
+        projectNames: post.projectIds.map((projectId) => this.getProjectDisplayName(projectId, allProjects)),
       }));
       this.posts.set(enriched);
     } catch (error) {

@@ -460,7 +460,7 @@ export class NotificationService {
 
       const cards: ActionableTaskCard[] = enriched.map((item) => {
         const project = projectMap.get(item.task.projectId);
-        const projectName = project?.name ?? '不明なプロジェクト';
+        const projectName = this.getProjectDisplayName(project);
         const primaryReason = this.highlightPriority.find((reason) =>
           item.highlightReasons.includes(reason)
         );
@@ -677,10 +677,11 @@ export class NotificationService {
       } satisfies DueTodayNotification;
     });
 
-    const projectMap = await this.fetchProjectNames(projectIds);
+    const projectMap = await this.fetchProjects(projectIds);
     const issueMap = await this.fetchIssueNames(issueRefs);
     for (const task of tasks) {
-      task.projectName = projectMap.get(task.projectId) ?? '不明なプロジェクト';
+      const project = projectMap.get(task.projectId);
+      task.projectName = this.getProjectDisplayName(project);
       task.issueName = issueMap.get(`${task.projectId}/${task.issueId}`) ?? null;
     }
 
@@ -767,11 +768,12 @@ export class NotificationService {
     }
 
     const taskDetails = await this.fetchTaskSnapshots(taskRefs);
-    const projectMap = await this.fetchProjectNames(projectIds);
+    const projectMap = await this.fetchProjects(projectIds);
     const issueMap = await this.fetchIssueNames(issueRefs);
 
     for (const entry of commentEntries) {
-      entry.projectName = projectMap.get(entry.projectId) ?? '不明なプロジェクト';
+      const project = projectMap.get(entry.projectId);
+      entry.projectName = this.getProjectDisplayName(project);
       entry.issueName = issueMap.get(`${entry.projectId}/${entry.issueId}`) ?? null;
     }
 
@@ -854,9 +856,9 @@ export class NotificationService {
   }
 
   /**
-   * プロジェクト名をまとめて取得する
+   * プロジェクト情報をまとめて取得する
    */
-  private async fetchProjectNames(projectIds: Set<string>): Promise<Map<string, string>> {
+  private async fetchProjects(projectIds: Set<string>): Promise<Map<string, Project>> {
     const ids = Array.from(projectIds);
     if (ids.length === 0) {
       return new Map();
@@ -870,24 +872,37 @@ export class NotificationService {
             return null;
           }
           const data = snapshot.data() as Project;
-          const name = typeof data.name === 'string' && data.name.trim().length > 0
-            ? data.name.trim()
-            : '名称未設定プロジェクト';
-          return { projectId, name };
+          return { projectId, project: data };
         } catch (error) {
-          console.error('Failed to fetch project name for notification:', projectId, error);
+          console.error('Failed to fetch project for notification:', projectId, error);
           return null;
         }
       }),
     );
 
-    const map = new Map<string, string>();
+    const map = new Map<string, Project>();
     for (const entry of entries) {
       if (entry) {
-        map.set(entry.projectId, entry.name);
+        map.set(entry.projectId, entry.project);
       }
     }
     return map;
+  }
+
+  /**
+   * プロジェクトの表示名を取得する（アーカイブ・削除状態を考慮）
+   */
+  private getProjectDisplayName(project: Project | undefined): string {
+    if (!project) {
+      return '削除されたプロジェクト';
+    }
+    if (project.archived) {
+      return 'アーカイブされたプロジェクト';
+    }
+    const name = typeof project.name === 'string' && project.name.trim().length > 0
+      ? project.name.trim()
+      : '名称未設定プロジェクト';
+    return name;
   }
 
   /**

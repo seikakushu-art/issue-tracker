@@ -15,7 +15,7 @@
         >
           <option value="">全てのプロジェクト</option>
           <option
-            *ngFor="let project of projects()"
+            *ngFor="let project of activeProjects()"
             [value]="project.id"
           >
             {{ project.name }}
@@ -74,7 +74,7 @@
               </a>
             </div>
           </td>
-          <td>{{ attachment.projectName || '不明なプロジェクト' }}</td>
+          <td>{{ attachment.projectName ?? '不明なプロジェクト' }}</td>
           <td>{{ attachment.uploaderName }}</td>
           <td class="numeric">{{ formatFileSize(attachment.fileSize) }}</td>
           <td>{{ attachment.uploadedAt ? (attachment.uploadedAt | date:'yyyy/MM/dd HH:mm') : '---' }}</td>

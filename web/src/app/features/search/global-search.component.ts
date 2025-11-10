@@ -183,17 +183,27 @@ export class GlobalSearchComponent implements OnInit {
     }
   }
 
+  private getProjectDisplayName(projectId: string, allProjects: (Project & { id: string })[]): string {
+    const project = allProjects.find(p => p.id === projectId);
+    if (!project) {
+      return '削除されたプロジェクト';
+    }
+    if (project.archived) {
+      return 'アーカイブされたプロジェクト';
+    }
+    return project.name;
+  }
+
   private async loadBoardItems(
     projects: (Project & { id: string })[],
   ): Promise<SearchResultItem[]> {
     try {
       const posts = await this.boardService.listAccessiblePosts();
-      const nameMap = new Map(projects.map((project) => [project.id, project.name] as const));
       return posts
         .filter((post): post is { id: string } & typeof post => Boolean(post.id))
         .map((post) => {
           const projectNames = post.projectIds.map(
-            (projectId) => nameMap.get(projectId) ?? '不明なプロジェクト',
+            (projectId) => this.getProjectDisplayName(projectId, projects),
           );
           const context = projectNames.length > 0
             ? `関連プロジェクト: ${projectNames.join(', ')}`
