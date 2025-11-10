@@ -472,6 +472,16 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /** 並び替え */
   sortTasks() {
     const sorted = [...this.filteredTasks].sort((a, b) => {
+      // ピン止めされたタスクを先頭に表示
+      const aPinned = this.isTaskPinned(a);
+      const bPinned = this.isTaskPinned(b);
+      if (aPinned && !bPinned) {
+        return -1;
+      }
+      if (!aPinned && bPinned) {
+        return 1;
+      }
+
       let aValue: unknown;
       let bValue: unknown;
 
@@ -516,6 +526,31 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     this.filteredTasks = sorted;
   }
+
+  /** 現在のユーザーがタスクをピン止めしているか */
+  isTaskPinned(task: Task): boolean {
+    if (!this.currentUid || !task.pinnedBy) {
+      return false;
+    }
+    return task.pinnedBy.includes(this.currentUid);
+  }
+
+  /** タスクのピン止め状態を切り替える */
+  async toggleTaskPin(task: Task, event: Event): Promise<void> {
+    event.stopPropagation();
+    if (!task.id) {
+      return;
+    }
+    const currentlyPinned = this.isTaskPinned(task);
+    try {
+      await this.tasksService.togglePin(this.projectId, this.issueId, task.id, !currentlyPinned);
+      await this.loadData();
+    } catch (error) {
+      console.error('タスクのピン止め切り替えに失敗しました:', error);
+      alert('タスクのピン止め切り替えに失敗しました');
+    }
+  }
+
 
   /** スマートフィルターパネルの開閉 */
   toggleSmartFilterPanel(): void {

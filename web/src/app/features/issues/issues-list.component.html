@@ -130,6 +130,8 @@
       *ngFor="let issue of filteredIssues"
       class="issue-card"
       [class.archived]="issue.archived"
+      [class.pinned]="isIssuePinned(issue)"
+      [style.--theme-color]="getIssueThemeColorValue(issue)"
       (click)="selectIssue(issue)"
       (keydown.enter)="selectIssue(issue)"
       role="button"
@@ -139,29 +141,40 @@
         class="theme-strip"
         [style.background-color]="getIssueThemeColorValue(issue)"
       ></div>
-      <div class="issue-header">
-        <div class="issue-actions" *ngIf="isAdmin()">
-          <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
-            <i class="icon-edit" aria-hidden="true"></i>
-            <span class="action-label">📝編集</span>
-          </button>
-          <button class="btn-icon" (click)="archiveIssue(issue, $event)" title="アーカイブ">
-            <i class="icon-archive" aria-hidden="true"></i>
-            <span class="action-label">{{ issue.archived ? '復元' : 'アーカイブ' }}</span>
-          </button>
-          <button class="btn-icon" (click)="deleteIssue(issue, $event)" title="削除">
-            <i class="icon-delete" aria-hidden="true"></i>
-            <span class="action-label">削除</span>
-          </button>
-        </div>
+       <div class="issue-actions">
+         <button
+           class="btn-icon pin-button"
+           (click)="toggleIssuePin(issue, $event)"
+           [title]="isIssuePinned(issue) ? 'ピン止め解除' : 'ピン止め'"
+           [class.pinned]="isIssuePinned(issue)"
+           [attr.aria-pressed]="isIssuePinned(issue)"
+           type="button"
+         >
+           <i class="icon-pin" aria-hidden="true"></i>
+         </button>
+         <ng-container *ngIf="isAdmin()">
+           <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
+             <i class="icon-edit" aria-hidden="true"></i>
+             <span class="action-label">📝編集</span>
+           </button>
+           <button class="btn-icon" (click)="archiveIssue(issue, $event)" title="アーカイブ">
+             <i class="icon-archive" aria-hidden="true"></i>
+             <span class="action-label">{{ issue.archived ? '復元' : 'アーカイブ' }}</span>
+           </button>
+           <button class="btn-icon" (click)="deleteIssue(issue, $event)" title="削除">
+             <i class="icon-delete" aria-hidden="true"></i>
+             <span class="action-label">削除</span>
+           </button>
+         </ng-container>
+       </div>
         <div class="issue-title">
           <div
             class="theme-color-badge"
             [style.background-color]="getIssueThemeColorValue(issue)"
           ></div>
+          <span class="pin-indicator" *ngIf="isIssuePinned(issue)" aria-hidden="true">📌</span>
           <h3>{{ issue.name }}</h3>
         </div>
-      </div>
       
       <div class="issue-content">
         <p class="description" *ngIf="issue.description">{{ issue.description }}</p>
@@ -207,6 +220,7 @@
           tabindex="0"
         >
           <div class="representative-task-main">
+            <span class="pin-indicator" *ngIf="isTaskPinned(task)" aria-hidden="true">📌</span>
             <span class="task-title">{{ task.title }}</span>
             <span
               *ngIf="task.importance"

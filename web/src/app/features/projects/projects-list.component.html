@@ -68,6 +68,7 @@
       class="project-card"
       [class.archived]="project.archived"
       [class.pinned]="isPinned(project)"
+      [style.--theme-color]="getProjectColor(project.id)"
       role="button"
       tabindex="0"
       (click)="selectProject(project)"

@@ -4,11 +4,11 @@
         <div class="notification-area" aria-labelledby="notifications-page-title">
             <div class="notification-area__header-row">
                 <div class="notification-area__header-title-section">
-                    <h1 id="notifications-page-title">通知エリア</h1>
+                    <h1 id="notifications-page-title">通知</h1>
                     <div class="notification-area__chips">
                         <div class="summary-chip summary-chip--alert" role="status" aria-live="polite">
                             <span class="summary-chip__icon" aria-hidden="true">🔔</span>
-                            <span class="summary-chip__label">本日確認すべき通知</span>
+                            <span class="summary-chip__label">未確認通知</span>
                             <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : totalNotificationCount() }}件</strong>
                         </div>
                         <div class="summary-chip summary-chip--success" role="status" aria-live="polite">

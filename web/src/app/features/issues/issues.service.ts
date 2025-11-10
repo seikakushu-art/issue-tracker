@@ -79,6 +79,7 @@ export class IssuesService {
       progress: dataRecord['progress'] as number ?? 0,
       archived: (dataRecord['archived'] as boolean) ?? false,
       representativeTaskId: (dataRecord['representativeTaskId'] as string | null | undefined) ?? null,
+      pinnedBy: Array.isArray(dataRecord['pinnedBy']) ? (dataRecord['pinnedBy'] as string[]) : [],
     };
   }
 
@@ -356,6 +357,36 @@ async setRepresentativeTask(projectId: string, issueId: string, taskId: string |
   await this.projectsService.ensureProjectRole(projectId, ['admin']);
   const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
   await updateDoc(docRef, { representativeTaskId: taskId });
+}
+
+/**
+   * 課題のピン止め状態を切り替える
+   */
+async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<void> {
+  const user = await this.requireUser();
+  const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
+  const snap = await getDoc(docRef);
+
+  if (!snap.exists()) {
+    throw new Error('課題が見つかりません');
+  }
+
+  const data = snap.data() as Record<string, unknown>;
+  const currentPinnedBy = Array.isArray(data['pinnedBy']) ? (data['pinnedBy'] as string[]) : [];
+
+  let nextPinnedBy: string[];
+  if (pinned) {
+    if (currentPinnedBy.includes(user.uid)) {
+      return;
+    }
+    nextPinnedBy = [...currentPinnedBy, user.uid];
+  } else {
+    nextPinnedBy = currentPinnedBy.filter(id => id !== user.uid);
+  }
+
+  await updateDoc(docRef, {
+    pinnedBy: nextPinnedBy,
+  });
 }
 
   /**

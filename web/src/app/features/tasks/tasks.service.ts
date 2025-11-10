@@ -35,6 +35,7 @@ export interface TaskSummary {
     title: string;
     importance?: Importance | null;
     tagIds: string[]; // 代表タスクに紐づくタグを併せて提示する
+    pinnedBy: string[]; // ピン止め状態
   } | null; // 一番手前に見せるタスク
 }
 
@@ -367,6 +368,7 @@ export class TasksService {
       tagIds: Array.isArray(record['tagIds']) ? (record['tagIds'] as string[]) : [],
       checklist: Array.isArray(record['checklist']) ? (record['checklist'] as ChecklistItem[]) : [],
       archived: typeof record['archived'] === 'boolean' ? (record['archived'] as boolean) : false,
+      pinnedBy: Array.isArray(record['pinnedBy']) ? (record['pinnedBy'] as string[]) : [],
     };
 
     if (typeof record['themeColor'] === 'string') {
@@ -417,30 +419,67 @@ export class TasksService {
       const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
       const snap = await getDocs(q);
 
-     // 指定された代表タスクIDと一致するものを優先して選択
-     const matchedDoc = representativeTaskId
-     ? snap.docs.find(docSnap => docSnap.id === representativeTaskId)
-     : undefined;
+      // 指定された代表タスクIDと一致するものを優先して選択
+      const matchedDoc = representativeTaskId
+        ? snap.docs.find(docSnap => docSnap.id === representativeTaskId)
+        : undefined;
 
-   const candidateDoc = matchedDoc ?? snap.docs[0];
-   const candidateData = candidateDoc?.data() as Task | undefined;
+      const candidateDoc = matchedDoc ?? snap.docs[0];
+      const candidateData = candidateDoc?.data() as Task | undefined;
 
-   const representativeTask = candidateDoc && candidateData
-     ? {
-         taskId: candidateDoc.id,
-         title: candidateData.title,
-         importance: candidateData.importance ?? null,
-         tagIds: candidateData.tagIds ?? [], // タグ未設定時は空配列で扱う
-    } : null;
-    return {
-      count: snap.docs.length,
-      representativeTask,
-    };
-  } catch (error) {
-    console.error('Error fetching task summary:', error);
-    return { count: 0, representativeTask: null };
+      const representativeTask = candidateDoc && candidateData
+        ? {
+            taskId: candidateDoc.id,
+            title: candidateData.title,
+            importance: candidateData.importance ?? null,
+            tagIds: Array.isArray((candidateData as unknown as Record<string, unknown>)['tagIds'])
+              ? ((candidateData as unknown as Record<string, unknown>)['tagIds'] as string[])
+              : (candidateData.tagIds ?? []), // タグ未設定時は空配列で扱う
+            pinnedBy: Array.isArray((candidateData as unknown as Record<string, unknown>)['pinnedBy'])
+              ? ((candidateData as unknown as Record<string, unknown>)['pinnedBy'] as string[])
+              : (candidateData.pinnedBy ?? []),
+          }
+        : null;
+
+      return {
+        count: snap.docs.length,
+        representativeTask,
+      };
+    } catch (error) {
+      console.error('Error fetching task summary:', error);
+      return { count: 0, representativeTask: null };
+    }
   }
-}
+
+  /**
+   * タスクのピン止め状態を切り替える
+   */
+  async togglePin(projectId: string, issueId: string, taskId: string, pinned: boolean): Promise<void> {
+    const user = await this.requireUser();
+    const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
+    const snap = await getDoc(docRef);
+
+    if (!snap.exists()) {
+      throw new Error('タスクが見つかりません');
+    }
+
+    const data = snap.data() as Record<string, unknown>;
+    const currentPinnedBy = Array.isArray(data['pinnedBy']) ? (data['pinnedBy'] as string[]) : [];
+
+    let nextPinnedBy: string[];
+    if (pinned) {
+      if (currentPinnedBy.includes(user.uid)) {
+        return;
+      }
+      nextPinnedBy = [...currentPinnedBy, user.uid];
+    } else {
+      nextPinnedBy = currentPinnedBy.filter(id => id !== user.uid);
+    }
+
+    await updateDoc(docRef, {
+      pinnedBy: nextPinnedBy,
+    });
+  }
 
 
   /**

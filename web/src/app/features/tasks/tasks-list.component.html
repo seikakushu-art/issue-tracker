@@ -138,6 +138,8 @@
       [class.completed]="task.status === 'completed'"
       [class.discarded]="task.status === 'discarded'"
       [class.archived]="task.archived"
+      [class.pinned]="isTaskPinned(task)"
+      [style.--theme-color]="getIssueThemeColor()"
       [style.borderTopColor]="getIssueThemeColor()"
       (click)="selectTask(task)"
       (keydown.enter)="selectTask(task)"
@@ -146,6 +148,16 @@
     >
       <div class="task-header">
         <div class="task-actions">
+          <button
+            class="btn-icon pin-button"
+            type="button"
+            (click)="toggleTaskPin(task, $event)"
+            [title]="isTaskPinned(task) ? 'ピン止め解除' : 'ピン止め'"
+            [class.pinned]="isTaskPinned(task)"
+            [attr.aria-pressed]="isTaskPinned(task)"
+          >
+            <i class="icon-pin" aria-hidden="true"></i>
+          </button>
           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
           <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="editTask(task, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
@@ -166,6 +178,7 @@
             class="task-theme-marker"
             [style.background-color]="getIssueThemeColor()"
           ></div>
+          <span class="pin-indicator" *ngIf="isTaskPinned(task)" aria-hidden="true">📌</span>
           <h3>{{ task.title }}</h3>
           <span class="importance-chip" [ngClass]="getImportanceClass(task.importance)">
             {{ getImportanceLabel(task.importance) }}

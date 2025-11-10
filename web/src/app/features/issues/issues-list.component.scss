@@ -331,7 +331,6 @@
 .issues-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
-  justify-content: center;
   gap: 16px;
 }
 
@@ -350,6 +349,77 @@
   display: flex;
   flex-direction: column;
 }
+
+.issue-card.pinned {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--theme-color, #2563eb) 20%, white), color-mix(in srgb, var(--theme-color, #2563eb) 12%, white));
+  border: 3px solid var(--theme-color, #2563eb);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--theme-color, #2563eb) 28%, transparent), 
+              0 0 0 4px color-mix(in srgb, var(--theme-color, #2563eb) 12%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-3px) scale(1.01);
+  position: relative;
+}
+
+.issue-card.pinned::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 8px;
+  padding: 3px;
+  background: linear-gradient(135deg, var(--theme-color, #2563eb), color-mix(in srgb, var(--theme-color, #2563eb) 80%, white));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  z-index: -1;
+  opacity: 0.6;
+}
+
+.issue-card.pinned:hover {
+  border-color: color-mix(in srgb, var(--theme-color, #2563eb) 85%, black);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--theme-color, #2563eb) 35%, transparent), 
+              0 0 0 5px color-mix(in srgb, var(--theme-color, #2563eb) 18%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: translateY(-5px) scale(1.02);
+}
+
+.issue-card.pinned:hover::before {
+  opacity: 0.8;
+}
+
+.issue-card.pinned .theme-strip {
+  height: 10px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--theme-color, #2563eb) 50%, transparent),
+              0 2px 8px color-mix(in srgb, var(--theme-color, #2563eb) 30%, transparent);
+  background: linear-gradient(90deg, var(--theme-color, #2563eb), color-mix(in srgb, var(--theme-color, #2563eb) 90%, white));
+}
+
+.issue-card.pinned:hover .theme-strip {
+  height: 12px;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--theme-color, #2563eb) 60%, transparent),
+              0 3px 12px color-mix(in srgb, var(--theme-color, #2563eb) 40%, transparent);
+}
+
+.issue-card.pinned .issue-title h3 {
+  color: color-mix(in srgb, var(--theme-color, #2563eb) 75%, black);
+  font-weight: 900;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--theme-color, #2563eb) 15%, transparent);
+}
+
+.issue-card.pinned .theme-color-badge {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9),
+              0 0 12px color-mix(in srgb, var(--theme-color, #2563eb) 40%, transparent),
+              0 2px 8px color-mix(in srgb, var(--theme-color, #2563eb) 25%, transparent);
+  transform: scale(1.1);
+}
+
+.issue-card.pinned:hover .theme-color-badge {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95),
+              0 0 16px color-mix(in srgb, var(--theme-color, #2563eb) 50%, transparent),
+              0 3px 12px color-mix(in srgb, var(--theme-color, #2563eb) 35%, transparent);
+}
+
 
 .issue-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -380,6 +450,11 @@
   gap: 8px;
   flex: 1;
   flex-wrap: wrap; // 長いタイトルでも折り返し表示
+}
+
+.issue-title .pin-indicator {
+  font-size: 1rem;
+  margin-right: 2px;
 }
 
 .theme-color-badge {
@@ -417,6 +492,52 @@
   align-items: center;
   gap: 4px;
   font-size: 13px;
+}
+
+.btn-icon.pin-button {
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-weight: 500;
+}
+
+.btn-icon.pin-button:hover {
+  background: rgba(37, 99, 235, 0.15);
+  color: #1e3a8a;
+}
+
+.btn-icon.pin-button.pinned {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--theme-color, #2563eb) 20%, white), color-mix(in srgb, var(--theme-color, #2563eb) 15%, white));
+  color: color-mix(in srgb, var(--theme-color, #2563eb) 70%, black);
+  border: 2px solid var(--theme-color, #2563eb);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--theme-color, #2563eb) 25%, transparent);
+  font-weight: 700;
+}
+
+.btn-icon.pin-button.pinned:hover {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--theme-color, #2563eb) 30%, white), color-mix(in srgb, var(--theme-color, #2563eb) 20%, white));
+  color: color-mix(in srgb, var(--theme-color, #2563eb) 60%, black);
+  border-color: color-mix(in srgb, var(--theme-color, #2563eb) 80%, black);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--theme-color, #2563eb) 35%, transparent);
+  transform: translateY(-2px) scale(1.05);
+}
+
+.btn-icon.pin-button.pinned i {
+  opacity: 1;
+  filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--theme-color, #2563eb) 30%, transparent));
+}
+
+.pin-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+
+.icon-pin::before {
+  content: '📌';
+  display: inline-block;
+  transform: translateY(-1px);
 }
 
 .btn-icon:hover {

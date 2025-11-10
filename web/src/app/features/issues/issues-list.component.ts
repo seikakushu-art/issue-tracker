@@ -225,6 +225,30 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
   }
   }
 
+  /** 課題が現在のユーザーによってピン止めされているか */
+  isIssuePinned(issue: Issue): boolean {
+    if (!this.currentUid || !issue.pinnedBy) {
+      return false;
+    }
+    return issue.pinnedBy.includes(this.currentUid);
+  }
+
+  /** 課題のピン止め状態を切り替える */
+  async toggleIssuePin(issue: Issue, event: Event): Promise<void> {
+    event.stopPropagation();
+    if (!issue.id) {
+      return;
+    }
+    const currentlyPinned = this.isIssuePinned(issue);
+    try {
+      await this.issuesService.togglePin(this.projectId, issue.id, !currentlyPinned);
+      await this.loadIssues();
+    } catch (error) {
+      console.error('課題のピン止め切り替えに失敗しました:', error);
+      alert('課題のピン止め切り替えに失敗しました');
+    }
+  }
+
   /**
    * 課題をフィルタリング
    */
@@ -355,6 +379,16 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    */
   sortIssues() {
     this.filteredIssues.sort((a, b) => {
+      // ピン止めされた課題を先頭に表示
+      const aPinned = this.isIssuePinned(a);
+      const bPinned = this.isIssuePinned(b);
+      if (aPinned && !bPinned) {
+        return -1;
+      }
+      if (!aPinned && bPinned) {
+        return 1;
+      }
+
       let aValue: unknown;
       let bValue: unknown;
 
@@ -647,7 +681,21 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
   /** 課題配下のすべてのタスクを取得（アーカイブ済みは除外） */
   getAllTasks(issueId: string): Task[] {
     const tasks = this.issueTasksMap[issueId] ?? [];
-    return tasks.filter(task => !task.archived);
+    const filtered = tasks.filter(task => !task.archived);
+    return filtered
+      .slice()
+      .sort((a, b) => {
+        const pinnedDiff = Number(this.isTaskPinned(b)) - Number(this.isTaskPinned(a));
+        return pinnedDiff;
+      });
+  }
+
+  /** 指定タスクが現在のユーザーによってピン止めされているか */
+  isTaskPinned(task: Task): boolean {
+    if (!this.currentUid || !task.pinnedBy) {
+      return false;
+    }
+    return task.pinnedBy.includes(this.currentUid);
   }
 
   /** タスクに紐づくタグ情報を取得し、カードに表示できる形式で返却 */
