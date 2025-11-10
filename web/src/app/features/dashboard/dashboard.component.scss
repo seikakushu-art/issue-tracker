@@ -503,6 +503,17 @@
   background: #cbd5f5;
 }
 
+.button--ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #e2e8f0;
+}
+
+.button--ghost:disabled:hover {
+  background: #e2e8f0;
+  transform: none;
+}
+
 .button--primary {
   background: linear-gradient(135deg, #2563eb, #0ea5e9);
   color: #ffffff;
@@ -536,6 +547,15 @@
 .button--chip-active {
   background: #2563eb;
   color: #ffffff;
+}
+
+.button--small {
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  height: auto;
+  line-height: 1.2;
 }
 
 .dashboard__widgets {

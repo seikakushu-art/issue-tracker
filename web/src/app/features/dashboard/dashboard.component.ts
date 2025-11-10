@@ -164,7 +164,7 @@ export class DashboardComponent implements OnInit {
     }
     const total = this.totalNotificationCount();
     if (total === 0) {
-      return '未読通知はありません。';
+      return '新しい通知はありません。';
     }
     return ;
   });
@@ -314,6 +314,37 @@ export class DashboardComponent implements OnInit {
       next.add(key);
       return next;
     });
+    this.saveReadNotificationKeys();
+  }
+
+  /** すべての通知を既読にする */
+  markAllNotificationsAsRead(): void {
+    const notifications = this.startupNotifications();
+    if (!notifications) {
+      return;
+    }
+
+    const allKeys = new Set<string>();
+
+    // 本日締切タスクのキーを追加
+    for (const task of notifications.dueTodayTasks) {
+      allKeys.add(`due:${task.taskId}`);
+    }
+
+    // メンション通知のキーを追加
+    for (const mention of notifications.mentions) {
+      allKeys.add(`mention:${mention.id}`);
+    }
+
+    // 既読キーを更新
+    this.readNotificationKeys.update((current) => {
+      const next = new Set(current);
+      for (const key of allKeys) {
+        next.add(key);
+      }
+      return next;
+    });
+
     this.saveReadNotificationKeys();
   }
    /** ユーザー設定画面へ遷移する */

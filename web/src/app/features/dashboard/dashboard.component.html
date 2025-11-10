@@ -16,6 +16,12 @@
                             <span class="summary-chip__label">本日締切・未完了</span>
                             <strong class="summary-chip__count">{{ notificationsLoading() ? '—' : dueTodayTotalCount() }}件</strong>
                         </div>
+                        <button type="button" class="button button--ghost button--small" 
+                            (click)="markAllNotificationsAsRead()"
+                            [disabled]="notificationsLoading() || totalNotificationCount() === 0"
+                            aria-label="すべて既読にする">
+                            すべて既読
+                        </button>
                     </div>
                 </div>
                 <div class="notification-area__header-controls">
