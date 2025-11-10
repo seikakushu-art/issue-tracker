@@ -139,6 +139,18 @@ export class TasksListComponent implements OnInit, OnDestroy {
   };
   commentLimitReached = false;
 
+  /** ステータス変更メニューで使用する選択肢 */
+  readonly taskStatusMenuOptions: { value: TaskStatus; label: string }[] = [
+    { value: 'incomplete', label: '未完了' },
+    { value: 'in_progress', label: '進行中' },
+    { value: 'on_hold', label: '保留' },
+    { value: 'completed', label: '完了' },
+    { value: 'discarded', label: '破棄' },
+  ];
+
+  /** どのタスクのステータスメニューを開いているか識別する */
+  statusMenuTaskId: string | null = null;
+
   attachments: TaskAttachmentView[] = [];
   attachmentsLoading = false;
   attachmentsError = '';
@@ -201,6 +213,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /** データ読み込み */
   private async loadData() {
     if (!this.projectId || !this.issueId) return;
+    this.statusMenuTaskId = null; // 再読み込み時はメニュー状態をリセット
 
     try {
       const projectPromise = (this.projectsService as unknown as { getProject: (id: string) => Promise<Project | null> }).getProject(this.projectId);
@@ -1444,14 +1457,36 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** タスクを完了状態へ更新 */
-  async markTaskAsCompleted(task: Task, event?: Event): Promise<void> {
+  /** ステータスメニューの開閉状態を判定 */
+  isStatusMenuOpen(task: Task): boolean {
+    return Boolean(task.id && this.statusMenuTaskId === task.id);
+  }
+
+  /** ステータス変更メニューのトグル処理 */
+  toggleStatusMenu(task: Task, event?: Event): void {
     if (event) {
-      event.stopPropagation();
+      event.stopPropagation(); // カード選択イベントを抑止
     }
 
     if (!task.id) {
+      return; // ID がなければ操作できない
+    }
+    if (!this.canEditTask(task)) {
+      alert('このタスクを変更する権限がありません');
       return;
+    }
+
+    this.statusMenuTaskId = this.statusMenuTaskId === task.id ? null : task.id;
+  }
+
+  /** タスクのステータスを指定の値へ更新 */
+  async updateTaskStatus(task: Task, status: TaskStatus, event?: Event): Promise<void> {
+    if (event) {
+      event.stopPropagation(); // メニュー選択でもカードのクリックを阻止
+    }
+
+    if (!task.id) {
+      return; // 何らかの理由で ID が欠けている場合は処理しない
     }
     if (!this.canEditTask(task)) {
       alert('このタスクを変更する権限がありません');
@@ -1460,19 +1495,20 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     try {
       const checklist = Array.isArray(task.checklist) ? task.checklist : [];
-      const progress = this.tasksService.calculateProgressFromChecklist(checklist, 'completed');
+      const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);
 
       await this.tasksService.updateTask(this.projectId, this.issueId, task.id, {
-        status: 'completed',
+        status,
         progress,
       });
+      this.statusMenuTaskId = null; // 成功時はメニューを閉じておく
 
       await this.loadData();
       this.refreshSelectedTask();
       await this.updateIssueProgress();
     } catch (error) {
-      console.error('タスクを完了に更新できませんでした:', error);
-      alert('タスクの完了更新に失敗しました');
+      console.error('タスクのステータス更新に失敗しました:', error);
+      alert('タスクのステータス更新に失敗しました');
     }
   }
 

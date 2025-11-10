@@ -158,25 +158,43 @@
           >
             <i class="icon-pin" aria-hidden="true"></i>
           </button>
-          <!-- 手動完了ボタン：ピンの直後に配置して操作しやすくする -->
-          <button
-            *ngIf="canEditTask(task) && task.status !== 'completed'"
-            type="button"
-            class="btn-icon btn-icon--labeled task-complete-button"
-            (click)="markTaskAsCompleted(task, $event)"
-            title="完了"
-          >
-            <span class="btn-label">完了にする</span>
-          </button>
+         <!-- ステータス変更ボタンと簡易メニューをひとまとめにする -->
+         <div
+         *ngIf="canEditTask(task)"
+         class="task-status-menu"
+       >
+         <button
+           type="button"
+           class="btn-icon btn-icon--labeled task-complete-button"
+           (click)="toggleStatusMenu(task, $event)"
+           title="ステータス変更"
+           [attr.aria-expanded]="isStatusMenuOpen(task)"
+         >
+           <span class="btn-label">ステータス変更</span>
+           <span class="status-button-caret" aria-hidden="true">▾</span>
+         </button>
+         <ul
+           *ngIf="isStatusMenuOpen(task)"
+           class="task-status-menu__list"
+           role="menu"
+         >
+           <li *ngFor="let option of taskStatusMenuOptions" role="none">
+             <button
+               type="button"
+               class="task-status-menu__item"
+               role="menuitem"
+               (click)="updateTaskStatus(task, option.value, $event)"
+               [class.is-active]="task.status === option.value"
+             >
+               {{ option.label }}
+             </button>
+           </li>
+         </ul>
+       </div>
           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
           <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="editTask(task, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>
             <span class="btn-label">📝編集</span>
-          </button>
-          <!-- アーカイブ状態のトグルもラベル表示 -->
-          <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="archiveTask(task, $event)" title="アーカイブ切替">
-            <i class="icon-archive" aria-hidden="true"></i>
-            <span class="btn-label">{{ task.archived ? '復元' : 'アーカイブ' }}</span>
           </button>
         <button class="btn-icon btn-icon--labeled" *ngIf="canDeleteTask(task)" (click)="deleteTask(task, $event)" title="削除">
           <i class="icon-delete" aria-hidden="true"></i>

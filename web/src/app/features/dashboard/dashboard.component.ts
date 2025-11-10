@@ -176,7 +176,7 @@ export class DashboardComponent implements OnInit {
     return notifications.dueTodayTasks.length + notifications.mentions.length;
   });
 
-  /** 通知リスト（最大3件） */
+  /** 通知リスト（スクロール可能） */
   readonly notificationListItems = computed(() => {
     const notifications = this.startupNotifications();
     if (!notifications) {
@@ -223,7 +223,7 @@ export class DashboardComponent implements OnInit {
       return timeB - timeA;
     });
 
-    return sorted.slice(0, 3);
+    return sorted;
   });
 
 
