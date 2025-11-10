@@ -111,6 +111,10 @@ interface MentionEntry {
 export interface StartupNotifications {
   dueTodayTasks: DueTodayNotification[];
   mentions: MentionNotification[];
+  limits: {
+    dueLimit: number;
+    mentionLimit: number;
+  };
 }
 
 
@@ -530,14 +534,18 @@ export class NotificationService {
    * アプリ起動時に提示する通知群を取得する
    */
   async getStartupNotifications(options: { dueLimit?: number; mentionLimit?: number } = {}): Promise<StartupNotifications> {
-    const dueLimit = options.dueLimit ?? 50;
-    const mentionLimit = options.mentionLimit ?? 20;
+    const dueLimit = options.dueLimit ?? 100;
+    const mentionLimit = options.mentionLimit ?? 100;
 
     const uid = this.auth.currentUser?.uid ?? null;
     if (!uid) {
       return {
         dueTodayTasks: [],
         mentions: [],
+        limits: {
+          dueLimit,
+          mentionLimit,
+        },
       } satisfies StartupNotifications;
     }
 
@@ -555,6 +563,10 @@ export class NotificationService {
     return {
       dueTodayTasks,
       mentions: mentionNotifications,
+      limits: {
+        dueLimit,
+        mentionLimit,
+      },
     } satisfies StartupNotifications;
   }
 

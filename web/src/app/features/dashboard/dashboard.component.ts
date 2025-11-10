@@ -5,8 +5,8 @@ import {
   ActionableTaskCard,
   DueTodayNotification,
   HighlightReason,
-  MentionNotification,
   NotificationService,
+  StartupNotifications,
 } from '../../core/notification.service';
 import { TasksService } from '../tasks/tasks.service';
 import { BulletinPost, Importance } from '../../models/schema';
@@ -70,7 +70,7 @@ export class DashboardComponent implements OnInit {
   /** 起動時通知のエラーメッセージ */
   readonly notificationsError = signal<string | null>(null);
   /** 起動時通知データ本体 */
-  readonly startupNotifications = signal<{ dueTodayTasks: DueTodayNotification[]; mentions: MentionNotification[] } | null>(null);
+  readonly startupNotifications = signal<StartupNotifications | null>(null);
   /** 担当者プロフィールキャッシュ */
   readonly assigneeProfiles = signal<Record<string, UserDirectoryProfile>>({});
   /** 既読通知のキー集合（ローカルストレージに保存） */
@@ -167,6 +167,27 @@ export class DashboardComponent implements OnInit {
       return '新しい通知はありません。';
     }
     return ;
+  });
+
+  /** 通知上限超過の警告メッセージ */
+  readonly notificationLimitWarning = computed(() => {
+    const notifications = this.startupNotifications();
+    if (!notifications || this.notificationsLoading()) {
+      return null;
+    }
+
+    const warnings: string[] = [];
+    const { dueTodayTasks, mentions, limits } = notifications;
+
+    if (dueTodayTasks.length >= limits.dueLimit) {
+      warnings.push(`本日締切タスクが上限（${limits.dueLimit}件）に達しています。一部の通知が表示されていない可能性があります。`);
+    }
+
+    if (mentions.length >= limits.mentionLimit) {
+      warnings.push(`メンション通知が上限（${limits.mentionLimit}件）に達しています。一部の通知が表示されていない可能性があります。`);
+    }
+
+    return warnings.length > 0 ? warnings.join(' ') : null;
   });
 
   /** 通知総件数（未読のみ） */
@@ -384,7 +405,7 @@ export class DashboardComponent implements OnInit {
         stack: error instanceof Error ? error.stack : undefined,
       });
       this.notificationsError.set(errorMessage);
-      this.startupNotifications.set({ dueTodayTasks: [], mentions: [] });
+      this.startupNotifications.set({ dueTodayTasks: [], mentions: [], limits: { dueLimit: 100, mentionLimit: 100 } });
     } finally {
       this.notificationsLoading.set(false);
     }

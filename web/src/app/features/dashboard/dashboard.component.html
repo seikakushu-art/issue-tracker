@@ -49,6 +49,11 @@
             <p class="notification-area__headline" [class.notification-area__headline--error]="notificationsError()">
                 {{ notificationHeadline() }}
             </p>
+            <p class="notification-area__headline notification-area__headline--warning" 
+                *ngIf="notificationLimitWarning()"
+                role="alert">
+                ⚠️ {{ notificationLimitWarning() }}
+            </p>
             <div class="notification-area__card">
                 <div class="notification-card">
                     <p class="notification-card__state" *ngIf="notificationsLoading()">通知を読み込み中です…</p>
