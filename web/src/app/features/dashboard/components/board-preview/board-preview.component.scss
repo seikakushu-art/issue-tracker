@@ -97,6 +97,18 @@
   .board-preview__title a:hover {
     text-decoration: underline;
   }
+
+  .board-preview__new-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: #ef4444;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
   
   .board-preview__excerpt {
     font-size: 0.875rem;

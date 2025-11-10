@@ -23,6 +23,7 @@ import {
     Role,
     Tag,
     Task,
+    TaskStatus,
   } from '../../../models/schema';
   import { TasksService } from '../tasks.service';
   import { TagsService } from '../../tags/tags.service';
@@ -77,6 +78,12 @@ import {
   
     tags: Tag[] = [];
     availableTagIds = new Set<string>();
+
+     /**
+     * チェックリストがすべて完了した際に表示する確認文言。
+     * UI から複数箇所で利用するためフィールドで保持する。
+     */
+     private readonly checklistCompletionConfirmMessage = 'チェックリストがすべてクリアしました。タスクを完了しますか？';
   
     currentUid: string | null = null;
     currentRole: Role | null = null;
@@ -239,12 +246,12 @@ import {
     /**
      * コメントテキストを解析して、テキスト部分とメンション部分を分離する
      */
-    parseCommentText(text: string, mentionIds: string[]): Array<{ type: 'text' | 'mention'; content: string; mentionId?: string }> {
+    parseCommentText(text: string, mentionIds: string[]): { type: 'text' | 'mention'; content: string; mentionId?: string }[] {
       if (!text) {
         return [];
       }
 
-      const segments: Array<{ type: 'text' | 'mention'; content: string; mentionId?: string }> = [];
+      const segments: { type: 'text' | 'mention'; content: string; mentionId?: string }[] = [];
       const mentionMap = new Map<string, string>();
       
       // メンションIDからユーザー名のマップを作成
@@ -851,6 +858,14 @@ import {
         mentions: Array.isArray(comment.mentions) ? comment.mentions : [],
       };
     }
+
+    /** チェックリスト完了時の確認ダイアログを表示 */
+    private confirmChecklistCompletion(): boolean {
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        return window.confirm(this.checklistCompletionConfirmMessage);
+      }
+      return true;
+    }
   
     private async persistChecklist(checklist: ChecklistItem[]): Promise<void> {
       if (!this.task || !this.projectId || !this.issueId || !this.task.id) {
@@ -861,17 +876,20 @@ import {
       }
 
       try {
-        // チェックリストからステータスを決定
+       // チェックリストの状態を基に、完了確認を挟みつつステータスを更新
         let status = this.task.status;
         if (checklist.length > 0) {
           const allCompleted = checklist.every((item) => item.completed);
           const someCompleted = checklist.some((item) => item.completed);
+          const fallbackStatus: TaskStatus = someCompleted ? 'in_progress' : 'incomplete';
+
           if (allCompleted) {
-            status = 'completed';
-          } else if (someCompleted && status !== 'on_hold' && status !== 'discarded') {
-            status = 'in_progress';
-          } else if (!someCompleted && status !== 'on_hold' && status !== 'discarded') {
-            status = 'incomplete';
+            if (status !== 'completed' && status !== 'on_hold' && status !== 'discarded') {
+              const shouldComplete = this.confirmChecklistCompletion();
+              status = shouldComplete ? 'completed' : fallbackStatus;
+            }
+          } else if (status !== 'on_hold' && status !== 'discarded') {
+            status = fallbackStatus;
           }
         }
         const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);

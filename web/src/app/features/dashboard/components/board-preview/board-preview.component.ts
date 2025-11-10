@@ -36,4 +36,12 @@ export class BoardPreviewComponent {
   get hasNoPosts(): boolean {
     return this.posts.length === 0;
   }
+
+  /** 投稿が12時間以内かどうかを判定 */
+  isNewPost(post: BulletinPreviewItem): boolean {
+    const now = new Date();
+    const postedAt = post.postedAt;
+    const diffInHours = (now.getTime() - postedAt.getTime()) / (1000 * 60 * 60);
+    return diffInHours <= 12;
+  }
 }

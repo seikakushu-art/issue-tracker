@@ -158,6 +158,16 @@
           >
             <i class="icon-pin" aria-hidden="true"></i>
           </button>
+          <!-- 手動完了ボタン：ピンの直後に配置して操作しやすくする -->
+          <button
+            *ngIf="canEditTask(task) && task.status !== 'completed'"
+            type="button"
+            class="btn-icon btn-icon--labeled task-complete-button"
+            (click)="markTaskAsCompleted(task, $event)"
+            title="完了"
+          >
+            <span class="btn-label">完了にする</span>
+          </button>
           <!-- 編集ボタンはラベルを表示して操作を明確化 -->
           <button class="btn-icon btn-icon--labeled" *ngIf="canEditTask(task)" (click)="editTask(task, $event)" title="編集">
             <i class="icon-edit" aria-hidden="true"></i>

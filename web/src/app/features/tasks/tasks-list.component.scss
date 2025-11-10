@@ -381,7 +381,7 @@
 
 .tasks-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 380px));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 420px));
   gap: 16px;
   justify-content: center;
 }
@@ -464,6 +464,55 @@
 .task-title .pin-indicator {
   font-size: 1rem;
   line-height: 1;
+}
+
+// 完了ボタンはタイトル行と高さを揃えつつ、行折返し時にも見栄えを保つ
+.task-complete-button {
+  padding: 4px 12px;
+  white-space: nowrap;
+  align-self: center;
+  background: #4ade80;
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #22c55e;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+  }
+  
+  &:active {
+    background: #16a34a;
+  }
+  
+  .icon-success {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn-label {
+    font-weight: 600;
+    color: #ffffff;
+  }
+}
+
+// btn-icon--labeledのスタイルを上書き
+.btn-icon--labeled.task-complete-button {
+  background: #4ade80;
+  color: #ffffff;
+  
+  &:hover {
+    background: #22c55e;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+  }
+  
+  .icon-success {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
 }
 
 .task-theme-marker {

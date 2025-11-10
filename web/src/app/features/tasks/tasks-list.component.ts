@@ -151,6 +151,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private tagsLoaded = false;
   private availableTagIdSet = new Set<string>();
 
+  /**
+   * チェックリスト完了時に表示する確認メッセージ。
+   * UI からもサービス層からも参照しやすいように定数化しておく。
+   */
+  private readonly checklistCompletionConfirmMessage = 'チェックリストがすべてクリアしました。タスクを完了しますか？';
+
   // 重要度表示用
   private importanceDisplay: Record<Importance, { label: string; weight: number }> = {
     Critical: { label: '至急重要', weight: 4 },
@@ -549,6 +555,15 @@ export class TasksListComponent implements OnInit, OnDestroy {
       console.error('タスクのピン止め切り替えに失敗しました:', error);
       alert('タスクのピン止め切り替えに失敗しました');
     }
+  }
+
+  /** チェックリスト完了時の確認ダイアログを表示 */
+  private confirmChecklistCompletion(): boolean {
+    // window が未定義な環境（テスト等）でも安全に動くようにガードを入れる
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      return window.confirm(this.checklistCompletionConfirmMessage);
+    }
+    return true; // フォールバックでは完了扱いとして処理を継続する
   }
 
 
@@ -1074,12 +1089,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /**
    * コメントテキストを解析して、テキスト部分とメンション部分を分離する
    */
-  parseCommentText(text: string, mentionIds: string[]): Array<{ type: 'text' | 'mention'; content: string; mentionId?: string }> {
+  parseCommentText(text: string, mentionIds: string[]): { type: 'text' | 'mention'; content: string; mentionId?: string }[] {
     if (!text) {
       return [];
     }
 
-    const segments: Array<{ type: 'text' | 'mention'; content: string; mentionId?: string }> = [];
+    const segments: { type: 'text' | 'mention'; content: string; mentionId?: string }[] = [];
     const mentionMap = new Map<string, string>();
     
     // メンションIDからユーザー名のマップを作成
@@ -1426,6 +1441,38 @@ export class TasksListComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('アーカイブの切替に失敗しました:', error);
       alert('アーカイブの切替に失敗しました');
+    }
+  }
+
+  /** タスクを完了状態へ更新 */
+  async markTaskAsCompleted(task: Task, event?: Event): Promise<void> {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (!task.id) {
+      return;
+    }
+    if (!this.canEditTask(task)) {
+      alert('このタスクを変更する権限がありません');
+      return;
+    }
+
+    try {
+      const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+      const progress = this.tasksService.calculateProgressFromChecklist(checklist, 'completed');
+
+      await this.tasksService.updateTask(this.projectId, this.issueId, task.id, {
+        status: 'completed',
+        progress,
+      });
+
+      await this.loadData();
+      this.refreshSelectedTask();
+      await this.updateIssueProgress();
+    } catch (error) {
+      console.error('タスクを完了に更新できませんでした:', error);
+      alert('タスクの完了更新に失敗しました');
     }
   }
 
@@ -1829,17 +1876,20 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     try {
-      // チェックリストからステータスを決定
+      // チェックリストの結果から次のステータスを慎重に判定
       let status = task.status;
       if (checklist.length > 0) {
         const allCompleted = checklist.every(item => item.completed);
         const someCompleted = checklist.some(item => item.completed);
+        const fallbackStatus = someCompleted ? 'in_progress' : 'incomplete';
+
         if (allCompleted) {
-          status = 'completed';
-        } else if (someCompleted && status !== 'on_hold' && status !== 'discarded') {
-          status = 'in_progress';
-        } else if (!someCompleted && status !== 'on_hold' && status !== 'discarded') {
-          status = 'incomplete';
+          if (status !== 'completed' && status !== 'on_hold' && status !== 'discarded') {
+            const shouldComplete = this.confirmChecklistCompletion();
+            status = shouldComplete ? 'completed' : fallbackStatus;
+          }
+        } else if (status !== 'on_hold' && status !== 'discarded') {
+          status = fallbackStatus;
         }
       }
       const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);

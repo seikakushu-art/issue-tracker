@@ -36,6 +36,7 @@
         </div>
         <h4 class="board-preview__title">
           <a [routerLink]="post.href" [fragment]="post.fragment ?? undefined">{{ post.title }}</a>
+          <span class="board-preview__new-tag" *ngIf="isNewPost(post)">新規</span>
         </h4>
         <p class="board-preview__excerpt">{{ post.excerpt }}</p>
       </li>
