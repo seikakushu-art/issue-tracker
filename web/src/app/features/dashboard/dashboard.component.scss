@@ -313,6 +313,24 @@
   color: #111827;
 }
 
+// 既読の通知アイテムのスタイル
+.notification-item--read {
+  opacity: 0.6;
+  
+  .notification-item__title {
+    color: #64748b;
+    font-weight: 500;
+  }
+  
+  .notification-item__description {
+    color: #94a3b8;
+  }
+  
+  .notification-item__marker {
+    opacity: 0.5;
+  }
+}
+
 .notification-item__tag {
   display: inline-flex;
   align-items: center;

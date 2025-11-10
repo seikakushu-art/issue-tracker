@@ -73,6 +73,8 @@ export class DashboardComponent implements OnInit {
   readonly startupNotifications = signal<{ dueTodayTasks: DueTodayNotification[]; mentions: MentionNotification[] } | null>(null);
   /** 担当者プロフィールキャッシュ */
   readonly assigneeProfiles = signal<Record<string, UserDirectoryProfile>>({});
+  /** 既読通知のキー集合（ローカルストレージに保存） */
+  private readonly readNotificationKeys = signal<Set<string>>(new Set());
   /** 重要度の優先順位（Criticalが最優先） */
   private readonly importanceRank: Record<Importance, number> = {
     Critical: 0,
@@ -162,18 +164,37 @@ export class DashboardComponent implements OnInit {
     }
     const total = this.totalNotificationCount();
     if (total === 0) {
-      return 'まだ通知はありません。';
+      return '未読通知はありません。';
     }
     return ;
   });
 
-  /** 通知総件数 */
+  /** 通知総件数（未読のみ） */
   readonly totalNotificationCount = computed(() => {
     const notifications = this.startupNotifications();
     if (!notifications) {
       return 0;
     }
-    return notifications.dueTodayTasks.length + notifications.mentions.length;
+    const readKeys = this.readNotificationKeys();
+    let unreadCount = 0;
+
+    // 本日締切タスクの未読数をカウント
+    for (const task of notifications.dueTodayTasks) {
+      const key = `due:${task.taskId}`;
+      if (!readKeys.has(key)) {
+        unreadCount++;
+      }
+    }
+
+    // メンション通知の未読数をカウント
+    for (const mention of notifications.mentions) {
+      const key = `mention:${mention.id}`;
+      if (!readKeys.has(key)) {
+        unreadCount++;
+      }
+    }
+
+    return unreadCount;
   });
 
   /** 通知リスト（スクロール可能） */
@@ -184,12 +205,14 @@ export class DashboardComponent implements OnInit {
     }
 
     const now = new Date();
+    const readKeys = this.readNotificationKeys();
 
     const dueTodayItems = notifications.dueTodayTasks.map((task) => {
       const isOverdue = task.dueDate ? this.notificationService.isOverdue(task.dueDate, now) : false;
       const type: NotificationListType = isOverdue ? 'overdue' : 'due_today';
+      const key = `due:${task.taskId}`;
       return {
-        key: `due:${task.taskId}`,
+        key,
         type,
         title: task.title,
         description: this.composeProjectLabel(task.projectName, task.issueName),
@@ -197,21 +220,24 @@ export class DashboardComponent implements OnInit {
         projectId: task.projectId,
         issueId: task.issueId,
         taskId: task.taskId,
-        isUnread: type !== 'due_today',
+        isUnread: !readKeys.has(key),
       } satisfies NotificationListItem;
     });
 
-    const mentionItems = notifications.mentions.map((mention) => ({
-      key: `mention:${mention.id}`,
-      type: 'mention' as const,
-      title: mention.taskTitle,
-      description: this.buildExcerpt(mention.commentText ?? '', 48),
-      timestamp: mention.createdAt,
-      projectId: mention.projectId,
-      issueId: mention.issueId,
-      taskId: mention.taskId,
-      isUnread: true,
-    } satisfies NotificationListItem));
+    const mentionItems = notifications.mentions.map((mention) => {
+      const key = `mention:${mention.id}`;
+      return {
+        key,
+        type: 'mention' as const,
+        title: mention.taskTitle,
+        description: this.buildExcerpt(mention.commentText ?? '', 48),
+        timestamp: mention.createdAt,
+        projectId: mention.projectId,
+        issueId: mention.issueId,
+        taskId: mention.taskId,
+        isUnread: !readKeys.has(key),
+      } satisfies NotificationListItem;
+    });
 
     const combined = [...mentionItems, ...dueTodayItems];
     const sorted = combined.sort((a, b) => {
@@ -250,10 +276,45 @@ export class DashboardComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    this.loadReadNotificationKeys();
     void this.refreshDashboard();
     void this.loadStartupNotifications();
     void this.refreshActionableTasks();
     void this.loadBulletinPreview();
+  }
+
+  /** ローカルストレージから既読通知キーを読み込む */
+  private loadReadNotificationKeys(): void {
+    try {
+      const stored = localStorage.getItem('readNotificationKeys');
+      if (stored) {
+        const keys = JSON.parse(stored) as string[];
+        this.readNotificationKeys.set(new Set(keys));
+      }
+    } catch (error) {
+      console.error('Failed to load read notification keys', error);
+      this.readNotificationKeys.set(new Set());
+    }
+  }
+
+  /** 既読通知キーをローカルストレージに保存する */
+  private saveReadNotificationKeys(): void {
+    try {
+      const keys = Array.from(this.readNotificationKeys());
+      localStorage.setItem('readNotificationKeys', JSON.stringify(keys));
+    } catch (error) {
+      console.error('Failed to save read notification keys', error);
+    }
+  }
+
+  /** 通知を既読にする */
+  private markNotificationAsRead(key: string): void {
+    this.readNotificationKeys.update((current) => {
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+    this.saveReadNotificationKeys();
   }
    /** ユーザー設定画面へ遷移する */
    goToUserSettings(): void {
@@ -631,6 +692,9 @@ export class DashboardComponent implements OnInit {
 
   /** 通知アイテムの遷移 */
   openNotification(item: NotificationListItem): void {
+    // 通知を既読にする
+    this.markNotificationAsRead(item.key);
+    // タスク詳細へ遷移
     this.goToTaskDetail({
       projectId: item.projectId,
       issueId: item.issueId,
