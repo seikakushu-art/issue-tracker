@@ -624,7 +624,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       alert('テンプレートを保存しました。');
     } catch (error) {
       console.error('テンプレートの保存に失敗しました:', error);
-      alert('テンプレートの保存に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : 'テンプレートの保存に失敗しました';
+      alert(errorMessage);
     }
   }
 
@@ -854,7 +855,12 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
           goal: projectData.goal ?? null,
         });
       } else {
-        await this.projectsService.createProject(projectData);
+        const projectId = await this.projectsService.createProject(projectData);
+        
+        // テンプレートが選択されている場合、テンプレートから課題とタスクを作成
+        if (this.selectedTemplateId && projectId) {
+          await this.createIssuesAndTasksFromTemplate(projectId, this.selectedTemplateId);
+        }
       }
 
       this.closeModal();
@@ -864,6 +870,64 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       alert(this.buildProjectSaveErrorMessage(error));
     } finally {
       this.saving = false;
+    }
+  }
+
+  /**
+   * テンプレートから課題とタスクを作成
+   */
+  private async createIssuesAndTasksFromTemplate(projectId: string, templateId: string): Promise<void> {
+    const template = this.templates.find((t) => t.id === templateId);
+    if (!template || !template.issues || template.issues.length === 0) {
+      return;
+    }
+
+    for (const templateIssue of template.issues) {
+      try {
+        // 課題を作成
+        const issueId = await this.issuesService.createIssue(projectId, {
+          name: templateIssue.name,
+          description: templateIssue.description ?? undefined,
+          goal: templateIssue.goal ?? undefined,
+          themeColor: templateIssue.themeColor ?? undefined,
+        });
+
+        // タスクを作成
+        if (templateIssue.tasks && templateIssue.tasks.length > 0) {
+          for (const templateTask of templateIssue.tasks) {
+            try {
+              // チェックリストの完了状態をリセット（テンプレートから作成する際は未完了状態で開始）
+              const resetChecklist = templateTask.checklist?.map(item => ({
+                ...item,
+                completed: false,
+              })) ?? [];
+
+              const taskId = await this.tasksService.createTask(projectId, issueId, {
+                title: templateTask.title,
+                description: templateTask.description ?? undefined,
+                goal: templateTask.goal ?? undefined,
+                themeColor: templateTask.themeColor ?? undefined,
+                importance: templateTask.importance ?? undefined,
+                status: 'incomplete', // テンプレートから作成するタスクは未完了状態で開始
+                assigneeIds: [], // テンプレートから作成する際は担当者をリセット
+                tagIds: templateTask.tagIds ?? [],
+                checklist: resetChecklist,
+              });
+
+              // テンプレートから作成する際は担当者を完全にリセット（作成者の自動追加を解除）
+              await this.tasksService.updateTask(projectId, issueId, taskId, {
+                assigneeIds: [],
+              });
+            } catch (error) {
+              console.error(`タスク「${templateTask.title}」の作成に失敗しました:`, error);
+              // エラーが発生しても次のタスクの作成を続行
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`課題「${templateIssue.name}」の作成に失敗しました:`, error);
+        // エラーが発生しても次の課題の作成を続行
+      }
     }
   }
   /**

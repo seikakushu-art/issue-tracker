@@ -214,6 +214,16 @@
               {{ attachment.fileName }}
             </a>
             <span class="attachment-size">{{ formatFileSize(attachment.fileSize) }}</span>
+            <button
+              type="button"
+              class="btn-icon btn-icon--labeled attachment-delete"
+              *ngIf="canDeleteAttachment(attachment)"
+              (click)="deleteAttachment(attachment)"
+              [disabled]="attachmentDeletingId === attachment.id"
+            >
+              <i class="icon-delete" aria-hidden="true"></i>
+              <span class="btn-label">{{ attachmentDeletingId === attachment.id ? '削除中...' : '削除' }}</span>
+            </button>
           </div>
           <div class="attachment-meta">
             <span class="attachment-uploader">
@@ -234,16 +244,6 @@
               {{ attachment.uploadedAt ? (attachment.uploadedAt | date:'yyyy/MM/dd HH:mm') : '---' }}
             </time>
           </div>
-          <button
-            type="button"
-            class="btn-icon btn-icon--labeled attachment-delete"
-            *ngIf="canDeleteAttachment(attachment)"
-            (click)="deleteAttachment(attachment)"
-            [disabled]="attachmentDeletingId === attachment.id"
-          >
-            <i class="icon-delete" aria-hidden="true"></i>
-            <span class="btn-label">{{ attachmentDeletingId === attachment.id ? '削除中...' : '削除' }}</span>
-          </button>
         </li>
       </ul>
 

@@ -56,8 +56,33 @@ export interface ProjectTemplate {
   sourceProjectId?: string | null;  // 元になったプロジェクトIDを記録（任意）
   createdBy: string;  // 作成者UID
   createdAt?: Date | null;
+  /** テンプレート化された課題とタスクのスナップショット */
+  issues?: ProjectTemplateIssue[];
 }
 
+/**
+ * テンプレート化された課題
+ */
+export interface ProjectTemplateIssue {
+  name: string;
+  description?: string | null;
+  goal?: string | null;
+  themeColor?: string | null;
+  tasks: ProjectTemplateTask[];
+}
+
+/**
+ * テンプレート化されたタスク
+ */
+export interface ProjectTemplateTask {
+  title: string;
+  description?: string | null;
+  goal?: string | null;
+  themeColor?: string | null;
+  importance?: Importance | null;
+  checklist: ChecklistItem[];
+  tagIds: string[];
+}
 /**
  * プロジェクトの招待情報
  */

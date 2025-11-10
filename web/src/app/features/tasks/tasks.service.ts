@@ -236,6 +236,7 @@ export class TasksService {
       startDate?: Date;
       endDate?: Date;
       goal?: string;
+      themeColor?: string;
       importance?: 'Critical' | 'High' | 'Medium' | 'Low';
       status: TaskStatus;
       assigneeIds?: string[];
@@ -294,6 +295,9 @@ export class TasksService {
     }
     if (input.goal !== undefined && input.goal !== null && input.goal !== '') {
       payload['goal'] = input.goal;
+    }
+    if (input.themeColor !== undefined && input.themeColor !== null && input.themeColor !== '') {
+      payload['themeColor'] = input.themeColor;
     }
     if (input.startDate !== undefined && input.startDate !== null) {
       payload['startDate'] = input.startDate;

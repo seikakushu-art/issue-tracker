@@ -139,8 +139,8 @@
 .attachment-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .attachment-name {
@@ -148,6 +148,8 @@
   color: #2563eb;
   text-decoration: none;
   word-break: break-word;
+  flex: 1;
+  min-width: 0;
 }
 
 .attachment-name:hover {
@@ -207,7 +209,7 @@
 }
 
 .attachment-delete {
-  align-self: flex-end;
+  flex-shrink: 0;
 }
 
 .detail-meta {
