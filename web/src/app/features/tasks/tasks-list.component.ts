@@ -183,7 +183,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.projectId = params['projectId'];
       this.issueId = params['issueId'];
-      this.loadData();
+      void this.loadData();
     });
 
     this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((params) => {
@@ -193,8 +193,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
         this.trySelectTaskById(focus);
       }
     });
-
-    this.loadTags();
   }
 
   ngOnDestroy() {
@@ -213,6 +211,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /** データ読み込み */
   private async loadData() {
     if (!this.projectId || !this.issueId) return;
+    await this.loadTags(); // タグ情報を先に同期しておく
     this.statusMenuTaskId = null; // 再読み込み時はメニュー状態をリセット
 
     try {
@@ -257,8 +256,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** タグ一覧読み込み */
   private async loadTags() {
+    if (!this.projectId) {
+      return; // プロジェクト未確定時は何もしない
+    }
     try {
-      this.availableTags = await this.tagsService.listTags();
+      this.availableTags = await this.tagsService.listTags(this.projectId);
       this.tagsLoaded = true;
       this.updateAvailableTagIndex();
       this.sanitizeAllTagSelections();
@@ -1593,10 +1595,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     /** タグが削除可能か（作成者本人か）を判定 */
   canDeleteTag(tag: Tag): boolean {
-    if (!tag.id || !this.currentUid) {
+    if (!tag.id) {
       return false;
     }
-    return tag.createdBy === this.currentUid;
+    if (this.isAdmin()) {
+      return true; // 管理者はプロジェクト内のタグを全て削除可能
+    }
+    return Boolean(this.currentUid && tag.createdBy === this.currentUid);
   }
 
   /** カスタムタグを一覧から削除し、フォームの選択状態も同期する */
@@ -1617,8 +1622,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (!this.projectId) {
+      alert('プロジェクト情報を取得できませんでした。');
+      return;
+    }
+
     try {
-      await this.tagsService.deleteTag(tag.id);
+      await this.tagsService.deleteTag(this.projectId, tag.id, this.currentRole ?? null);
       this.availableTags = this.availableTags.filter(t => t.id !== tag.id); // 表示リストから除外
       this.taskForm.tagIds = this.taskForm.tagIds.filter(id => id !== tag.id); // フォームで選択されていれば外す
       this.updateAvailableTagIndex();
@@ -1651,11 +1661,21 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     this.creatingTag = true;
+    if (!this.projectId) {
+      alert('プロジェクト情報を取得できませんでした。');
+      return;
+    }
     try {
       const preferredColor = this.normalizeHexColorInput(this.newTagColor); // 入力値を正規化（未指定ならundefined）
-      const tagId = await this.tagsService.createTag({ name, color: preferredColor ?? undefined }); // Firestoreへタグを保存
-      const createdTag = await this.tagsService.getTag(tagId); // 付与されたカラーや作成者情報を取得
-      const newTag: Tag = createdTag ?? { id: tagId, name, color: preferredColor ?? undefined, createdBy: this.currentUid ?? null };
+      const tagId = await this.tagsService.createTag(this.projectId, { name, color: preferredColor ?? undefined }); // Firestoreへタグを保存
+      const createdTag = await this.tagsService.getTag(this.projectId, tagId); // 付与されたカラーや作成者情報を取得
+      const newTag: Tag = createdTag ?? {
+        id: tagId,
+        projectId: this.projectId,
+        name,
+        color: preferredColor ?? undefined,
+        createdBy: this.currentUid ?? null,
+      };
       this.availableTags = [...this.availableTags, newTag]; // Change Detectionを確実に発火
       this.updateAvailableTagIndex();
       this.sanitizeAllTagSelections();

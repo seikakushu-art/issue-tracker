@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ProjectsService } from '../projects/projects.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -25,7 +26,7 @@ interface AttachmentRow {
 @Component({
   selector: 'app-attachments-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './attachments-list.component.html',
   styleUrls: ['./attachments-list.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -39,9 +40,21 @@ export class AttachmentsListComponent implements OnInit {
   readonly loading = signal<boolean>(false);
   readonly error = signal<string>('');
   readonly lastUpdated = signal<Date | null>(null);
+  readonly projects = signal<Project[]>([]);
+  readonly selectedProjectId = signal<string>('');
 
   async ngOnInit(): Promise<void> {
+    await this.loadProjects();
     await this.refresh();
+  }
+
+  async loadProjects(): Promise<void> {
+    try {
+      const projects = await this.projectsService.listMyProjects();
+      this.projects.set(projects);
+    } catch (error) {
+      console.error('プロジェクト一覧の取得に失敗しました:', error);
+    }
   }
 
   async refresh(): Promise<void> {
@@ -49,8 +62,13 @@ export class AttachmentsListComponent implements OnInit {
     this.error.set('');
 
     try {
-      const projects = await this.projectsService.listMyProjects();
-      const projectIds = this.extractProjectIds(projects);
+      const projects = this.projects();
+      const selectedProjectId = this.selectedProjectId();
+      
+      // プロジェクトが選択されている場合はそのプロジェクトのみ、そうでなければ全て
+      const projectIds = selectedProjectId
+        ? [selectedProjectId]
+        : this.extractProjectIds(projects);
 
       if (projectIds.length === 0) {
         this.attachments.set([]);
@@ -84,6 +102,10 @@ export class AttachmentsListComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  onProjectChange(): void {
+    void this.refresh();
   }
 
   formatFileSize(bytes: number | null | undefined): string {

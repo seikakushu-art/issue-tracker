@@ -26,6 +26,49 @@
     color: #6b7280;
     font-size: 14px;
   }
+
+  .page-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+  }
+
+  .project-select {
+    min-width: 200px;
+    max-width: 300px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #1f2937;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .project-select:hover:not(:disabled) {
+    border-color: #9ca3af;
+  }
+
+  .project-select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .project-select:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
   
   .last-updated {
     margin: 0;

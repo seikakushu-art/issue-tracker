@@ -12,7 +12,7 @@ import {
   getDoc,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Tag } from '../../models/schema';
+import { Role, Tag } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
@@ -21,20 +21,44 @@ type TagWithId = Tag & { id: string };
 
 /**
  * タグ管理サービス
- * ワークスペース全体で共有されるタグを作成・編集・削除・取得する
+ * プロジェクト単位で利用するタグの作成・編集・削除・取得を担う
  */
 @Injectable({ providedIn: 'root' })
 export class TagsService {
   private db = inject(Firestore);
   private auth = inject(Auth);
   private authReady: Promise<void> | null = null;
-  private colorAssignments = new Map<string, string>(); // 表示用に確保したカラーを保持
+  // プロジェクト単位で色割り当てを保持（projectId -> (tagId -> color)）
+  private colorAssignments = new Map<string, Map<string, string>>();
+
+  /** 指定プロジェクト向けのタグコレクションを組み立てる */
+  private getTagsCollection(projectId: string) {
+    const normalized = projectId?.trim();
+    if (!normalized) {
+      throw new Error('projectId is required');
+    }
+    return collection(this.db, `projects/${normalized}/tags`);
+  }
+
+  /** プロジェクト単位のカラー割り当てマップを取得（存在しなければ初期化） */
+  private getProjectColorAssignments(projectId: string): Map<string, string> {
+    const normalized = projectId.trim();
+    let assignments = this.colorAssignments.get(normalized);
+    if (!assignments) {
+      assignments = new Map<string, string>();
+      this.colorAssignments.set(normalized, assignments);
+    }
+    return assignments;
+  }
 
   /** Firestoreからタグ一覧をそのまま取得する */
-  private async fetchTagsRaw(): Promise<TagWithId[]> {
-    const tagsCollection = collection(this.db, 'tags');
+  private async fetchTagsRaw(projectId: string): Promise<TagWithId[]> {
+    const tagsCollection = this.getTagsCollection(projectId);
     const snap = await getDocs(query(tagsCollection));
-    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Tag) }));
+    return snap.docs.map((d) => {
+      const data = d.data() as Tag;
+      return { id: d.id, ...data, projectId: data.projectId ?? projectId };
+    });
   }
 
   /** 16進カラーコードを正規化（#付き・大文字6桁） */
@@ -88,11 +112,13 @@ export class TagsService {
 
   /** 希望色を尊重しつつ、他タグと重複しないカラーを決定 */
   private resolveUniqueColor(
+    projectId: string,
     preferredColor: string | null | undefined,
     tags: TagWithId[],
     excludeTagId?: string,
   ): string {
     const usedColors = new Set<string>();
+    const assignments = this.getProjectColorAssignments(projectId);
 
     for (const tag of tags) {
       if (excludeTagId && tag.id === excludeTagId) {
@@ -104,7 +130,7 @@ export class TagsService {
       }
     }
 
-    for (const [tagId, assigned] of this.colorAssignments.entries()) {
+    for (const [tagId, assigned] of assignments.entries()) {
       if (excludeTagId && tagId === excludeTagId) {
         continue;
       }
@@ -177,7 +203,7 @@ export class TagsService {
    * @param input タグの入力データ
    * @returns 作成されたタグのドキュメントID
    */
-  async createTag(input: {
+  async createTag(projectId: string, input: {
     name: string;
     color?: string;
   }): Promise<string> {
@@ -194,19 +220,23 @@ export class TagsService {
       throw new Error(`タグ名は最大${MAX_TAG_NAME_LENGTH}文字までです`);
     }
 
-    const tags = await this.fetchTagsRaw();
+    const tags = await this.fetchTagsRaw(projectId);
+    if (tags.length >= 20) {
+      throw new Error('タグは1プロジェクトあたり最大20個までです');
+    }
     this.ensureUniqueName(trimmedName, tags);
 
-    const resolvedColor = this.resolveUniqueColor(input.color ?? null, tags);
+    const resolvedColor = this.resolveUniqueColor(projectId, input.color ?? null, tags);
 
     const payload: Record<string, unknown> = {
+      projectId,
       name: trimmedName,
       color: resolvedColor,
       createdAt: serverTimestamp(),
       createdBy: user.uid,
     };
-    const ref = await addDoc(collection(this.db, 'tags'), payload);
-    this.colorAssignments.set(ref.id, resolvedColor);
+    const ref = await addDoc(this.getTagsCollection(projectId), payload);
+    this.getProjectColorAssignments(projectId).set(ref.id, resolvedColor);
     return ref.id;
   }
 
@@ -214,11 +244,12 @@ export class TagsService {
    * タグ一覧を取得する
    * @returns タグの配列
    */
-  async listTags(): Promise<Tag[]> {
+  async listTags(projectId: string): Promise<Tag[]> {
     try {
-      const tags = await this.fetchTagsRaw();
+      const tags = await this.fetchTagsRaw(projectId);
       const usedColors = new Set<string>();
       const tagsNeedingColor: { id: string; fallbackColor: string }[] = [];
+      const assignments = this.getProjectColorAssignments(projectId);
 
       // 既存タグのカラーを正規化し、使用済みカラー集合を先に構築
       for (const tag of tags) {
@@ -240,27 +271,28 @@ export class TagsService {
         }
 
         if (tag.id) {
-          this.colorAssignments.set(tag.id, resolvedColor);
+          assignments.set(tag.id, resolvedColor);
         }
 
         return {
           ...tag,
+          projectId,
           color: resolvedColor,
         };
       });
       if (tagsNeedingColor.length > 0) {
         await Promise.all(
           tagsNeedingColor.map(({ id, fallbackColor }) => {
-            const docRef = doc(this.db, `tags/${id}`);
+            const docRef = doc(this.db, `projects/${projectId}/tags/${id}`);
             return updateDoc(docRef, { color: fallbackColor });
           }),
         );
       }
 
       const validIds = new Set(tags.map(tag => tag.id));
-      for (const cachedId of Array.from(this.colorAssignments.keys())) {
+      for (const cachedId of Array.from(assignments.keys())) {
         if (!validIds.has(cachedId)) {
-          this.colorAssignments.delete(cachedId);
+          assignments.delete(cachedId);
         }
       }
 
@@ -276,12 +308,13 @@ export class TagsService {
    * @param tagId タグID
    * @returns タグデータ（存在しない場合はnull）
    */
-  async getTag(tagId: string): Promise<Tag | null> {
-    const docRef = doc(this.db, `tags/${tagId}`);
+  async getTag(projectId: string, tagId: string): Promise<Tag | null> {
+    const docRef = doc(this.db, `projects/${projectId}/tags/${tagId}`);
     const docSnap = await getDoc(docRef);
-    
+
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Tag) };
+      const data = docSnap.data() as Tag;
+      return { id: docSnap.id, ...data, projectId: data.projectId ?? projectId };
     }
     return null;
   }
@@ -292,6 +325,7 @@ export class TagsService {
    * @param updates 更新データ
    */
   async updateTag(
+    projectId: string,
     tagId: string,
     updates: Partial<{
       name: string;
@@ -301,7 +335,7 @@ export class TagsService {
     let cachedTags: TagWithId[] | null = null;
 
     if (updates.name !== undefined || updates.color !== undefined) {
-      cachedTags = await this.fetchTagsRaw();
+      cachedTags = await this.fetchTagsRaw(projectId);
     }
 
     if (updates.name !== undefined && cachedTags) {
@@ -321,13 +355,13 @@ export class TagsService {
     }
 
     if (updates.color !== undefined) {
-      cachedTags ??= await this.fetchTagsRaw();
-      const resolvedColor = this.resolveUniqueColor(updates.color ?? null, cachedTags, tagId);
+      cachedTags ??= await this.fetchTagsRaw(projectId);
+      const resolvedColor = this.resolveUniqueColor(projectId, updates.color ?? null, cachedTags, tagId);
       updates.color = resolvedColor;
-      this.colorAssignments.set(tagId, resolvedColor);
+      this.getProjectColorAssignments(projectId).set(tagId, resolvedColor);
     }
 
-    const docRef = doc(this.db, `tags/${tagId}`);
+    const docRef = doc(this.db, `projects/${projectId}/tags/${tagId}`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await updateDoc(docRef, updates as any);
   }
@@ -336,18 +370,20 @@ export class TagsService {
    * タグを削除する
    * @param tagId タグID
    */
-  async deleteTag(tagId: string): Promise<void> {
+  async deleteTag(projectId: string, tagId: string, requesterRole: Role | null): Promise<void> {
     const user = await this.requireUser();
-    const tag = await this.getTag(tagId);
+    const tag = await this.getTag(projectId, tagId);
     if (!tag) {
       throw new Error('指定したタグが見つかりません');
     }
-    if (tag.createdBy && tag.createdBy !== user.uid) {
-      throw new Error('タグを削除する権限がありません');
+    if (requesterRole !== 'admin') {
+      if (!tag.createdBy || tag.createdBy !== user.uid) {
+        throw new Error('タグを削除する権限がありません');
+      }
     }
-    const docRef = doc(this.db, `tags/${tagId}`);
+    const docRef = doc(this.db, `projects/${projectId}/tags/${tagId}`);
     await deleteDoc(docRef);
-    this.colorAssignments.delete(tagId);
+    this.getProjectColorAssignments(projectId).delete(tagId);
   }
 }
 

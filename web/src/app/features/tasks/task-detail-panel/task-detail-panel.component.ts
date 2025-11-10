@@ -684,7 +684,7 @@ import {
           this.tasksService.getTask(this.projectId, this.issueId, this.taskId),
           this.issuesService.getIssue(this.projectId, this.issueId),
           (this.projectsService as unknown as { getProject(id: string): Promise<Project | null> }).getProject(this.projectId),
-          this.tagsService.listTags(),
+          this.tagsService.listTags(this.projectId),
           (this.projectsService as unknown as { getSignedInUid(): Promise<string> }).getSignedInUid(),
         ]);
   

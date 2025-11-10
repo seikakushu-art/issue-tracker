@@ -138,11 +138,13 @@ export interface Comment {
 }
 
 /**
- * タグ（ワークスペース全体で共有）
+ * * タグ（プロジェクト内で共有）
+ * プロジェクト単位で作成・利用し、他プロジェクトには影響しない
  */
 export interface Tag {
   id?: string;
-  name: string;  // 必須、ワークスペースで一意
+  projectId: string;  // 所属プロジェクトID（必須）
+  name: string;  // 必須、同一プロジェクト内で一意
   color?: string;  // タグのカラー
   createdAt?: Date | null;
   createdBy?: string | null;  // 作成ユーザーID

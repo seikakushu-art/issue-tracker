@@ -4,14 +4,32 @@
         <h1>添付ファイル一覧</h1>
         <p>所属プロジェクトで共有されている添付ファイルを一括で確認できます。</p>
       </div>
-      <button
-        type="button"
-        class="btn btn-secondary"
-        (click)="refresh()"
-        [disabled]="loading()"
-      >
-        {{ loading() ? '更新中…' : '再読み込み' }}
-      </button>
+      <div class="page-header__actions">
+        <label for="project-select" class="filter-label">プロジェクト</label>
+        <select
+          id="project-select"
+          class="project-select"
+          [ngModel]="selectedProjectId()"
+          (ngModelChange)="selectedProjectId.set($event); onProjectChange()"
+          [disabled]="loading()"
+        >
+          <option value="">全てのプロジェクト</option>
+          <option
+            *ngFor="let project of projects()"
+            [value]="project.id"
+          >
+            {{ project.name }}
+          </option>
+        </select>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="refresh()"
+          [disabled]="loading()"
+        >
+          {{ loading() ? '更新中…' : '再読み込み' }}
+        </button>
+      </div>
     </header>
   
     <p *ngIf="lastUpdated()" class="last-updated">

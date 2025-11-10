@@ -71,12 +71,29 @@ export class ProjectTemplatesService {
   }
 
   /**
+   * テンプレート数をカウントする
+   * @returns テンプレート数
+   */
+  private async countTemplates(): Promise<number> {
+    const templates = await this.listTemplates();
+    return templates.length;
+  }
+
+  /**
    * 指定したプロジェクトからテンプレートを生成
    * 期間・担当者・進捗など、個別プロジェクトに紐づく情報は保存しない
    */
   async saveFromProject(projectId: string, templateName?: string): Promise<string> {
     const { project, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin']);
-// プロンプトなどで入力されたテンプレート名を優先し、なければプロジェクト名を利用
+    
+    // テンプレート数の上限チェック（20件）
+    const templateCount = await this.countTemplates();
+    const MAX_TEMPLATES = 20;
+    if (templateCount >= MAX_TEMPLATES) {
+      throw new Error(`プロジェクトテンプレートの上限（${MAX_TEMPLATES}件）に達しています。新しいテンプレートを作成するには、既存のテンプレートを削除してください。`);
+    }
+    
+    // プロンプトなどで入力されたテンプレート名を優先し、なければプロジェクト名を利用
     const normalizedName = templateName?.trim() ? templateName.trim() : project.name;
     const payload: Record<string, unknown> = {
       // Firestore上に保存するテンプレート名

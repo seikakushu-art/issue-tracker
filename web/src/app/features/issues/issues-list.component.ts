@@ -114,7 +114,6 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     void this.loadAvailableProjects();
-    void this.loadTags(); // タグ表示用に初回読込
     // ルートパラメータからprojectIdを取得
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.projectId = params['projectId'];
@@ -154,7 +153,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       await this.loadIssueTasks();
       this.filterIssues();
       await this.refreshTaskSummaries();
-      void this.loadTags(); // 直近で作成されたタグも反映
+      await this.loadTagsForProject(this.projectId); // 直近で作成されたタグも反映
     } catch (error) {
       console.error('課題の読み込みに失敗しました:', error);
     }
@@ -181,9 +180,15 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 /**
    * タグ一覧を読み込み、IDから即座に参照できるようマップ化する
    */
-private async loadTags(): Promise<void> {
+private async loadTagsForProject(projectId: string): Promise<void> {
+  if (!projectId) {
+    this.tagMap = {};
+    this.smartFilterTagOptions = [];
+    return;
+  }
+
   try {
-    const tags = await this.tagsService.listTags();
+    const tags = await this.tagsService.listTags(projectId);
     this.tagMap = tags.reduce<Record<string, Tag>>((acc, tag) => {
       if (tag.id) {
         acc[tag.id] = tag; // 代表タスク表示で名称と色を即座に取り出す

@@ -115,7 +115,6 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadProjects();
     this.loadTemplates();
-    void this.loadTags();
     this.observeCreateQuery();
   }
 
@@ -153,6 +152,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       await this.loadIssueCounts();
       await this.loadMemberProfiles(this.projects);
       await this.loadProjectTasks();
+      await this.loadTagsForAllProjects(); // プロジェクト一覧に応じたタグ候補を再構築
       this.filterProjects();
       if (this.showInviteModal && this.inviteProject?.id) {
         const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
@@ -997,16 +997,37 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
 }
 
 /** タグ一覧を取得してスマートフィルターに反映 */
-private async loadTags(): Promise<void> {
+private async loadTagsForAllProjects(): Promise<void> {
+  const projectsWithId = (this.projects ?? []).filter((project): project is Project & { id: string } => Boolean(project.id));
+  if (projectsWithId.length === 0) {
+    this.availableTags = [];
+    this.smartFilterTagOptions = [];
+    return;
+  }
+
   try {
-    this.availableTags = await this.tagsService.listTags();
-    this.smartFilterTagOptions = this.availableTags
-      .filter((tag): tag is Tag & { id: string } => Boolean(tag.id))
-      .map((tag) => ({
-        id: tag.id!,
-        name: tag.name,
-        color: tag.color ?? null,
-      }));
+    const tagResults = await Promise.all(
+      projectsWithId.map(async (project) => {
+        try {
+          const tags = await this.tagsService.listTags(project.id);
+          return { project, tags };
+        } catch (error) {
+          console.error(`タグ一覧の取得に失敗しました: ${project.name}`, error);
+          return { project, tags: [] as Tag[] };
+        }
+      }),
+    );
+
+    this.availableTags = tagResults.flatMap(({ tags }) => tags);
+    this.smartFilterTagOptions = tagResults.flatMap(({ project, tags }) =>
+      tags
+        .filter((tag): tag is Tag & { id: string } => Boolean(tag.id))
+        .map((tag) => ({
+          id: tag.id!,
+          name: `${project.name} / ${tag.name}`, // プロジェクト単位で識別しやすいよう前置する
+          color: tag.color ?? null,
+        })),
+    );
   } catch (error) {
     console.error('タグ一覧の取得に失敗しました:', error);
     this.availableTags = [];
