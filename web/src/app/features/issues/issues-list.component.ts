@@ -64,7 +64,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   showArchived = false;
   currentRole: Role | null = null;
   currentUid: string | null = null;
-  readonly maxVisibleMembers = 4;
+  readonly maxVisibleMembers = 10;
   /**
    * 課題IDごとのタスク概要（件数と代表タスク情報）をキャッシュ
    * UIのカード上で素早く表示できるよう、サービスからまとめて取得した内容を保持する

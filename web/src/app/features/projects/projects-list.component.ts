@@ -62,7 +62,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   saving = false;
   showArchived = false;
   currentUid: string | null = null;
-  readonly maxVisibleMembers = 4;
+  readonly maxVisibleMembers = 10;
 
   // スマートフィルターとタスクキャッシュ
   private projectTasksMap: Record<string, Task[]> = {};

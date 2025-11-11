@@ -322,10 +322,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   /**
    * 指定URLがログイン画面かどうか判定
+   * ログイン画面、アカウント作成画面、プロジェクト招待画面でもヘッダーを非表示にする
    */
   private isLoginUrl(url: string): boolean {
     const [path] = url.split('?');
-    return path === '/login';
+    return path === '/login' || path === '/register' || path.startsWith('/invite/');
   }
 
   /**

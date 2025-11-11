@@ -41,6 +41,7 @@ import { InviteStatus, ProjectInvite, Role } from '../../models/schema';
 
           <ng-template #loginPrompt>
             <p class="info-message">参加するにはログインしてください。</p>
+            <p class="info-message">アカウントをお持ちでない場合は<a href="https://kensyu10115.web.app/register">こちら</a>から新規登録してください。</p>
             <button class="btn btn-primary" (click)="goToLogin()">ログイン画面へ</button>
           </ng-template>
 
@@ -97,6 +98,8 @@ import { InviteStatus, ProjectInvite, Role } from '../../models/schema';
       margin: 0 0 12px;
       font-size: 20px;
       color: #1f2933;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     .invite-summary {

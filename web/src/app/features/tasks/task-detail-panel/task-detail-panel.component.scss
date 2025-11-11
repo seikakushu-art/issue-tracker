@@ -371,8 +371,9 @@
   padding: 0;
   list-style: none;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .assignee-actions {
@@ -382,7 +383,8 @@
 .assignee-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .assignee-avatar {

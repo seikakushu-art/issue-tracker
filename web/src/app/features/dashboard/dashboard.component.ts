@@ -203,6 +203,33 @@ export class DashboardComponent implements OnInit {
     return warnings.length > 0 ? warnings.join(' ') : null;
   });
 
+  /** 期限通知のキーを生成する（期限情報を含めることで、期限変更時に新しい通知として扱う） */
+  private getDueNotificationKey(taskId: string, dueDate: Date | null): string {
+    if (!dueDate) {
+      return `due:${taskId}`;
+    }
+    // 期限の日付部分（YYYY-MM-DD）を含める（東京時間ベース）
+    const tokyoDateParts = this.getTokyoDateParts(dueDate);
+    const dateStr = `${tokyoDateParts.year}-${String(tokyoDateParts.month + 1).padStart(2, '0')}-${String(tokyoDateParts.day).padStart(2, '0')}`;
+    return `due:${taskId}:${dateStr}`;
+  }
+
+  /** 東京時間での日付部分を取得するヘルパー */
+  private getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
+    const formatter = new Intl.DateTimeFormat('ja-JP', {
+      timeZone: 'Asia/Tokyo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date);
+    return {
+      year: parseInt(parts.find((p) => p.type === 'year')!.value, 10),
+      month: parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1, // 0-indexed
+      day: parseInt(parts.find((p) => p.type === 'day')!.value, 10),
+    };
+  }
+
   /** 通知総件数（未読のみ） */
   readonly totalNotificationCount = computed(() => {
     const notifications = this.startupNotifications();
@@ -214,7 +241,7 @@ export class DashboardComponent implements OnInit {
 
     // 本日締切タスクの未読数をカウント
     for (const task of notifications.dueTodayTasks) {
-      const key = `due:${task.taskId}`;
+      const key = this.getDueNotificationKey(task.taskId, task.dueDate);
       if (!readKeys.has(key)) {
         unreadCount++;
       }
@@ -244,7 +271,7 @@ export class DashboardComponent implements OnInit {
     const dueTodayItems = notifications.dueTodayTasks.map((task) => {
       const isOverdue = task.dueDate ? this.notificationService.isOverdue(task.dueDate, now) : false;
       const type: NotificationListType = isOverdue ? 'overdue' : 'due_today';
-      const key = `due:${task.taskId}`;
+      const key = this.getDueNotificationKey(task.taskId, task.dueDate);
       return {
         key,
         type,
@@ -362,7 +389,7 @@ export class DashboardComponent implements OnInit {
 
     // 本日締切タスクのキーを追加
     for (const task of notifications.dueTodayTasks) {
-      allKeys.add(`due:${task.taskId}`);
+      allKeys.add(this.getDueNotificationKey(task.taskId, task.dueDate));
     }
 
     // メンション通知のキーを追加

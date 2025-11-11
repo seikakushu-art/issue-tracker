@@ -19,6 +19,9 @@
     margin: 0 0 8px 0;
     font-size: 24px;
     color: #1f2937;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
   
   .page-header__titles p {
@@ -175,6 +178,60 @@
     width: 70px;
     max-width: 90px;
     text-align: center;
+  }
+
+  .info-tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    vertical-align: middle;
+
+    .info-icon {
+      font-size: 0.9rem;
+      color: #64748b;
+      transition: color 0.2s ease;
+    }
+
+    &:hover .info-icon {
+      color: #2563eb;
+    }
+
+    .tooltip-content {
+      position: absolute;
+      top: calc(100% + 8px);
+      bottom: auto;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #ffffff;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      z-index: 1001;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 100%;
+        top: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-bottom-color: #1e293b;
+        border-top-color: transparent;
+      }
+    }
+
+    &:hover .tooltip-content {
+      opacity: 1;
+      visibility: visible;
+    }
   }
 
   .attachments-table .actions-cell {

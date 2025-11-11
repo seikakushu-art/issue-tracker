@@ -331,7 +331,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 選択中のタスクに退出ボタンを表示するか判定 */
   shouldShowLeaveButton(): boolean {
-    return this.selectedTask !== null;
+    return this.canAttemptJoinTask() && this.selectedTask !== null && this.isCurrentUserAssignee();
   }
 
   /** 現在のユーザーが選択中タスクの担当者かを判定 */
