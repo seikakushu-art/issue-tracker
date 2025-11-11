@@ -100,11 +100,15 @@
 }
 
 .summary-text h3 .issue-label {
-  color: #64748b;
-  font-weight: 500;
+  color: #475569;
+  font-weight: 600;
   font-size: 16px;
   margin-right: 8px;
   display: inline-block;
+  background: rgba(71, 85, 105, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
 }
 
 .summary-text h3 .issue-name {
@@ -129,11 +133,15 @@
 }
 
 .summary-goal .goal-label {
-  color: #64748b;
-  font-weight: 500;
+  color: #475569;
+  font-weight: 600;
   font-size: 13px;
-  margin-right: 4px;
+  margin-right: 6px;
   display: inline-block;
+  background: rgba(71, 85, 105, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
 }
 
 .summary-goal .goal-content {

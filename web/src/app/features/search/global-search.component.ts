@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { BoardService } from '../board/board.service';
 import { IssuesService } from '../issues/issues.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -16,10 +16,12 @@ interface SearchResultItem {
   type: SearchResultType;
   title: string;
   context?: string;
+  description?: string;
   routerLink: (string | number)[];
   fragment?: string;
   titleLower: string;
   contextLower: string | null;
+  descriptionLower: string | null;
 }
 
 @Component({
@@ -35,11 +37,18 @@ export class GlobalSearchComponent implements OnInit {
   private readonly tasksService = inject(TasksService);
   private readonly boardService = inject(BoardService);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly router = inject(Router);
 
   readonly query = signal('');
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly includeArchived = signal(false);
+  readonly typeFilters = signal<Record<SearchResultType, boolean>>({
+    project: true,
+    issue: true,
+    task: true,
+    board: true,
+  });
   private readonly items = signal<SearchResultItem[]>([]);
 
   private readonly typeLabels: Record<SearchResultType, string> = {
@@ -52,18 +61,28 @@ export class GlobalSearchComponent implements OnInit {
   readonly filteredResults = computed(() => {
     const keyword = this.query().trim().toLowerCase();
     const allItems = this.items();
-    if (!keyword) {
-      return allItems;
+    const typeFilters = this.typeFilters();
+    
+    // まずタイプフィルタを適用
+    let filtered = allItems.filter((item) => typeFilters[item.type]);
+    
+    // 次にキーワードフィルタを適用
+    if (keyword) {
+      filtered = filtered.filter((item) => {
+        if (item.titleLower.includes(keyword)) {
+          return true;
+        }
+        if (item.contextLower && item.contextLower.includes(keyword)) {
+          return true;
+        }
+        if (item.descriptionLower && item.descriptionLower.includes(keyword)) {
+          return true;
+        }
+        return false;
+      });
     }
-    return allItems.filter((item) => {
-      if (item.titleLower.includes(keyword)) {
-        return true;
-      }
-      if (item.contextLower && item.contextLower.includes(keyword)) {
-        return true;
-      }
-      return false;
-    });
+    
+    return filtered;
   });
 
   readonly countsByType = computed(() => {
@@ -87,6 +106,31 @@ export class GlobalSearchComponent implements OnInit {
     void this.loadAllData();
   }
 
+  onResultClick(item: SearchResultItem, event: Event): void {
+    // プロジェクトページへの遷移時にスクロール
+    if (item.type === 'project') {
+      // 遷移完了後にスクロール
+      this.router.navigate(item.routerLink, { fragment: item.fragment }).then(() => {
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
+      });
+      event.preventDefault();
+    } else if (item.type === 'board' && item.fragment) {
+      // 掲示板の場合は、fragmentの要素にスクロール
+      this.router.navigate(item.routerLink, { fragment: item.fragment }).then(() => {
+        setTimeout(() => {
+          const element = document.getElementById(item.fragment!);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 300);
+      });
+      event.preventDefault();
+    }
+    // プロジェクト以外は通常のルーターリンクを使用
+  }
+
   async loadAllData(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
@@ -101,6 +145,7 @@ export class GlobalSearchComponent implements OnInit {
         type: 'project',
         title: project.name,
         context: project.goal ? `ゴール: ${project.goal}` : undefined,
+        description: project.description,
         routerLink: ['/projects', project.id!],
       }));
 
@@ -124,13 +169,10 @@ export class GlobalSearchComponent implements OnInit {
           id: issue.id!,
           type: 'issue',
           title: issue.name,
-          context: `${project.name}`,
+          context: undefined,
+          description: issue.description,
           routerLink: ['/projects', project.id!, 'issues', issue.id!],
         }),
-      );
-
-      const issueMap = new Map(
-        issueEntries.map(({ issue, project }) => [issue.id!, { issue, project }]),
       );
 
       const tasksByProject = await Promise.all(
@@ -150,24 +192,12 @@ export class GlobalSearchComponent implements OnInit {
       const taskItems = tasksByProject
         .flat()
         .map(({ task }) => {
-          const issueInfo = issueMap.get(task.issueId);
-          const contextParts = [] as string[];
-          if (issueInfo) {
-            contextParts.push(`${issueInfo.project.name} / ${issueInfo.issue.name}`);
-          } else {
-            const projectName = validProjects.find((project) => project.id === task.projectId)?.name;
-            if (projectName) {
-              contextParts.push(projectName);
-            }
-          }
-          if (task.importance) {
-            contextParts.push(`重要度: ${task.importance}`);
-          }
           return this.createItem({
             id: task.id!,
             type: 'task',
             title: task.title,
-            context: contextParts.join(' ・ '),
+            context: undefined,
+            description: task.description,
             routerLink: ['/projects', task.projectId, 'issues', task.issueId],
           });
         })
@@ -217,7 +247,7 @@ export class GlobalSearchComponent implements OnInit {
             title: post.title,
             context,
             routerLink: ['/board'],
-            fragment: post.id!,
+            fragment: `post-${post.id!}`,
           });
         });
     } catch (error) {
@@ -231,20 +261,24 @@ export class GlobalSearchComponent implements OnInit {
     type: SearchResultType;
     title: string;
     context?: string;
+    description?: string | null;
     routerLink: (string | number)[];
     fragment?: string;
   }): SearchResultItem {
     const title = input.title ?? '';
     const context = input.context?.trim() || undefined;
+    const description = input.description?.trim() || undefined;
     return {
       id: input.id,
       type: input.type,
       title,
       context,
+      description,
       routerLink: [...input.routerLink],
       fragment: input.fragment ?? undefined,
       titleLower: title.toLowerCase(),
       contextLower: context ? context.toLowerCase() : null,
+      descriptionLower: description ? description.toLowerCase() : null,
     };
   }
 
@@ -255,6 +289,13 @@ export class GlobalSearchComponent implements OnInit {
   onIncludeArchivedChange(checked: boolean): void {
     this.includeArchived.set(checked);
     void this.loadAllData();
+  }
+
+  onTypeFilterChange(type: SearchResultType, checked: boolean): void {
+    this.typeFilters.update((filters) => ({
+      ...filters,
+      [type]: checked,
+    }));
   }
 
   highlight(text: string | undefined | null): SafeHtml {

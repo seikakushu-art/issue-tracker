@@ -1,6 +1,15 @@
 <div class="smart-filter-panel">
     <header class="panel-header">
-      <h3>スマートフィルター</h3>
+      <div class="header-title">
+        <h3>スマートフィルター</h3>
+        <div class="info-tooltip">
+          <span class="info-icon" aria-label="フィルター条件の説明">ℹ️</span>
+          <div class="tooltip-content">
+            <p>グループ内は いずれか一致 (OR)</p>
+            <p>グループ間は すべて満たす (AND)</p>
+          </div>
+        </div>
+      </div>
       <button type="button" class="btn-close" (click)="closePanel()" aria-label="フィルターを閉じる">×</button>
     </header>
   

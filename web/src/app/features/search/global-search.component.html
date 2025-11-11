@@ -32,8 +32,16 @@
         <span class="search-status__total">{{ totalCount() }} 件ヒット</span>
         <ul class="search-status__breakdown">
           <li *ngFor="let type of typeOrder">
-            <span class="type-chip type-chip--{{ type }}">{{ labelFor(type) }}</span>
-            <span class="type-count">{{ countsByType()[type] }}</span>
+            <label class="search-status__type-filter">
+              <input
+                type="checkbox"
+                [checked]="typeFilters()[type]"
+                (change)="onTypeFilterChange(type, $any($event.target).checked)"
+                [attr.aria-label]="labelFor(type) + 'を表示'"
+              />
+              <span class="type-chip type-chip--{{ type }}">{{ labelFor(type) }}</span>
+              <span class="type-count">{{ countsByType()[type] }}</span>
+            </label>
           </li>
         </ul>
       </div>
@@ -41,10 +49,15 @@
   
     <ul class="search-results">
       <li *ngFor="let item of filteredResults(); trackBy: trackById" class="search-results__item">
-        <a [routerLink]="item.routerLink" [fragment]="item.fragment" class="result-card">
+        <a 
+          [routerLink]="item.routerLink" 
+          [fragment]="item.fragment" 
+          (click)="onResultClick(item, $event)"
+          class="result-card">
           <span class="result-card__type type-chip type-chip--{{ item.type }}">{{ labelFor(item.type) }}</span>
           <span class="result-card__title" [innerHTML]="highlight(item.title)"></span>
           <span class="result-card__context" *ngIf="item.context" [innerHTML]="highlight(item.context)"></span>
+          <span class="result-card__description" *ngIf="item.description" [innerHTML]="highlight(item.description)"></span>
         </a>
       </li>
     </ul>

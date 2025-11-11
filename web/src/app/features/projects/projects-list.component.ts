@@ -397,7 +397,11 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     return memberIds.filter((memberId) => {
       const profile = this.memberProfiles[memberId];
       const username = profile?.username ?? '';
-      return username.toLowerCase().includes(keyword) || memberId.toLowerCase().includes(keyword);
+      // ユーザー名が存在する場合のみ検索（プレースホルダーが「ユーザー名でメンバーを検索」のため）
+      if (!username) {
+        return false; // ユーザー名がない場合は検索対象外
+      }
+      return username.toLowerCase().includes(keyword);
     });
   }
 

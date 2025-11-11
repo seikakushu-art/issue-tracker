@@ -76,11 +76,15 @@
 }
 
 .summary-title h3 .project-label {
-  color: #64748b;
-  font-weight: 500;
+  color: #475569;
+  font-weight: 600;
   font-size: 16px;
   margin-right: 8px;
   display: inline-block;
+  background: rgba(71, 85, 105, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
 }
 
 .summary-title h3 .project-name {
@@ -101,6 +105,28 @@
   overflow-wrap: break-word;
   white-space: pre-wrap;
   min-width: 0;
+}
+
+.summary-goal .goal-label {
+  color: #475569;
+  font-weight: 600;
+  font-size: 13px;
+  margin-right: 6px;
+  display: inline-block;
+  background: rgba(71, 85, 105, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+
+.summary-goal .goal-content {
+  color: #666;
+  font-weight: 400;
+  font-size: 13px;
+  display: inline-block;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .summary-dates {

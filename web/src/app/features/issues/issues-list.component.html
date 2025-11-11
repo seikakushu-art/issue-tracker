@@ -9,7 +9,7 @@
     <div class="summary-header">
       <div class="summary-title">
         <h3><span class="project-label">プロジェクト:</span> <span class="project-name">{{ projectDetails.name }}</span></h3>
-        <p class="summary-goal" *ngIf="projectDetails.goal">{{ projectDetails.goal }}</p>
+        <p class="summary-goal" *ngIf="projectDetails.goal"><span class="goal-label">達成目標:</span> <span class="goal-content">{{ projectDetails.goal }}</span></p>
       </div>
       <div class="summary-dates">
         <span *ngIf="projectDetails.startDate">開始: {{ projectDetails.startDate | date:'yyyy/MM/dd' }}</span>
