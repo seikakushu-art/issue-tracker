@@ -110,12 +110,13 @@
     <div class="filter-group">
       <span>並び替え:</span>
       <select [(ngModel)]="sortBy" (change)="sortTasks()">
-        <option value="title">タイトル</option>
+        <option value="title">名称</option>
         <option value="startDate">開始日</option>
         <option value="endDate">終了日</option>
         <option value="progress">進捗</option>
         <option value="importance">重要度</option>
         <option value="createdAt">作成日</option>
+        <option value="period">期間</option>
       </select>
       <select [(ngModel)]="sortOrder" (change)="sortTasks()">
         <option value="asc">昇順</option>

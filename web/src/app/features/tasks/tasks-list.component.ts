@@ -114,8 +114,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
    readonly smartFilterScope = 'tasks';
 
   // 並び替え設定
-  sortBy: 'title' | 'startDate' | 'endDate' | 'progress' | 'importance' | 'createdAt' = 'title';
+  sortBy: 'title' | 'startDate' | 'endDate' | 'progress' | 'importance' | 'createdAt' | 'period' = 'title';
   sortOrder: 'asc' | 'desc' = 'asc';
+
+  /** localStorage用のキー */
+  private readonly SORT_BY_KEY = 'tasks-sort-by';
+  private readonly SORT_ORDER_KEY = 'tasks-sort-order';
 
   // フォームデータ
   taskForm = {
@@ -193,6 +197,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         this.trySelectTaskById(focus);
       }
     });
+    this.loadSortPreferences();
   }
 
   ngOnDestroy() {
@@ -492,6 +497,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 並び替え */
   sortTasks() {
+    this.saveSortPreferences();
     const sorted = [...this.filteredTasks].sort((a, b) => {
       // ピン止めされたタスクを先頭に表示
       const aPinned = this.isTaskPinned(a);
@@ -530,6 +536,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
         case 'createdAt':
           aValue = this.normalizeDate(a.createdAt)?.getTime() || 0;
           bValue = this.normalizeDate(b.createdAt)?.getTime() || 0;
+          break;
+        case 'period':
+          aValue = this.getTaskDuration(a);
+          bValue = this.getTaskDuration(b);
           break;
         default:
           return 0;
@@ -581,6 +591,42 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return true; // フォールバックでは完了扱いとして処理を継続する
   }
 
+  /**
+   * localStorageから並び替え設定を読み込む
+   */
+  private loadSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      const savedSortBy = window.localStorage.getItem(this.SORT_BY_KEY);
+      const savedSortOrder = window.localStorage.getItem(this.SORT_ORDER_KEY);
+      
+      if (savedSortBy && ['title', 'startDate', 'endDate', 'progress', 'importance', 'createdAt', 'period'].includes(savedSortBy)) {
+        this.sortBy = savedSortBy as typeof this.sortBy;
+      }
+      if (savedSortOrder && ['asc', 'desc'].includes(savedSortOrder)) {
+        this.sortOrder = savedSortOrder as typeof this.sortOrder;
+      }
+    } catch (error) {
+      console.warn('並び替え設定の読み込みに失敗しました:', error);
+    }
+  }
+
+  /**
+   * 並び替え設定をlocalStorageに保存する
+   */
+  private saveSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(this.SORT_BY_KEY, this.sortBy);
+      window.localStorage.setItem(this.SORT_ORDER_KEY, this.sortOrder);
+    } catch (error) {
+      console.warn('並び替え設定の保存に失敗しました:', error);
+    }
+  }
 
   /** スマートフィルターパネルの開閉 */
   toggleSmartFilterPanel(): void {
@@ -2024,5 +2070,18 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /** 日付をDateオブジェクトに正規化 */
   private normalizeDate(date: Date | string | null | undefined): Date | null {
     return this.toDate(date);
+  }
+
+  /** タスク期間（日数）を算出する（開始・終了がそろっていない場合は0） */
+  private getTaskDuration(task: Task): number {
+    const startDate = this.normalizeDate(task.startDate);
+    const endDate = this.normalizeDate(task.endDate);
+    if (!startDate || !endDate) {
+      return 0;
+    }
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+    const diff = end - start;
+    return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
   }
 }

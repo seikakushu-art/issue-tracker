@@ -94,8 +94,12 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   readonly smartFilterScope = 'issues';
 
   // 並び替え設定
-  sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' = 'name';
+  sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' | 'period' | 'taskCount' = 'name';
   sortOrder: 'asc' | 'desc' = 'asc';
+
+  /** localStorage用のキー */
+  private readonly SORT_BY_KEY = 'issues-sort-by';
+  private readonly SORT_ORDER_KEY = 'issues-sort-order';
 
   // フォームデータ
   issueForm = {
@@ -122,6 +126,7 @@ export class IssuesListComponent implements OnInit, OnDestroy {
         this.loadIssues();
       }
     });
+    this.loadSortPreferences();
   }
 
   ngOnDestroy() {
@@ -380,9 +385,47 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
   }
 
   /**
+   * localStorageから並び替え設定を読み込む
+   */
+  private loadSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      const savedSortBy = window.localStorage.getItem(this.SORT_BY_KEY);
+      const savedSortOrder = window.localStorage.getItem(this.SORT_ORDER_KEY);
+      
+      if (savedSortBy && ['name', 'startDate', 'endDate', 'progress', 'createdAt', 'period', 'taskCount'].includes(savedSortBy)) {
+        this.sortBy = savedSortBy as typeof this.sortBy;
+      }
+      if (savedSortOrder && ['asc', 'desc'].includes(savedSortOrder)) {
+        this.sortOrder = savedSortOrder as typeof this.sortOrder;
+      }
+    } catch (error) {
+      console.warn('並び替え設定の読み込みに失敗しました:', error);
+    }
+  }
+
+  /**
+   * 並び替え設定をlocalStorageに保存する
+   */
+  private saveSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(this.SORT_BY_KEY, this.sortBy);
+      window.localStorage.setItem(this.SORT_ORDER_KEY, this.sortOrder);
+    } catch (error) {
+      console.warn('並び替え設定の保存に失敗しました:', error);
+    }
+  }
+
+  /**
    * 課題を並び替え
    */
   sortIssues() {
+    this.saveSortPreferences();
     this.filteredIssues.sort((a, b) => {
       // ピン止めされた課題を先頭に表示
       const aPinned = this.isIssuePinned(a);
@@ -417,6 +460,14 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
         case 'createdAt':
           aValue = a.createdAt || new Date(0);
           bValue = b.createdAt || new Date(0);
+          break;
+        case 'period':
+          aValue = this.getIssueDuration(a);
+          bValue = this.getIssueDuration(b);
+          break;
+        case 'taskCount':
+          aValue = this.getTaskCount(a.id ?? '');
+          bValue = this.getTaskCount(b.id ?? '');
           break;
         default:
           return 0;
@@ -632,6 +683,37 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     this.showModal = false;
     this.editingIssue = null;
     this.saving = false;
+  }
+
+  /** 課題期間（日数）を算出する（開始・終了がそろっていない場合は0） */
+  private getIssueDuration(issue: Issue): number {
+    const startDate = this.normalizeToDate(issue.startDate);
+    const endDate = this.normalizeToDate(issue.endDate);
+    if (!startDate || !endDate) {
+      return 0;
+    }
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+    const diff = end - start;
+    return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
+  }
+
+  /** 任意の値をDate型へ正規化する（Timestamp互換にも対応） */
+  private normalizeToDate(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (typeof value === 'object' && 'toDate' in (value as Record<string, unknown>)) {
+      const candidate = value as { toDate?: () => Date };
+      if (typeof candidate.toDate === 'function') {
+        return candidate.toDate();
+      }
+    }
+    const parsed = new Date(value as string);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   /**

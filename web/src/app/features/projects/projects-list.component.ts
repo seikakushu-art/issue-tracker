@@ -111,8 +111,12 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   private memberColorCache = new Map<string, string>();
   private memberProfiles: Record<string, UserDirectoryProfile> = {};
 
+  /** localStorage用のキー */
+  private readonly SORT_BY_KEY = 'projects-sort-by';
+  private readonly SORT_ORDER_KEY = 'projects-sort-order';
 
   ngOnInit() {
+    this.loadSortPreferences();
     this.loadProjects();
     this.loadTemplates();
     this.observeCreateQuery();
@@ -277,9 +281,47 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * localStorageから並び替え設定を読み込む
+   */
+  private loadSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      const savedSortBy = window.localStorage.getItem(this.SORT_BY_KEY);
+      const savedSortOrder = window.localStorage.getItem(this.SORT_ORDER_KEY);
+      
+      if (savedSortBy && ['name', 'startDate', 'endDate', 'progress', 'createdAt', 'period', 'issueCount', 'memberCount'].includes(savedSortBy)) {
+        this.sortBy = savedSortBy as typeof this.sortBy;
+      }
+      if (savedSortOrder && ['asc', 'desc'].includes(savedSortOrder)) {
+        this.sortOrder = savedSortOrder as typeof this.sortOrder;
+      }
+    } catch (error) {
+      console.warn('並び替え設定の読み込みに失敗しました:', error);
+    }
+  }
+
+  /**
+   * 並び替え設定をlocalStorageに保存する
+   */
+  private saveSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(this.SORT_BY_KEY, this.sortBy);
+      window.localStorage.setItem(this.SORT_ORDER_KEY, this.sortOrder);
+    } catch (error) {
+      console.warn('並び替え設定の保存に失敗しました:', error);
+    }
+  }
+
+  /**
    * プロジェクトを並び替え
    */
   sortProjects() {
+    this.saveSortPreferences();
     this.filteredProjects.sort((a, b) => {
       // ピン止めされたプロジェクトを先頭に表示
       const aPinned = this.isPinned(a);
