@@ -388,6 +388,44 @@ export class ProjectsService {
       throw new Error('少なくとも1人の管理者が必要です。');
     }
 
+    // 削除されるメンバーが担当者になっているタスクからもそのユーザーを外す
+    const tasksRef = collectionGroup(this.db, 'tasks');
+    const tasksSnapshot = await getDocs(
+      query(
+        tasksRef,
+        where('projectId', '==', projectId),
+        where('assigneeIds', 'array-contains', memberId),
+      ),
+    );
+
+    // 各タスクから削除されるメンバーを担当者から外す
+    const updatePromises = tasksSnapshot.docs.map(async (taskDoc) => {
+      const taskData = taskDoc.data() as Record<string, unknown>;
+      const assigneeIds = Array.isArray(taskData['assigneeIds']) 
+        ? (taskData['assigneeIds'] as string[])
+        : [];
+      
+      // 削除されるメンバーを担当者リストから除外
+      const updatedAssigneeIds = assigneeIds.filter((id) => id !== memberId);
+      
+      // パスからprojectId, issueId, taskIdを取得
+      const pathParts = taskDoc.ref.path.split('/');
+      const taskProjectId = pathParts[1];
+      const issueId = pathParts[3];
+      const taskId = pathParts[5];
+      
+      if (updatedAssigneeIds.length !== assigneeIds.length) {
+        // 担当者が変更された場合のみ更新
+        const taskRef = doc(this.db, `projects/${taskProjectId}/issues/${issueId}/tasks/${taskId}`);
+        await updateDoc(taskRef, {
+          assigneeIds: updatedAssigneeIds,
+        });
+      }
+    });
+
+    await Promise.all(updatePromises);
+
+    // プロジェクトのメンバーリストとロールを更新
     await updateDoc(doc(this.db, 'projects', projectId), {
       memberIds: nextMemberIds,
       roles: nextRoles,

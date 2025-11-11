@@ -297,6 +297,7 @@ export class NotificationService {
   /**
    * 指定ユーザー向けのアクション可能タスクカードをまとめて取得する
    * アーカイブされたタスクと削除/アーカイブされたプロジェクトのタスクは除外される
+   * メンバーとして削除されたプロジェクトのタスクも除外される
    */
   async getActionableTaskCards(options: { limit?: number; mentionTake?: number } = {}): Promise<ActionableTaskCard[]> {
     const uid = this.auth.currentUser?.uid;
@@ -308,6 +309,12 @@ export class NotificationService {
       const take = options.limit ?? 30;
       const mentionTake = options.mentionTake ?? 3;
       const now = new Date();
+
+      // アクセス可能なプロジェクトIDを取得（メンバーとして削除されたプロジェクトを除外）
+      const accessibleProjects = await this.fetchAccessibleProjectIds(uid);
+      if (accessibleProjects.size === 0) {
+        return [];
+      }
 
       const tasksRef = collectionGroup(this.db, 'tasks');
       const taskQuery = query(
@@ -459,11 +466,15 @@ export class NotificationService {
         })
       );
 
-      // 削除/アーカイブされたプロジェクトのタスクを除外
+      // 削除/アーカイブされたプロジェクト、またはメンバーとして削除されたプロジェクトのタスクを除外
       const filteredEnriched = enriched.filter((item) => {
         const project = projectMap.get(item.task.projectId);
         // プロジェクトが存在しない、またはアーカイブされている場合は除外
-        return project && !project.archived;
+        if (!project || project.archived) {
+          return false;
+        }
+        // アクセス可能なプロジェクトのみを対象とする（メンバーとして削除されたプロジェクトを除外）
+        return accessibleProjects.has(item.task.projectId);
       });
 
       if (filteredEnriched.length === 0) {

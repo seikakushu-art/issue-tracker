@@ -149,6 +149,8 @@ export interface Attachment {
   issueName?: string | null;  // 所属課題名（スナップショット）
   taskId?: string;  // 所属タスクID
   taskTitle?: string | null;  // 添付時点のタスク名
+  authorUsername?: string | null;  // 表示に使うユーザー名
+  authorPhotoUrl?: string | null;  // アイコン画像URL
 }
 
 /**

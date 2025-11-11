@@ -118,14 +118,6 @@ export class TasksService {
     if (typeof data['taskTitle'] === 'string') {
       attachment.taskTitle = data['taskTitle'];
     }
-    if (typeof data['authorUsername'] === 'string' && data['authorUsername'].trim().length > 0) {
-      attachment.authorUsername = data['authorUsername'].trim();
-    }
-    if (typeof data['authorPhotoUrl'] === 'string' && data['authorPhotoUrl'].trim().length > 0) {
-      attachment.authorPhotoUrl = data['authorPhotoUrl'].trim();
-    } else if (data['authorPhotoUrl'] === null) {
-      attachment.authorPhotoUrl = null;
-    }
 
     return attachment;
   }
@@ -342,6 +334,8 @@ export class TasksService {
    */
   async listTasks(projectId: string, issueId: string, includeArchived = true): Promise<Task[]> {
     try {
+      // プロジェクトのメンバーシップをチェック（Firestoreルールでも保護されているが、クライアント側でも明示的にチェック）
+      await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
       const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
       const snap = await getDocs(q);
       const tasks = snap.docs.map((docSnap) => this.hydrateTask(docSnap.id, docSnap.data() as Task));
@@ -359,6 +353,8 @@ export class TasksService {
    */
   async listTasksByProject(projectId: string, includeArchived = true): Promise<Task[]> {
     try {
+      // プロジェクトのメンバーシップをチェック（メンバーとして削除されたプロジェクトのタスクを取得しないようにする）
+      await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
       const constraints = [where('projectId', '==', projectId)];
       if (!includeArchived) {
         constraints.push(where('archived', '==', false));
@@ -451,6 +447,8 @@ export class TasksService {
     representativeTaskId: string | null = null,
   ): Promise<TaskSummary> {
     try {
+      // プロジェクトのメンバーシップをチェック（Firestoreルールでも保護されているが、クライアント側でも明示的にチェック）
+      await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
       const q = query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
       const snap = await getDocs(q);
 
@@ -525,6 +523,8 @@ export class TasksService {
    * @returns タスクデータ（存在しない場合はnull）
    */
   async getTask(projectId: string, issueId: string, taskId: string): Promise<Task | null> {
+    // プロジェクトのメンバーシップをチェック（Firestoreルールでも保護されているが、クライアント側でも明示的にチェック）
+    await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
     const docSnap = await getDoc(docRef);
     
@@ -1027,12 +1027,24 @@ export class TasksService {
       ),
     );
 
+    // アクセス可能なプロジェクトのみをフィルタリング（メンバーとして削除されたプロジェクトを除外）
+    const accessibleProjectIds: string[] = [];
+    for (const projectId of normalized) {
+      try {
+        await this.projectsService.ensureProjectRole(projectId, ['admin', 'member', 'guest']);
+        accessibleProjectIds.push(projectId);
+      } catch (error) {
+        // メンバーシップがないプロジェクトはスキップ
+        console.warn(`プロジェクト ${projectId} へのアクセス権限がありません`, error);
+      }
+    }
+
     const attachmentsGroup = collectionGroup(this.db, 'attachments');
     const results: Attachment[] = [];
 
-    // プロジェクトIDでフィルタリング
-    if (normalized.length > 0) {
-      for (const chunk of this.chunkArray(normalized, 10)) {
+    // プロジェクトIDでフィルタリング（アクセス可能なプロジェクトのみ）
+    if (accessibleProjectIds.length > 0) {
+      for (const chunk of this.chunkArray(accessibleProjectIds, 10)) {
         if (chunk.length === 0) {
           continue;
         }

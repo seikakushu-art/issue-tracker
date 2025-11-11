@@ -836,14 +836,7 @@ import {
     }
   
     private composeAttachmentView(attachment: Attachment): TaskAttachmentView {
-      // 保存されたauthorUsernameとauthorPhotoUrlを優先的に使用（メンバー削除後も保持）
-      const savedAuthorUsername = attachment.authorUsername && attachment.authorUsername.trim().length > 0
-        ? attachment.authorUsername
-        : null;
-      const savedAuthorPhotoUrl = attachment.authorPhotoUrl ?? null;
-      
-      // 保存された情報がない場合のみ、プロファイルから取得を試みる
-      const profile = !savedAuthorUsername && attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
+      const profile = attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
       const isCurrentUser = this.currentUid !== null && attachment.uploadedBy === this.currentUid;
       const fallback = isCurrentUser ? this.currentUserProfile : undefined;
       const uploaderLabel = profile?.username ?? fallback?.username ?? attachment.uploadedBy ?? '不明なユーザー';

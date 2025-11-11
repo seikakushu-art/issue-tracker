@@ -49,7 +49,12 @@ export class ProjectSidebarComponent implements OnInit {
   /** エラー発生時のメッセージを控える。 */
   loadError = '';
 
+  /** localStorage用のキー */
+  private readonly SORT_BY_KEY = 'project-sidebar-sort-by';
+  private readonly SORT_ORDER_KEY = 'project-sidebar-sort-order';
+
   async ngOnInit(): Promise<void> {
+    this.loadSortPreferences();
     await this.loadProjects();
   }
 
@@ -78,7 +83,45 @@ export class ProjectSidebarComponent implements OnInit {
 
   /** 並び替え指定が変わったときに都度適用する。 */
   onSortChange(): void {
+    this.saveSortPreferences();
     this.applySorting();
+  }
+
+  /**
+   * localStorageから並び替え設定を読み込む
+   */
+  private loadSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      const savedSortBy = window.localStorage.getItem(this.SORT_BY_KEY);
+      const savedSortOrder = window.localStorage.getItem(this.SORT_ORDER_KEY);
+      
+      if (savedSortBy && ['name', 'startDate', 'endDate', 'progress', 'createdAt', 'period', 'issueCount', 'memberCount'].includes(savedSortBy)) {
+        this.sortBy = savedSortBy as typeof this.sortBy;
+      }
+      if (savedSortOrder && ['asc', 'desc'].includes(savedSortOrder)) {
+        this.sortOrder = savedSortOrder as typeof this.sortOrder;
+      }
+    } catch (error) {
+      console.warn('並び替え設定の読み込みに失敗しました:', error);
+    }
+  }
+
+  /**
+   * 並び替え設定をlocalStorageに保存する
+   */
+  private saveSortPreferences(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(this.SORT_BY_KEY, this.sortBy);
+      window.localStorage.setItem(this.SORT_ORDER_KEY, this.sortOrder);
+    } catch (error) {
+      console.warn('並び替え設定の保存に失敗しました:', error);
+    }
   }
 
   /** 選択中の条件に基づいてプロジェクト一覧を並べ替える。 */
