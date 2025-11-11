@@ -296,6 +296,7 @@ export class NotificationService {
 
   /**
    * 指定ユーザー向けのアクション可能タスクカードをまとめて取得する
+   * アーカイブされたタスクと削除/アーカイブされたプロジェクトのタスクは除外される
    */
   async getActionableTaskCards(options: { limit?: number; mentionTake?: number } = {}): Promise<ActionableTaskCard[]> {
     const uid = this.auth.currentUser?.uid;
@@ -458,7 +459,19 @@ export class NotificationService {
         })
       );
 
-      const cards: ActionableTaskCard[] = enriched.map((item) => {
+      // 削除/アーカイブされたプロジェクトのタスクを除外
+      const filteredEnriched = enriched.filter((item) => {
+        const project = projectMap.get(item.task.projectId);
+        // プロジェクトが存在しない、またはアーカイブされている場合は除外
+        return project && !project.archived;
+      });
+
+      if (filteredEnriched.length === 0) {
+        console.log('[要対応タスク] フィルタリング後、抽出されたタスクが0件です');
+        return [];
+      }
+
+      const cards: ActionableTaskCard[] = filteredEnriched.map((item) => {
         const project = projectMap.get(item.task.projectId);
         const projectName = this.getProjectDisplayName(project);
         const primaryReason = this.highlightPriority.find((reason) =>

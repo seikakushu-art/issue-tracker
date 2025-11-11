@@ -689,6 +689,7 @@ export class TasksService {
 
   /**
    * タスクを削除する（物理削除）
+   * - 配下のコメント・添付ファイルも合わせて物理削除する
    * @param projectId プロジェクトID
    * @param issueId 課題ID
    * @param taskId タスクID
@@ -704,6 +705,45 @@ export class TasksService {
     if (role === 'member' && task.createdBy !== uid) {
       throw new Error('このタスクを削除する権限がありません');
     }
+
+    // タスクのコメントを削除
+    const commentsRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}/comments`);
+    const commentsSnap = await getDocs(commentsRef);
+    for (const commentDoc of commentsSnap.docs) {
+      await deleteDoc(commentDoc.ref);
+    }
+
+    // タスクの添付ファイルを削除（FirestoreとStorage）
+    const attachmentsRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments`);
+    const attachmentsSnap = await getDocs(attachmentsRef);
+    for (const attachmentDoc of attachmentsSnap.docs) {
+      const attachmentData = attachmentDoc.data() as Record<string, unknown>;
+      const attachmentId = attachmentDoc.id;
+      const fileName = typeof attachmentData['fileName'] === 'string' ? attachmentData['fileName'] : '';
+      let storagePath = typeof attachmentData['storagePath'] === 'string' ? attachmentData['storagePath'] : null;
+      
+      // storagePathが存在しない場合、パスを再構築
+      if (!storagePath && fileName) {
+        storagePath = this.buildAttachmentStoragePath(projectId, issueId, taskId, attachmentId, fileName);
+      }
+      
+      // Storageからファイルを削除
+      if (storagePath) {
+        try {
+          await deleteObject(ref(this.storage, storagePath));
+        } catch (error) {
+          console.warn(`ストレージファイルの削除に失敗しました: ${storagePath}`, error);
+          // エラーが発生しても続行（ファイルが既に存在しない場合など）
+        }
+      } else {
+        console.warn(`添付ファイルのstoragePathが取得できませんでした: attachmentId=${attachmentId}, fileName=${fileName}`);
+      }
+      
+      // Firestoreから添付ファイルドキュメントを削除
+      await deleteDoc(attachmentDoc.ref);
+    }
+
+    // タスクを削除
     await deleteDoc(docRef);
     await this.refreshProgress(projectId, issueId);
   }

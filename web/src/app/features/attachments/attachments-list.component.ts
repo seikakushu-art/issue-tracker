@@ -2,10 +2,11 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Auth } from '@angular/fire/auth';
 import { ProjectsService } from '../projects/projects.service';
 import { TasksService } from '../tasks/tasks.service';
 import { UserDirectoryService } from '../../core/user-directory.service';
-import { Attachment, Project } from '../../models/schema';
+import { Attachment, Project, Role } from '../../models/schema';
 
 interface AttachmentRow {
   id: string;
@@ -35,18 +36,32 @@ export class AttachmentsListComponent implements OnInit {
   private readonly projectsService = inject(ProjectsService);
   private readonly tasksService = inject(TasksService);
   private readonly userDirectoryService = inject(UserDirectoryService);
+  private readonly auth = inject(Auth);
 
   readonly attachments = signal<AttachmentRow[]>([]);
   readonly loading = signal<boolean>(false);
+  readonly deletingId = signal<string | null>(null);
   readonly error = signal<string>('');
   readonly lastUpdated = signal<Date | null>(null);
   readonly projects = signal<Project[]>([]);
   readonly activeProjects = signal<Project[]>([]); // アーカイブされていないプロジェクトのみ
   readonly selectedProjectId = signal<string>('');
+  readonly currentUid = signal<string | null>(null);
+  readonly projectRoles = signal<Map<string, Role>>(new Map());
 
   async ngOnInit(): Promise<void> {
+    await this.loadCurrentUser();
     await this.loadProjects();
     await this.refresh();
+  }
+
+  private async loadCurrentUser(): Promise<void> {
+    const user = this.auth.currentUser;
+    if (user) {
+      this.currentUid.set(user.uid);
+    } else {
+      this.currentUid.set(null);
+    }
   }
 
   async loadProjects(): Promise<void> {
@@ -55,6 +70,19 @@ export class AttachmentsListComponent implements OnInit {
       this.projects.set(projects);
       // アーカイブされていないプロジェクトのみをフィルタリング
       this.activeProjects.set(projects.filter(p => !p.archived));
+      
+      // プロジェクトごとの権限をマップに保存
+      const uid = this.currentUid();
+      if (uid) {
+        const rolesMap = new Map<string, Role>();
+        for (const project of projects) {
+          const role = project.roles?.[uid] ?? null;
+          if (role) {
+            rolesMap.set(project.id ?? '', role);
+          }
+        }
+        this.projectRoles.set(rolesMap);
+      }
       
       // 選択されているプロジェクトがアーカイブされている場合は選択をクリア
       const selectedProjectId = this.selectedProjectId();
@@ -100,10 +128,42 @@ export class AttachmentsListComponent implements OnInit {
         return;
       }
 
-      const profileMap = await this.buildProfileMap(attachments);
+      // アーカイブされたタスクの添付ファイルを除外するため、タスクのアーカイブ状態を取得
+      const taskArchivedMap = new Map<string, boolean>();
+      for (const projectId of projectIds) {
+        try {
+          const tasks = await this.tasksService.listTasksByProject(projectId, true);
+          for (const task of tasks) {
+            if (task.id) {
+              taskArchivedMap.set(task.id, task.archived ?? false);
+            }
+          }
+        } catch (error) {
+          console.error(`プロジェクト ${projectId} のタスク取得に失敗しました:`, error);
+        }
+      }
+
+      // アーカイブされたタスクの添付ファイルを除外
+      const filteredAttachments = attachments.filter((attachment) => {
+        if (!attachment.taskId) {
+          // タスクIDが無い場合は表示する（互換性のため）
+          return true;
+        }
+        const isArchived = taskArchivedMap.get(attachment.taskId);
+        // タスクが見つからない場合も表示する（削除されたタスクの可能性があるため）
+        return isArchived === undefined ? true : !isArchived;
+      });
+
+      if (filteredAttachments.length === 0) {
+        this.attachments.set([]);
+        this.lastUpdated.set(new Date());
+        return;
+      }
+
+      const profileMap = await this.buildProfileMap(filteredAttachments);
       const projectNameMap = new Map<string, string>(); // 使用されなくなったが、型の互換性のため残す
 
-      const rows = attachments.map(attachment => this.composeRow(attachment, {
+      const rows = filteredAttachments.map(attachment => this.composeRow(attachment, {
         profileMap,
         projectNameMap,
       }));
@@ -148,6 +208,56 @@ export class AttachmentsListComponent implements OnInit {
 
   trackByAttachmentId(_: number, row: AttachmentRow): string {
     return row.id;
+  }
+
+  canDeleteAttachment(row: AttachmentRow): boolean {
+    const uid = this.currentUid();
+    if (!uid || !row.projectId) {
+      return false;
+    }
+    const role = this.projectRoles().get(row.projectId);
+    if (role === 'admin') {
+      return true; // 管理者はすべての添付ファイルを削除可能
+    }
+    if (role === 'member') {
+      return row.uploadedBy === uid; // メンバーは自分がアップロードしたファイルのみ削除可能
+    }
+    return false;
+  }
+
+  async deleteAttachment(row: AttachmentRow, event: Event): Promise<void> {
+    event.stopPropagation();
+    event.preventDefault();
+
+    if (!this.canDeleteAttachment(row)) {
+      alert('この添付ファイルを削除する権限がありません');
+      return;
+    }
+
+    if (!row.projectId || !row.issueId || !row.taskId || !row.id) {
+      alert('添付ファイル情報が不完全です');
+      return;
+    }
+
+    if (!confirm(`添付ファイル「${row.fileName}」を削除しますか？`)) {
+      return;
+    }
+
+    this.deletingId.set(row.id);
+    this.error.set('');
+
+    try {
+      await this.tasksService.deleteAttachment(row.projectId, row.issueId, row.taskId, row.id);
+      // 一覧を更新
+      await this.refresh();
+    } catch (error) {
+      console.error('添付ファイルの削除に失敗しました:', error);
+      const message = error instanceof Error ? error.message : '添付ファイルの削除に失敗しました';
+      this.error.set(message);
+      alert(message);
+    } finally {
+      this.deletingId.set(null);
+    }
   }
 
   private extractProjectIds(projects: Project[]): string[] {

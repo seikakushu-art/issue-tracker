@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { RouterModule } from '@angular/router';
 import { BoardService } from '../board/board.service';
@@ -24,7 +25,7 @@ interface SearchResultItem {
 @Component({
   selector: 'app-global-search',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './global-search.component.html',
   styleUrls: ['./global-search.component.scss'],
 })
@@ -38,6 +39,7 @@ export class GlobalSearchComponent implements OnInit {
   readonly query = signal('');
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly includeArchived = signal(false);
   private readonly items = signal<SearchResultItem[]>([]);
 
   private readonly typeLabels: Record<SearchResultType, string> = {
@@ -90,9 +92,10 @@ export class GlobalSearchComponent implements OnInit {
     this.error.set(null);
     try {
       const projects = await this.projectsService.listMyProjects();
+      const includeArchived = this.includeArchived();
       const validProjects = projects.filter(
         (project): project is Project & { id: string } => Boolean(project.id),
-      );
+      ).filter((project) => includeArchived || !project.archived);
       const projectItems = validProjects.map((project) => this.createItem({
         id: project.id!,
         type: 'project',
@@ -104,7 +107,7 @@ export class GlobalSearchComponent implements OnInit {
       const issuesByProject = await Promise.all(
         validProjects.map(async (project) => {
           try {
-            const issues = await this.issuesService.listIssues(project.id!, false);
+            const issues = await this.issuesService.listIssues(project.id!, includeArchived);
             return issues
               .filter((issue): issue is Issue & { id: string } => Boolean(issue.id))
               .map((issue) => ({ issue, project }));
@@ -133,7 +136,7 @@ export class GlobalSearchComponent implements OnInit {
       const tasksByProject = await Promise.all(
         validProjects.map(async (project) => {
           try {
-            const tasks = await this.tasksService.listTasksByProject(project.id!, false);
+            const tasks = await this.tasksService.listTasksByProject(project.id!, includeArchived);
             return tasks
               .filter((task): task is Task & { id: string } => Boolean(task.id))
               .map((task) => ({ task, project }));
@@ -247,6 +250,11 @@ export class GlobalSearchComponent implements OnInit {
 
   onQueryChange(value: string): void {
     this.query.set(value);
+  }
+
+  onIncludeArchivedChange(checked: boolean): void {
+    this.includeArchived.set(checked);
+    void this.loadAllData();
   }
 
   highlight(text: string | undefined | null): SafeHtml {

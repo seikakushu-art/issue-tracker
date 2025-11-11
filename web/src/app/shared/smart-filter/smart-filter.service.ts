@@ -22,9 +22,17 @@ export class SmartFilterService {
    * プリセットを新規作成し、保存後に返す
    */
   createPreset(scope: string, name: string, criteria: SmartFilterCriteria): SmartFilterPreset {
+    const trimmedName = name.trim();
+    
+    // スマートフィルター名の文字数上限チェック（50文字）
+    const MAX_PRESET_NAME_LENGTH = 50;
+    if (trimmedName.length > MAX_PRESET_NAME_LENGTH) {
+      throw new Error(`フィルター名は最大${MAX_PRESET_NAME_LENGTH}文字までです`);
+    }
+    
     const preset: SmartFilterPreset = {
       id: this.generateId(),
-      name: name.trim().length > 0 ? name.trim() : '名称未設定',
+      name: trimmedName.length > 0 ? trimmedName : '名称未設定',
       criteria: {
         tagIds: [...criteria.tagIds],
         assigneeIds: [...criteria.assigneeIds],
@@ -43,12 +51,20 @@ export class SmartFilterService {
    * 既存プリセットの名称を変更する
    */
   renamePreset(scope: string, presetId: string, nextName: string): SmartFilterPreset[] {
-    const trimmed = nextName.trim().length > 0 ? nextName.trim() : '名称未設定';
+    const trimmed = nextName.trim();
+    
+    // スマートフィルター名の文字数上限チェック（50文字）
+    const MAX_PRESET_NAME_LENGTH = 50;
+    if (trimmed.length > MAX_PRESET_NAME_LENGTH) {
+      throw new Error(`フィルター名は最大${MAX_PRESET_NAME_LENGTH}文字までです`);
+    }
+    
+    const finalName = trimmed.length > 0 ? trimmed : '名称未設定';
     const updated = this.getPresets(scope).map((preset) =>
       preset.id === presetId
         ? {
             ...preset,
-            name: trimmed,
+            name: finalName,
           }
         : preset
     );

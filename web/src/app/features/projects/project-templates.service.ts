@@ -225,6 +225,12 @@ export class ProjectTemplatesService {
     // プロンプトなどで入力されたテンプレート名を優先し、なければプロジェクト名を利用
     const normalizedName = templateName?.trim() ? templateName.trim() : project.name;
     
+    // テンプレート名の文字数上限チェック（80文字）
+    const MAX_TEMPLATE_NAME_LENGTH = 80;
+    if (normalizedName.length > MAX_TEMPLATE_NAME_LENGTH) {
+      throw new Error(`テンプレート名は最大${MAX_TEMPLATE_NAME_LENGTH}文字までです`);
+    }
+    
     // テンプレート名の重複チェック
     await this.checkNameUniqueness(normalizedName);
     

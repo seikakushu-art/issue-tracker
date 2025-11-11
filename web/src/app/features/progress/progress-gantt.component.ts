@@ -157,7 +157,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.loading = true;
     this.loadError = null;
     try {
-      const projects = (await this.projectsService.listMyProjects()).filter((project): project is Project & { id: string } => Boolean(project.id));
+      const projects = (await this.projectsService.listMyProjects())
+        .filter((project): project is Project & { id: string } => Boolean(project.id))
+        .filter((project) => !project.archived);
       const issueResults = await Promise.all(
         projects.map(async (project) => {
           const issues = await this.issuesService.listIssues(project.id!, false);

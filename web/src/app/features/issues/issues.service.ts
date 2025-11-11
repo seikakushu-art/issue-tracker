@@ -14,6 +14,7 @@ import {
   setDoc,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
+import { Storage, deleteObject, ref } from '@angular/fire/storage';
 import { Issue, Project, Task } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
@@ -29,6 +30,7 @@ import { ProjectsService } from '../projects/projects.service';
 export class IssuesService {
   private db = inject(Firestore);
   private auth = inject(Auth);
+  private storage = inject(Storage);
   private progressService = inject(ProgressService);
   private projectsService = inject(ProjectsService);
 
@@ -418,17 +420,66 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
 
   /**
    * 課題を削除する（物理削除）
+   * - 配下のタスク・コメント・添付ファイルも合わせて物理削除する
    * @param projectId プロジェクトID
    * @param issueId 課題ID
    */
   async deleteIssue(projectId: string, issueId: string): Promise<void> {
     await this.projectsService.ensureProjectRole(projectId, ['admin']);
-    // まず配下のタスクをすべて削除し、孤立ドキュメントを防ぐ
+    
+    // 課題配下のタスクを取得
     const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`);
     const tasksSnap = await getDocs(tasksRef);
+    
     for (const taskDoc of tasksSnap.docs) {
+      const taskId = taskDoc.id;
+      
+      // タスクのコメントを削除
+      const commentsRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}/comments`);
+      const commentsSnap = await getDocs(commentsRef);
+      for (const commentDoc of commentsSnap.docs) {
+        await deleteDoc(commentDoc.ref);
+      }
+
+      // タスクの添付ファイルを削除（FirestoreとStorage）
+      const attachmentsRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments`);
+      const attachmentsSnap = await getDocs(attachmentsRef);
+      for (const attachmentDoc of attachmentsSnap.docs) {
+        const attachmentData = attachmentDoc.data() as Record<string, unknown>;
+        const attachmentId = attachmentDoc.id;
+        const fileName = typeof attachmentData['fileName'] === 'string' ? attachmentData['fileName'] : '';
+        let storagePath = typeof attachmentData['storagePath'] === 'string' ? attachmentData['storagePath'] : null;
+        
+        // storagePathが存在しない場合、パスを再構築
+        if (!storagePath && fileName) {
+          const safeName = fileName
+            .normalize('NFKC')
+            .replace(/[\s]+/g, '_')
+            .replace(/[^a-zA-Z0-9_.-]/g, '_');
+          storagePath = `projects/${projectId}/issues/${issueId}/tasks/${taskId}/attachments/${attachmentId}_${safeName}`;
+        }
+        
+        // Storageからファイルを削除
+        if (storagePath) {
+          try {
+            await deleteObject(ref(this.storage, storagePath));
+          } catch (error) {
+            console.warn(`ストレージファイルの削除に失敗しました: ${storagePath}`, error);
+            // エラーが発生しても続行（ファイルが既に存在しない場合など）
+          }
+        } else {
+          console.warn(`添付ファイルのstoragePathが取得できませんでした: attachmentId=${attachmentId}, fileName=${fileName}`);
+        }
+        
+        // Firestoreから添付ファイルドキュメントを削除
+        await deleteDoc(attachmentDoc.ref);
+      }
+
+      // タスクを削除
       await deleteDoc(taskDoc.ref);
     }
+    
+    // 課題本体を削除
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
     await deleteDoc(docRef);
     await this.progressService.updateProjectProgress(projectId); // プロジェクト進捗を再計算

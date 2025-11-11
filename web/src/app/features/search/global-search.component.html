@@ -1,6 +1,17 @@
 <section class="search-page" aria-labelledby="search-heading">
     <header class="search-header">
-      <h1 id="search-heading">横断検索</h1>
+      <div class="search-header__title-row">
+        <h1 id="search-heading">横断検索</h1>
+        <label class="search-header__archive-checkbox">
+          <input
+            type="checkbox"
+            [checked]="includeArchived()"
+            (change)="onIncludeArchivedChange($any($event.target).checked)"
+            aria-label="アーカイブ済みも表示"
+          />
+          <span>アーカイブ済みも表示</span>
+        </label>
+      </div>
       <p class="search-caption">プロジェクト・課題・タスク・掲示板をまとめて検索できます。部分一致・大文字小文字を気にせず探せます。</p>
       <div class="search-input">
         <input
@@ -9,6 +20,7 @@
           [value]="query()"
           (input)="onQueryChange($any($event.target).value ?? '')"
           aria-label="検索キーワード"
+          maxlength="100"
         />
       </div>
     </header>

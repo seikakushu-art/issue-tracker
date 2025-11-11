@@ -101,6 +101,7 @@
             [(ngModel)]="newPresetName"
             placeholder="フィルター名を入力"
             aria-label="新規フィルター名"
+            maxlength="50"
           >
             <button type="button" class="btn" (click)="savePreset()">
             保存
@@ -119,7 +120,7 @@
               </div>
             </div>
             <div class="preset-edit" *ngIf="editingPresetId === preset.id">
-              <input type="text" [(ngModel)]="editingName" aria-label="プリセット名編集">
+              <input type="text" [(ngModel)]="editingName" aria-label="プリセット名編集" maxlength="50">
               <button type="button" class="btn" (click)="submitPresetName(preset)">保存</button>
             </div>
           </li>

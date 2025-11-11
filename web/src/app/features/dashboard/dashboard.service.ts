@@ -116,7 +116,7 @@ export class DashboardService {
           issues
             .filter((issue): issue is Issue & { id: string } => Boolean(issue.id))
             .map(async (issue) => {
-              const tasks = await this.tasksService.listTasks(project.id!, issue.id!);
+              const tasks = await this.tasksService.listTasks(project.id!, issue.id!, false);
               return { ...issue, tasks } as IssueWithTasks;
             }),
         );
@@ -194,6 +194,7 @@ export class DashboardService {
   /**
    * ボトルネック検知ロジック
    * 現在のユーザーが担当しているタスクのみを対象とする
+   * アーカイブされたタスクは検知対象外
    */
   private detectBottlenecks(projects: ProjectSnapshot[], currentUserId: string | null): BottleneckInsight[] {
     const now = new Date();
@@ -210,6 +211,11 @@ export class DashboardService {
         for (const task of issue.tasks) {
           // 現在のユーザーが担当しているタスクのみを対象とする
           if (!task.assigneeIds || !task.assigneeIds.includes(currentUserId)) {
+            continue;
+          }
+
+          // アーカイブされたタスクは検知対象外
+          if (task.archived) {
             continue;
           }
 
@@ -252,8 +258,11 @@ export class DashboardService {
         }
 
         // 進捗が停滞している課題の判定は、現在のユーザーが担当しているタスクを含む課題のみを対象とする
+        // アーカイブされたタスクは除外
         const userTasks = issue.tasks.filter((task) => 
-          task.assigneeIds && task.assigneeIds.includes(currentUserId)
+          !task.archived &&
+          task.assigneeIds && 
+          task.assigneeIds.includes(currentUserId)
         );
         
         if (

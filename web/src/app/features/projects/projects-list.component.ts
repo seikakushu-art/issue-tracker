@@ -610,6 +610,13 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // テンプレート名の文字数上限チェック（80文字）
+    const MAX_TEMPLATE_NAME_LENGTH = 80;
+    if (normalizedName.length > MAX_TEMPLATE_NAME_LENGTH) {
+      alert(`テンプレート名は最大${MAX_TEMPLATE_NAME_LENGTH}文字までです`);
+      return;
+    }
+
     const confirmed = confirm(
       `プロジェクト「${project.name}」をテンプレート名「${normalizedName}」で保存しますか？`,
     );

@@ -52,6 +52,7 @@
           <th scope="col">作成者</th>
           <th scope="col" class="numeric">サイズ</th>
           <th scope="col">日付</th>
+          <th scope="col" class="actions-column">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -78,6 +79,19 @@
           <td>{{ attachment.uploaderName }}</td>
           <td class="numeric">{{ formatFileSize(attachment.fileSize) }}</td>
           <td>{{ attachment.uploadedAt ? (attachment.uploadedAt | date:'yyyy/MM/dd HH:mm') : '---' }}</td>
+          <td class="actions-cell">
+            <button
+              *ngIf="canDeleteAttachment(attachment)"
+              type="button"
+              class="btn-icon btn-icon--danger"
+              (click)="deleteAttachment(attachment, $event)"
+              [disabled]="deletingId() === attachment.id"
+              [title]="deletingId() === attachment.id ? '削除中...' : '削除'"
+            >
+              <i class="icon-delete" aria-hidden="true"></i>
+              <span class="btn-label">{{ deletingId() === attachment.id ? '削除中...' : '削除' }}</span>
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>

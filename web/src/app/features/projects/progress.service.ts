@@ -12,6 +12,7 @@ export class ProgressService {
 
   /**
    * 課題の進捗率を計算する（配下タスクの加重平均）
+   * アーカイブされたタスクと破棄されたタスクは集計対象外
    * @param projectId プロジェクトID
    * @param issueId 課題ID
    * @returns 進捗率（0-100）
@@ -42,8 +43,8 @@ export class ProgressService {
         const importanceWeight = this.getImportanceWeight(task.importance);
         const weight = importanceWeight || 1;  // 重みが未設定の場合は1
 
-        // 破棄されたタスクは集計対象外
-        if (task.status === 'discarded') {
+        // 破棄されたタスクとアーカイブされたタスクは集計対象外
+        if (task.status === 'discarded' || task.archived) {
           continue;
         }
 

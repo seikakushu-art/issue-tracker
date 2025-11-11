@@ -112,6 +112,21 @@
   font-size: 13px;
 }
 
+.summary-goal .goal-label {
+  color: #64748b;
+  font-weight: 500;
+  font-size: 13px;
+  margin-right: 4px;
+  display: inline-block;
+}
+
+.summary-goal .goal-content {
+  color: #666;
+  font-weight: 400;
+  font-size: 13px;
+  display: inline-block;
+}
+
 .summary-deadline {
   display: flex;
   gap: 12px;

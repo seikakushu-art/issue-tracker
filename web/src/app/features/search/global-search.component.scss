@@ -10,6 +10,34 @@
     gap: 1rem;
     margin-bottom: 1.5rem;
   }
+
+  .search-header__title-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .search-header__archive-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.9rem;
+    color: #475569;
+  }
+
+  .search-header__archive-checkbox input[type="checkbox"] {
+    width: 1.125rem;
+    height: 1.125rem;
+    cursor: pointer;
+    accent-color: #38bdf8;
+  }
+
+  .search-header__archive-checkbox:hover {
+    color: #0f172a;
+  }
   
   .search-header h1 {
     font-size: 2rem;

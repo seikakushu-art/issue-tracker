@@ -144,6 +144,58 @@
     text-align: right;
     white-space: nowrap;
   }
+
+  .attachments-table .actions-column {
+    width: 100px;
+    text-align: center;
+  }
+
+  .attachments-table .actions-cell {
+    text-align: center;
+    padding: 8px 16px;
+  }
+
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .btn-icon:hover:not(:disabled) {
+    background: #f3f4f6;
+    color: #1f2937;
+  }
+
+  .btn-icon:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-icon--danger {
+    color: #dc2626;
+  }
+
+  .btn-icon--danger:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #b91c1c;
+  }
+
+  .btn-icon .icon-delete::before {
+    content: '🗑️';
+    font-style: normal;
+  }
+
+  .btn-icon .btn-label {
+    font-size: 12px;
+  }
   
   .task-cell {
     display: flex;

@@ -195,7 +195,16 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
    * 現在の条件をプリセットとして保存
    */
   savePreset(): void {
-    const preset = this.smartFilterService.createPreset(this.scope, this.newPresetName, this.localCriteria);
+    const trimmedName = this.newPresetName.trim();
+    
+    // スマートフィルター名の文字数上限チェック（50文字）
+    const MAX_PRESET_NAME_LENGTH = 50;
+    if (trimmedName.length > MAX_PRESET_NAME_LENGTH) {
+      alert(`フィルター名は最大${MAX_PRESET_NAME_LENGTH}文字までです`);
+      return;
+    }
+    
+    const preset = this.smartFilterService.createPreset(this.scope, trimmedName, this.localCriteria);
     this.presets = [...this.presets, preset];
     this.newPresetName = '';
   }
@@ -212,7 +221,16 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
    * プリセット名称の更新確定
    */
   submitPresetName(preset: SmartFilterPreset): void {
-    this.presets = this.smartFilterService.renamePreset(this.scope, preset.id, this.editingName);
+    const trimmedName = this.editingName.trim();
+    
+    // スマートフィルター名の文字数上限チェック（50文字）
+    const MAX_PRESET_NAME_LENGTH = 50;
+    if (trimmedName.length > MAX_PRESET_NAME_LENGTH) {
+      alert(`フィルター名は最大${MAX_PRESET_NAME_LENGTH}文字までです`);
+      return;
+    }
+    
+    this.presets = this.smartFilterService.renamePreset(this.scope, preset.id, trimmedName);
     this.editingPresetId = null;
     this.editingName = '';
   }

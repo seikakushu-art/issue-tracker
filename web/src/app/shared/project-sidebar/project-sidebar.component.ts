@@ -55,16 +55,18 @@ export class ProjectSidebarComponent implements OnInit {
 
   /**
    * Firestoreからプロジェクト一覧を取得し、名称昇順で並べる。
+   * アーカイブされたプロジェクトは除外する。
    */
   private async loadProjects(): Promise<void> {
     this.loading = true;
     this.loadError = '';
     try {
       const projects = await this.projectsService.listMyProjects();
-      this.rawProjects = [...projects];
+      // アーカイブされたプロジェクトを除外
+      this.rawProjects = projects.filter(project => !project.archived);
       this.applySorting();
       // 課題数ソートで必要となる情報は裏で取得し、完了したら必要に応じて再ソートする。
-      void this.prepareIssueCounts(projects);
+      void this.prepareIssueCounts(this.rawProjects);
     } catch (error) {
       console.error('プロジェクト一覧の取得に失敗しました:', error);
       this.projects = [];
