@@ -158,12 +158,32 @@ export class DashboardService {
         task.status !== 'discarded',
       ).length;
 
-      const overdue = Boolean(
+      // プロジェクトの終了日が過ぎているかチェック
+      const projectOverdue = Boolean(
         project.endDate &&
         this.normalizeDate(project.endDate) &&
         this.normalizeToEndOfDay(this.normalizeDate(project.endDate)!) < now &&
         progress < 100
       );
+
+      // プロジェクト内のタスクに遅延しているものがあるかチェック
+      const hasOverdueTask = allTasks.some((task) => {
+        if (task.status === 'completed' || task.status === 'discarded') {
+          return false;
+        }
+        if (!task.endDate) {
+          return false;
+        }
+        const taskEndDate = this.normalizeDate(task.endDate);
+        if (!taskEndDate) {
+          return false;
+        }
+        // タスクの終了日が過ぎているかチェック（東京時間ベース）
+        const daysUntil = this.daysUntilDeadline(now, taskEndDate);
+        return daysUntil < 0;
+      });
+
+      const overdue = projectOverdue || hasOverdueTask;
 
       const elapsedRatio = this.calculateElapsedRatio(project.startDate ?? null, project.endDate ?? null, now);
       const warningLevel = this.resolveWarningLevel(progress, elapsedRatio);

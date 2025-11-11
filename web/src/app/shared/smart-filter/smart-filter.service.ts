@@ -1,27 +1,95 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import {
+  Firestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+} from '@angular/fire/firestore';
+import { Auth, User, authState } from '@angular/fire/auth';
 import { SmartFilterCriteria, SmartFilterPreset } from './smart-filter.model';
+import { firstValueFrom, TimeoutError } from 'rxjs';
+import { filter, take, timeout } from 'rxjs/operators';
 
 /**
- * スマートフィルターを永続化するサービス
- * ローカルストレージが利用できない環境（SSRなど）ではメモリ上に保存する
+ * スマートフィルターをFirestoreに永続化するサービス
+ * ユーザーごとに分離して保存される
  */
 @Injectable({ providedIn: 'root' })
 export class SmartFilterService {
-  /** SSR等でlocalStorageが無い場合に備えてメモリキャッシュを保持 */
-  private memoryStore = new Map<string, SmartFilterPreset[]>();
+  private db = inject(Firestore);
+  private auth = inject(Auth);
+
+  /**
+   * 現在のユーザーを取得する（認証待ち）
+   */
+  private async requireUser(): Promise<User> {
+    const current = this.auth.currentUser;
+    if (current) {
+      return current;
+    }
+
+    try {
+      const user = await firstValueFrom(
+        authState(this.auth).pipe(
+          filter((user): user is User => user !== null),
+          take(1),
+          timeout(2000),
+        ),
+      );
+      return user;
+    } catch (error) {
+      if (error instanceof TimeoutError) {
+        console.warn('Firebase認証の待機がタイムアウトしました');
+      } else {
+        console.error('Firebase認証の待機中にエラーが発生しました:', error);
+      }
+      throw new Error('ログインが必要です');
+    }
+  }
+
+  /**
+   * ユーザーIDを取得する
+   */
+  private async getUserId(): Promise<string> {
+    const user = await this.requireUser();
+    return user.uid;
+  }
+
+  /**
+   * スコープごとのプリセットコレクション参照を取得
+   */
+  private async getPresetsCollection(scope: string): Promise<ReturnType<typeof collection>> {
+    const userId = await this.getUserId();
+    return collection(this.db, `users/${userId}/smartFilters/${scope}/presets`);
+  }
 
   /**
    * プリセット一覧を取得する
    */
-  getPresets(scope: string): SmartFilterPreset[] {
-    const stored = this.readFromStorage(scope);
-    return stored ?? [];
+  async getPresets(scope: string): Promise<SmartFilterPreset[]> {
+    try {
+      const presetsRef = await this.getPresetsCollection(scope);
+      const snapshot = await getDocs(presetsRef);
+      return snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() as SmartFilterPreset;
+        return {
+          ...data,
+          id: docSnap.id,
+        };
+      });
+    } catch (error) {
+      console.warn('スマートフィルターの読み込みに失敗しました', error);
+      return [];
+    }
   }
 
   /**
    * プリセットを新規作成し、保存後に返す
    */
-  createPreset(scope: string, name: string, criteria: SmartFilterCriteria): SmartFilterPreset {
+  async createPreset(scope: string, name: string, criteria: SmartFilterCriteria): Promise<SmartFilterPreset> {
     const trimmedName = name.trim();
     
     // スマートフィルター名の文字数上限チェック（50文字）
@@ -30,9 +98,15 @@ export class SmartFilterService {
       throw new Error(`フィルター名は最大${MAX_PRESET_NAME_LENGTH}文字までです`);
     }
     
-    const preset: SmartFilterPreset = {
-      id: this.generateId(),
-      name: trimmedName.length > 0 ? trimmedName : '名称未設定',
+    // 名前の重複チェック
+    const existingPresets = await this.getPresets(scope);
+    const finalName = trimmedName.length > 0 ? trimmedName : '名称未設定';
+    if (existingPresets.some(preset => preset.name === finalName)) {
+      throw new Error(`「${finalName}」という名前のフィルターは既に存在します`);
+    }
+    
+    const presetData: Omit<SmartFilterPreset, 'id'> = {
+      name: finalName,
       criteria: {
         tagIds: [...criteria.tagIds],
         assigneeIds: [...criteria.assigneeIds],
@@ -42,15 +116,19 @@ export class SmartFilterService {
       },
     };
 
-    const next = [...this.getPresets(scope), preset];
-    this.writeToStorage(scope, next);
-    return preset;
+    const presetsRef = await this.getPresetsCollection(scope);
+    const docRef = await addDoc(presetsRef, presetData);
+    
+    return {
+      ...presetData,
+      id: docRef.id,
+    };
   }
 
   /**
    * 既存プリセットの名称を変更する
    */
-  renamePreset(scope: string, presetId: string, nextName: string): SmartFilterPreset[] {
+  async renamePreset(scope: string, presetId: string, nextName: string): Promise<SmartFilterPreset[]> {
     const trimmed = nextName.trim();
     
     // スマートフィルター名の文字数上限チェック（50文字）
@@ -60,79 +138,31 @@ export class SmartFilterService {
     }
     
     const finalName = trimmed.length > 0 ? trimmed : '名称未設定';
-    const updated = this.getPresets(scope).map((preset) =>
-      preset.id === presetId
-        ? {
-            ...preset,
-            name: finalName,
-          }
-        : preset
-    );
-    this.writeToStorage(scope, updated);
-    return updated;
+    const existingPresets = await this.getPresets(scope);
+    
+    // 名前の重複チェック（自分自身は除外）
+    if (existingPresets.some(preset => preset.id !== presetId && preset.name === finalName)) {
+      throw new Error(`「${finalName}」という名前のフィルターは既に存在します`);
+    }
+    
+    // Firestoreのドキュメントを更新
+    const userId = await this.getUserId();
+    const presetRef = doc(this.db, `users/${userId}/smartFilters/${scope}/presets/${presetId}`);
+    await updateDoc(presetRef, { name: finalName });
+    
+    // 更新後の一覧を返す
+    return await this.getPresets(scope);
   }
 
   /**
    * 指定したプリセットを削除する
    */
-  deletePreset(scope: string, presetId: string): SmartFilterPreset[] {
-    const filtered = this.getPresets(scope).filter((preset) => preset.id !== presetId);
-    this.writeToStorage(scope, filtered);
-    return filtered;
-  }
-
-  /**
-   * localStorageからプリセットを読み込む（なければメモリストア）
-   */
-  private readFromStorage(scope: string): SmartFilterPreset[] | null {
-    if (typeof window === 'undefined' || !window?.localStorage) {
-      return this.memoryStore.get(scope) ?? null;
-    }
-
-    try {
-      const raw = window.localStorage.getItem(this.buildKey(scope));
-      if (!raw) {
-        return [];
-      }
-      const parsed = JSON.parse(raw) as SmartFilterPreset[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      console.warn('スマートフィルターの読み込みに失敗しました', error);
-      return [];
-    }
-  }
-
-  /**
-   * プリセット一覧をlocalStorageまたはメモリに保存する
-   */
-  private writeToStorage(scope: string, presets: SmartFilterPreset[]): void {
-    if (typeof window === 'undefined' || !window?.localStorage) {
-      this.memoryStore.set(scope, presets);
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(this.buildKey(scope), JSON.stringify(presets));
-    } catch (error) {
-      console.warn('スマートフィルターの保存に失敗しました', error);
-    }
-  }
-
-  /**
-   * スコープに紐づくストレージキーを生成
-   */
-  private buildKey(scope: string): string {
-    return `smart-filter::${scope}`;
-  }
-
-  /**
-   * UUIDを生成する（ブラウザ対応がない場合は乱数フォールバック）
-   */
-  private generateId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-    // 乱数でフォールバック（十分な一意性を確保するため桁数を多めに確保）
-    return `sf_${Math.random().toString(36).slice(2, 11)}${Date.now().toString(36)}`;
+  async deletePreset(scope: string, presetId: string): Promise<SmartFilterPreset[]> {
+    const userId = await this.getUserId();
+    const presetRef = doc(this.db, `users/${userId}/smartFilters/${scope}/presets/${presetId}`);
+    await deleteDoc(presetRef);
+    
+    // 削除後の一覧を返す
+    return await this.getPresets(scope);
   }
 }

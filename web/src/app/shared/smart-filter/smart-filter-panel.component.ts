@@ -57,17 +57,29 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
 
   private smartFilterService = inject(SmartFilterService);
 
-  ngOnInit(): void {
-    this.presets = this.smartFilterService.getPresets(this.scope);
+  async ngOnInit(): Promise<void> {
+    await this.loadPresets();
     this.syncLocalCriteria();
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
+  async ngOnChanges(changes: SimpleChanges): Promise<void> {
     if (changes['criteria'] && !changes['criteria'].firstChange) {
       this.syncLocalCriteria();
     }
     if (changes['scope'] && !changes['scope'].firstChange) {
-      this.presets = this.smartFilterService.getPresets(this.scope);
+      await this.loadPresets();
+    }
+  }
+
+  /**
+   * プリセット一覧を読み込む
+   */
+  private async loadPresets(): Promise<void> {
+    try {
+      this.presets = await this.smartFilterService.getPresets(this.scope);
+    } catch (error) {
+      console.warn('プリセットの読み込みに失敗しました', error);
+      this.presets = [];
     }
   }
 
@@ -196,7 +208,7 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
   /**
    * 現在の条件をプリセットとして保存
    */
-  savePreset(): void {
+  async savePreset(): Promise<void> {
     const trimmedName = this.newPresetName.trim();
     
     // スマートフィルター名の文字数上限チェック（50文字）
@@ -206,9 +218,17 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
       return;
     }
     
-    const preset = this.smartFilterService.createPreset(this.scope, trimmedName, this.localCriteria);
-    this.presets = [...this.presets, preset];
-    this.newPresetName = '';
+    try {
+      await this.smartFilterService.createPreset(this.scope, trimmedName, this.localCriteria);
+      this.presets = await this.smartFilterService.getPresets(this.scope);
+      this.newPresetName = '';
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('フィルターの保存に失敗しました');
+      }
+    }
   }
 
   /**
@@ -222,7 +242,7 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
   /**
    * プリセット名称の更新確定
    */
-  submitPresetName(preset: SmartFilterPreset): void {
+  async submitPresetName(preset: SmartFilterPreset): Promise<void> {
     const trimmedName = this.editingName.trim();
     
     // スマートフィルター名の文字数上限チェック（50文字）
@@ -232,19 +252,32 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
       return;
     }
     
-    this.presets = this.smartFilterService.renamePreset(this.scope, preset.id, trimmedName);
-    this.editingPresetId = null;
-    this.editingName = '';
+    try {
+      this.presets = await this.smartFilterService.renamePreset(this.scope, preset.id, trimmedName);
+      this.editingPresetId = null;
+      this.editingName = '';
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('フィルター名の変更に失敗しました');
+      }
+    }
   }
 
   /**
    * プリセットを削除
    */
-  deletePreset(preset: SmartFilterPreset): void {
-    this.presets = this.smartFilterService.deletePreset(this.scope, preset.id);
-    if (this.editingPresetId === preset.id) {
-      this.editingPresetId = null;
-      this.editingName = '';
+  async deletePreset(preset: SmartFilterPreset): Promise<void> {
+    try {
+      this.presets = await this.smartFilterService.deletePreset(this.scope, preset.id);
+      if (this.editingPresetId === preset.id) {
+        this.editingPresetId = null;
+        this.editingName = '';
+      }
+    } catch (error) {
+      console.error('プリセットの削除に失敗しました', error);
+      alert('フィルターの削除に失敗しました');
     }
   }
 
