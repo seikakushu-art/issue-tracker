@@ -644,8 +644,42 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
           themeColor: issueData.themeColor ?? null,
         };
         if (targetProjectId !== this.projectId) {
-          await this.issuesService.moveIssue(this.projectId, this.editingIssue.id!, targetProjectId, updatePayload);
-          alert('課題を選択したプロジェクトへ移動しました。');
+          const originalName = issueData.name;
+          const result = await this.issuesService.moveIssue(this.projectId, this.editingIssue.id!, targetProjectId, updatePayload);
+          
+          const messages: string[] = ['課題を選択したプロジェクトへ移動しました。'];
+          
+          if (result.finalName !== originalName) {
+            messages.push(`移動先に同じ名前の課題があったため、課題名を「${result.finalName}」に変更しました。`);
+          }
+          
+          if (result.dateAdjusted) {
+            const dateMessages: string[] = [];
+            if (result.originalStart && result.adjustedStart && result.originalStart !== result.adjustedStart) {
+              const originalStartStr = result.originalStart instanceof Date ? result.originalStart.toLocaleDateString('ja-JP') : String(result.originalStart);
+              const adjustedStartStr = result.adjustedStart instanceof Date ? result.adjustedStart.toLocaleDateString('ja-JP') : String(result.adjustedStart);
+              dateMessages.push(`開始日を${originalStartStr}から${adjustedStartStr}に変更`);
+            }
+            if (result.originalEnd && result.adjustedEnd && result.originalEnd !== result.adjustedEnd) {
+              const originalEndStr = result.originalEnd instanceof Date ? result.originalEnd.toLocaleDateString('ja-JP') : String(result.originalEnd);
+              const adjustedEndStr = result.adjustedEnd instanceof Date ? result.adjustedEnd.toLocaleDateString('ja-JP') : String(result.adjustedEnd);
+              dateMessages.push(`終了日を${originalEndStr}から${adjustedEndStr}に変更`);
+            }
+            if (dateMessages.length > 0) {
+              messages.push(`移動先プロジェクトの期間内に収めるため、${dateMessages.join('、')}しました。`);
+            }
+          }
+          
+          if (result.removedAssignees && result.removedAssignees.length > 0) {
+            const removedCount = result.removedAssignees.reduce((sum, item) => sum + item.assigneeIds.length, 0);
+            messages.push(`移動先プロジェクトのメンバーでない担当者（${removedCount}人）をタスクから削除しました。`);
+          }
+          
+          if (result.skippedTags && result.skippedTags.length > 0) {
+            messages.push(`移動先プロジェクトのタグ上限（20個）に達しているため、以下のタグは追加されませんでした: ${result.skippedTags.join('、')}`);
+          }
+          
+          alert(messages.join('\n'));
         } else {
           await this.issuesService.updateIssue(this.projectId, this.editingIssue.id!, updatePayload);
         }

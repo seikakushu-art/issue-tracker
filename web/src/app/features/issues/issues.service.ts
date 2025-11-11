@@ -14,13 +14,14 @@ import {
   setDoc,
 } from '@angular/fire/firestore';
 import { Auth, User } from '@angular/fire/auth';
-import { Storage, deleteObject, ref } from '@angular/fire/storage';
-import { Issue, Project, Task } from '../../models/schema';
+import { Storage, deleteObject, ref, getDownloadURL, uploadBytes } from '@angular/fire/storage';
+import { Issue, Project, Task, Tag } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
 import { ProjectsService } from '../projects/projects.service';
+import { TagsService } from '../tags/tags.service';
 
 /**
  * 課題（Issue）管理サービス
@@ -33,6 +34,7 @@ export class IssuesService {
   private storage = inject(Storage);
   private progressService = inject(ProgressService);
   private projectsService = inject(ProjectsService);
+  private tagsService = inject(TagsService);
 
   /**
    * Firestoreから取得した日時フィールドをDate型へ正規化するユーティリティ
@@ -504,6 +506,7 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
    * @param currentProjectId 現在のプロジェクトID
    * @param issueId 課題ID
    * @param targetProjectId 移動先プロジェクトID
+   * @returns 移動結果（名前、期間調整情報）
    */
     async moveIssue(
       currentProjectId: string,
@@ -519,11 +522,12 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
         archived: boolean;
         progress: number | null;
       }>,
-    ): Promise<void> {
+    ): Promise<{ finalName: string; dateAdjusted: boolean; originalStart?: Date | null; originalEnd?: Date | null; adjustedStart?: Date | null; adjustedEnd?: Date | null; removedAssignees?: { taskId: string; assigneeIds: string[] }[]; skippedTags?: string[] }> {
       await this.projectsService.ensureProjectRole(currentProjectId, ['admin']);
       await this.projectsService.ensureProjectRole(targetProjectId, ['admin']);
       if (currentProjectId === targetProjectId) {
-        return;
+        const originalName = overrides?.name ?? (await this.getIssue(currentProjectId, issueId))?.name ?? '';
+        return { finalName: originalName, dateAdjusted: false };
       }
   
       const sourceIssueRef = doc(this.db, `projects/${currentProjectId}/issues/${issueId}`);
@@ -534,24 +538,258 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
   
       const rawIssue = issueSnap.data() as Issue;
       const rawIssueRecord = rawIssue as unknown as Record<string, unknown>;
-  
+
       const normalizedStart = this.normalizeDate(rawIssueRecord['startDate']);
       const normalizedEnd = this.normalizeDate(rawIssueRecord['endDate']);
-  
+
       const overrideStart = overrides && Object.prototype.hasOwnProperty.call(overrides, 'startDate')
         ? this.normalizeDate(overrides.startDate ?? null)
         : normalizedStart;
       const overrideEnd = overrides && Object.prototype.hasOwnProperty.call(overrides, 'endDate')
         ? this.normalizeDate(overrides.endDate ?? null)
         : normalizedEnd;
-  
-      await this.validateWithinProjectPeriod(targetProjectId, overrideStart, overrideEnd);
-  
-      const targetName = overrides?.name ?? rawIssue.name;
-      await this.checkNameUniqueness(targetProjectId, targetName, issueId);
+
+      // 移動先プロジェクトの期間を取得
+      const targetProjectSnap = await getDoc(doc(this.db, 'projects', targetProjectId));
+      if (!targetProjectSnap.exists()) {
+        throw new Error('移動先のプロジェクトが見つかりません');
+      }
+      const targetProject = targetProjectSnap.data() as Project;
+      const targetProjectRecord = targetProject as unknown as Record<string, unknown>;
+      const targetProjectStart = this.normalizeDate(targetProjectRecord['startDate']);
+      const targetProjectEnd = this.normalizeDate(targetProjectRecord['endDate']);
+
+      // 移動先プロジェクトのアクティブな課題数の上限チェック
+      // 移動する課題がアーカイブ済みの場合は、アクティブな課題数の上限には影響しない
+      const willBeArchived = overrides?.archived ?? (rawIssueRecord['archived'] as boolean) ?? false;
+      if (!willBeArchived) {
+        const activeIssueCount = await this.countActiveIssues(targetProjectId);
+        const MAX_ACTIVE_ISSUES = 50;
+        // 移動元のプロジェクトから移動する課題を除外してカウントする必要はない
+        // （移動先プロジェクトにはまだ存在しないため）
+        if (activeIssueCount >= MAX_ACTIVE_ISSUES) {
+          throw new Error(`移動先のプロジェクトのアクティブな課題の上限（${MAX_ACTIVE_ISSUES}件）に達しています。課題を移動するには、移動先プロジェクトの既存の課題をアーカイブするか削除してください。`);
+        }
+      }
+
+      // 課題の期間が移動先プロジェクトの期間を超える場合、自動的に調整する
+      let adjustedStart = overrideStart;
+      let adjustedEnd = overrideEnd;
+      let dateAdjusted = false;
+
+      if (targetProjectStart && adjustedStart && adjustedStart < targetProjectStart) {
+        adjustedStart = targetProjectStart;
+        dateAdjusted = true;
+      }
+
+      if (targetProjectEnd && adjustedEnd && adjustedEnd > targetProjectEnd) {
+        adjustedEnd = targetProjectEnd;
+        dateAdjusted = true;
+      }
+
+      // 調整後の期間でバリデーション（タスクの期間チェックなど）
+      await this.validateWithinProjectPeriod(targetProjectId, adjustedStart, adjustedEnd);
+
+      // 期間が調整された場合、overridesに反映
+      if (dateAdjusted) {
+        if (!overrides) {
+          overrides = {};
+        }
+        if (adjustedStart !== overrideStart) {
+          overrides.startDate = adjustedStart;
+        }
+        if (adjustedEnd !== overrideEnd) {
+          overrides.endDate = adjustedEnd;
+        }
+      }
+
+      // 移動先に同じ名前の課題がある場合、自動的に名前を変更する
+      let targetName = overrides?.name ?? rawIssue.name;
+      const existingIssues = await this.listIssues(targetProjectId, true);
+      const duplicate = existingIssues.find(issue => issue.name === targetName && issue.id !== issueId);
+      if (duplicate) {
+        // 名前の末尾に番号を追加して重複を回避
+        let counter = 1;
+        let newName = `${targetName} (${counter})`;
+        while (existingIssues.some(issue => issue.name === newName && issue.id !== issueId)) {
+          counter++;
+          newName = `${targetName} (${counter})`;
+        }
+        targetName = newName;
+        // overridesに新しい名前を設定
+        if (overrides) {
+          overrides.name = targetName;
+        } else {
+          overrides = { name: targetName };
+        }
+      }
+
+      // 元の期間を保存（通知用）
+      const originalStart = overrideStart;
+      const originalEnd = overrideEnd;
   
       const tasksSnap = await getDocs(collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks`));
       const tasks = tasksSnap.docs.map(docSnap => ({ id: docSnap.id, ...(docSnap.data() as Task) }));
+
+      // 移動元プロジェクトのタグを取得
+      const sourceTags = await this.tagsService.listTags(currentProjectId);
+      const sourceTagMap = new Map<string, Tag>();
+      for (const tag of sourceTags) {
+        if (tag.id) {
+          sourceTagMap.set(tag.id, tag);
+        }
+      }
+
+      // 移動先プロジェクトのタグを取得
+      const targetTags = await this.tagsService.listTags(targetProjectId);
+      const targetTagMapByName = new Map<string, Tag>();
+      const targetTagMapById = new Map<string, Tag>();
+      for (const tag of targetTags) {
+        if (tag.id) {
+          targetTagMapById.set(tag.id, tag);
+        }
+        if (tag.name) {
+          targetTagMapByName.set(tag.name, tag);
+        }
+      }
+
+      // タスクに使用されているタグIDを収集
+      const usedTagIds = new Set<string>();
+      for (const task of tasks) {
+        if (task.tagIds && Array.isArray(task.tagIds)) {
+          for (const tagId of task.tagIds) {
+            if (typeof tagId === 'string' && tagId.trim().length > 0) {
+              usedTagIds.add(tagId);
+            }
+          }
+        }
+      }
+
+      // 移動先プロジェクトに存在しないタグを追加
+      const tagIdMapping = new Map<string, string>(); // 移動元タグID → 移動先タグID
+      const MAX_TAGS_PER_PROJECT = 20;
+      const skippedTags: string[] = [];
+      
+      // 移動先プロジェクトのタグ数をチェック
+      const currentTagCount = targetTags.length;
+      const tagsToCreate = new Set<string>();
+      
+      // 作成が必要なタグを特定
+      for (const tagId of usedTagIds) {
+        const sourceTag = sourceTagMap.get(tagId);
+        if (!sourceTag || !sourceTag.name) {
+          continue;
+        }
+
+        // 移動先プロジェクトに同じ名前のタグが存在するかチェック
+        const existingTag = targetTagMapByName.get(sourceTag.name);
+        if (existingTag && existingTag.id) {
+          // 既に存在する場合は、そのIDを使用
+          tagIdMapping.set(tagId, existingTag.id);
+        } else {
+          // 存在しない場合は、作成が必要
+          tagsToCreate.add(sourceTag.name);
+        }
+      }
+      
+      // タグの上限をチェック
+      const canCreateAllTags = currentTagCount + tagsToCreate.size <= MAX_TAGS_PER_PROJECT;
+      
+      if (!canCreateAllTags) {
+        // 上限に達している場合、作成できる分だけ作成する
+        const availableSlots = MAX_TAGS_PER_PROJECT - currentTagCount;
+        const tagsToCreateArray = Array.from(tagsToCreate);
+        const tagsToCreateLimited = tagsToCreateArray.slice(0, availableSlots);
+        const tagsToSkip = tagsToCreateArray.slice(availableSlots);
+        
+        // スキップされたタグを保存
+        skippedTags.push(...tagsToSkip);
+        
+        // 作成できるタグのみを作成
+        for (const tagName of tagsToCreateLimited) {
+          const sourceTag = Array.from(sourceTagMap.values()).find(t => t.name === tagName);
+          if (!sourceTag) {
+            continue;
+          }
+          
+          const tagId = Array.from(usedTagIds).find(id => {
+            const tag = sourceTagMap.get(id);
+            return tag?.name === tagName;
+          });
+          
+          if (!tagId) {
+            continue;
+          }
+          
+          try {
+            const newTagId = await this.tagsService.createTag(targetProjectId, {
+              name: sourceTag.name,
+              color: sourceTag.color ?? undefined,
+            });
+            tagIdMapping.set(tagId, newTagId);
+          } catch (error) {
+            console.error(`タグ「${sourceTag.name}」の作成に失敗しました:`, error);
+            // 作成に失敗したタグもスキップされたタグとして扱う
+            skippedTags.push(sourceTag.name);
+          }
+        }
+        
+        // スキップされたタグはマッピングしない（タグが使用されない）
+      } else {
+        // 上限に達していない場合、すべてのタグを作成
+        for (const tagId of usedTagIds) {
+          const sourceTag = sourceTagMap.get(tagId);
+          if (!sourceTag || !sourceTag.name) {
+            continue;
+          }
+
+          // 移動先プロジェクトに同じ名前のタグが存在するかチェック
+          const existingTag = targetTagMapByName.get(sourceTag.name);
+          if (existingTag && existingTag.id) {
+            // 既に存在する場合は、そのIDを使用
+            tagIdMapping.set(tagId, existingTag.id);
+          } else {
+            // 存在しない場合は、新しいタグを作成
+            try {
+              const newTagId = await this.tagsService.createTag(targetProjectId, {
+                name: sourceTag.name,
+                color: sourceTag.color ?? undefined,
+              });
+              tagIdMapping.set(tagId, newTagId);
+            } catch (error) {
+              console.error(`タグ「${sourceTag.name}」の作成に失敗しました:`, error);
+              // 作成に失敗したタグもスキップされたタグとして扱う
+              skippedTags.push(sourceTag.name);
+            }
+          }
+        }
+      }
+
+      // 移動先プロジェクトのメンバーを取得
+      const targetProjectMemberIds = new Set(targetProject.memberIds ?? []);
+      
+      // タスクの担当者が移動先プロジェクトのメンバーかチェックし、メンバーでない担当者を削除
+      const tasksWithRemovedAssignees: { taskId: string; removedAssignees: string[] }[] = [];
+      for (const task of tasks) {
+        if (task.assigneeIds && Array.isArray(task.assigneeIds)) {
+          const originalAssigneeIds = task.assigneeIds;
+          const validAssigneeIds = originalAssigneeIds.filter(
+            assigneeId => typeof assigneeId === 'string' && assigneeId.trim().length > 0 && targetProjectMemberIds.has(assigneeId)
+          );
+          
+          if (validAssigneeIds.length !== originalAssigneeIds.length) {
+            const removedAssignees = originalAssigneeIds.filter(
+              assigneeId => typeof assigneeId === 'string' && assigneeId.trim().length > 0 && !targetProjectMemberIds.has(assigneeId)
+            );
+            tasksWithRemovedAssignees.push({
+              taskId: task.id!,
+              removedAssignees: removedAssignees.filter((id): id is string => typeof id === 'string'),
+            });
+            // タスクの担当者リストを更新
+            task.assigneeIds = validAssigneeIds;
+          }
+        }
+      }
   
       const targetIssueRef = doc(this.db, `projects/${targetProjectId}/issues/${issueId}`);
       const payload = {
@@ -568,19 +806,146 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       }
   
       await setDoc(targetIssueRef, payload);
-  
+
+      // 課題名とプロジェクト名を取得（添付ファイル一覧で表示するため）
+      const targetProjectName = targetProject.name || null;
+      const issueName = targetName;
+
       for (const task of tasks) {
         const { id: taskId, ...taskData } = task;
+        
+        // タスクのタグIDを移動先プロジェクトのタグIDにマッピング
+        let mappedTagIds: string[] | undefined;
+        if (task.tagIds && Array.isArray(task.tagIds)) {
+          mappedTagIds = task.tagIds
+            .map(tagId => {
+              if (typeof tagId === 'string' && tagId.trim().length > 0) {
+                return tagIdMapping.get(tagId) ?? null;
+              }
+              return null;
+            })
+            .filter((id): id is string => id !== null);
+        }
+        
         const taskPayload = {
           ...taskData,
           projectId: targetProjectId,
           issueId,
+          tagIds: mappedTagIds ?? task.tagIds, // マッピングされたタグIDを使用
         } as Record<string, unknown>;
   
         await setDoc(
           doc(this.db, `projects/${targetProjectId}/issues/${issueId}/tasks/${taskId}`),
           taskPayload,
         );
+  
+        // 添付ファイルも移動先プロジェクトのStorageに移動
+        const attachmentsRef = collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks/${taskId}/attachments`);
+        const attachmentsSnap = await getDocs(attachmentsRef);
+        
+        for (const attachmentDoc of attachmentsSnap.docs) {
+          const attachmentData = attachmentDoc.data() as Record<string, unknown>;
+          const attachmentId = attachmentDoc.id;
+          const fileName = typeof attachmentData['fileName'] === 'string' ? attachmentData['fileName'] : '';
+          const fileSize = typeof attachmentData['fileSize'] === 'number' ? attachmentData['fileSize'] : 0;
+          const uploadedBy = typeof attachmentData['uploadedBy'] === 'string' ? attachmentData['uploadedBy'] : '';
+          const uploadedAt = attachmentData['uploadedAt'];
+          const oldStoragePath = typeof attachmentData['storagePath'] === 'string' ? attachmentData['storagePath'] : null;
+          const oldFileUrl = typeof attachmentData['fileUrl'] === 'string' ? attachmentData['fileUrl'] : null;
+          
+          // 新しいStorageパスを構築
+          const safeName = fileName
+            .normalize('NFKC')
+            .replace(/[\s]+/g, '_')
+            .replace(/[^a-zA-Z0-9_.-]/g, '_');
+          const newStoragePath = `projects/${targetProjectId}/issues/${issueId}/tasks/${taskId}/attachments/${attachmentId}_${safeName}`;
+          
+          let newFileUrl = oldFileUrl;
+          
+          // Storageファイルを移動（ダウンロード→アップロード→削除）
+          // oldStoragePathが存在する場合は、それから直接ダウンロードURLを取得して使用
+          if (oldStoragePath) {
+            try {
+              // Storageパスから直接ダウンロードURLを取得（古いURLが無効になっている可能性があるため）
+              const oldStorageRef = ref(this.storage, oldStoragePath);
+              let downloadUrl = oldFileUrl;
+              
+              // 古いURLが無効な場合に備えて、Storageパスから直接URLを取得
+              try {
+                downloadUrl = await getDownloadURL(oldStorageRef);
+              } catch (error) {
+                // StorageパスからURLを取得できない場合は、古いURLを使用
+                if (!downloadUrl) {
+                  console.warn(`StorageパスからダウンロードURLを取得できませんでした: ${oldStoragePath}`, error);
+                }
+              }
+              
+              if (downloadUrl) {
+                // ファイルをダウンロード
+                const response = await fetch(downloadUrl);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  
+                  // 新しいパスにアップロード
+                  const newStorageRef = ref(this.storage, newStoragePath);
+                  await uploadBytes(newStorageRef, blob, {
+                    contentType: blob.type || undefined,
+                  });
+                  newFileUrl = await getDownloadURL(newStorageRef);
+                  
+                  // 古いファイルを削除（移動先プロジェクトのパスから）
+                  try {
+                    await deleteObject(oldStorageRef);
+                  } catch (error) {
+                    console.warn(`古いStorageファイルの削除に失敗しました: ${oldStoragePath}`, error);
+                    // エラーが発生しても続行
+                  }
+                } else {
+                  console.warn(`添付ファイルのダウンロードに失敗しました: ${downloadUrl}`);
+                }
+              }
+            } catch (error) {
+              console.error(`添付ファイルの移動に失敗しました: ${attachmentId}`, error);
+              // エラーが発生しても続行（ファイルが既に存在しない場合など）
+            }
+          } else if (oldFileUrl) {
+            // storagePathが無いがfileUrlがある場合（古いデータの可能性）
+            try {
+              const response = await fetch(oldFileUrl);
+              if (response.ok) {
+                const blob = await response.blob();
+                
+                const newStorageRef = ref(this.storage, newStoragePath);
+                await uploadBytes(newStorageRef, blob, {
+                  contentType: blob.type || undefined,
+                });
+                newFileUrl = await getDownloadURL(newStorageRef);
+              }
+            } catch (error) {
+              console.error(`添付ファイルの移動に失敗しました（fileUrl使用）: ${attachmentId}`, error);
+            }
+          }
+          
+          // Firestoreの添付ファイルドキュメントを移動先に作成
+          const newAttachmentRef = doc(this.db, `projects/${targetProjectId}/issues/${issueId}/tasks/${taskId}/attachments/${attachmentId}`);
+          await setDoc(newAttachmentRef, {
+            fileName,
+            fileUrl: newFileUrl,
+            fileSize,
+            uploadedBy,
+            uploadedAt,
+            storagePath: newStoragePath,
+            projectId: targetProjectId, // プロジェクトIDを設定（添付ファイル一覧でフィルタリングするため）
+            projectName: targetProjectName, // プロジェクト名を設定（添付ファイル一覧で表示するため）
+            issueId, // 課題IDを設定
+            issueName, // 課題名を設定（添付ファイル一覧で表示するため）
+            taskId, // タスクIDを設定
+            taskTitle: task.title || null, // タスク名を設定（添付ファイル一覧で表示するため）
+          });
+          
+          // 古い添付ファイルドキュメントを削除
+          await deleteDoc(attachmentDoc.ref);
+        }
   
         await deleteDoc(doc(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks/${taskId}`));
       }
@@ -590,6 +955,19 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       await this.progressService.updateProjectProgress(currentProjectId);
       await this.progressService.updateProjectProgress(targetProjectId);
       await this.progressService.updateIssueProgress(targetProjectId, issueId);
+      
+      return {
+        finalName: targetName,
+        dateAdjusted,
+        originalStart: dateAdjusted ? originalStart : undefined,
+        originalEnd: dateAdjusted ? originalEnd : undefined,
+        adjustedStart: dateAdjusted ? adjustedStart : undefined,
+        adjustedEnd: dateAdjusted ? adjustedEnd : undefined,
+        removedAssignees: tasksWithRemovedAssignees.length > 0
+          ? tasksWithRemovedAssignees.map(item => ({ taskId: item.taskId, assigneeIds: item.removedAssignees }))
+          : undefined,
+        skippedTags: skippedTags.length > 0 ? skippedTags : undefined,
+      };
     }
 }
 

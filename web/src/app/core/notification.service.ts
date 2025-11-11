@@ -794,7 +794,7 @@ export class NotificationService {
       .map((entry) => {
         const taskKey = `${entry.projectId}/${entry.issueId}/${entry.taskId}`;
         const task = taskDetails.get(taskKey);
-        const title = task?.title ?? '不明なタスク';
+        const title = task?.title ?? '移動されたタスク';
         return {
           id: entry.id,
           projectId: entry.projectId,

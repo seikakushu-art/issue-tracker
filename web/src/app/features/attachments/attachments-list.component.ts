@@ -121,7 +121,7 @@ export class AttachmentsListComponent implements OnInit {
         return;
       }
 
-      const attachments = await this.tasksService.listAttachmentsForProjects(projectIds);
+      const attachments = await this.tasksService.listAttachmentsForProjects(projectIds, false);
       if (attachments.length === 0) {
         this.attachments.set([]);
         this.lastUpdated.set(new Date());

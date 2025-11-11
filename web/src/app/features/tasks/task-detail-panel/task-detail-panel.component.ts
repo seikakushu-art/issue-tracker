@@ -695,9 +695,34 @@ import {
         this.currentUid = uid ?? null;
         this.currentRole = project?.roles?.[uid] ?? null;
   
-        await this.loadProjectMembers(project?.memberIds ?? [], uid ?? null);
-        await this.loadAttachments();
-        await this.loadComments();
+        // プロジェクトメンバーIDとタスクの担当者IDを結合してプロファイルを読み込む
+        // 課題移動後も担当者の情報を表示できるようにするため
+        const projectMemberIds = project?.memberIds ?? [];
+        const assigneeIds = this.task?.assigneeIds ?? [];
+        
+        // コメントと添付ファイルを読み込んで、作成者IDも収集
+        const attachments = await this.tasksService.listAttachments(this.projectId, this.issueId, this.taskId);
+        const comments = await this.tasksService.listComments(this.projectId, this.issueId, this.taskId);
+        
+        const commentCreatorIds = comments
+          .map(comment => comment.createdBy)
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+        const attachmentUploaderIds = attachments
+          .map(attachment => attachment.uploadedBy)
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+        
+        // すべてのIDを結合してプロファイルを読み込む
+        const allMemberIds = Array.from(new Set([...projectMemberIds, ...assigneeIds, ...commentCreatorIds, ...attachmentUploaderIds]));
+        await this.loadProjectMembers(allMemberIds, uid ?? null);
+        
+        // プロファイルを読み込んだ後、ビューを構築
+        this.attachments = attachments
+          .map((attachment) => this.composeAttachmentView(attachment))
+          .sort((a, b) => (b.uploadedAt?.getTime() ?? 0) - (a.uploadedAt?.getTime() ?? 0));
+        this.comments = comments
+          .map((comment) => this.composeCommentView(comment))
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+        
         this.updateAttachmentLimitState();
         this.updateCommentLimitState();
       } catch (error) {

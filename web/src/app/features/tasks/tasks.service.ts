@@ -984,28 +984,44 @@ export class TasksService {
 
   /**
    * 指定したプロジェクトに紐づく添付ファイルをまとめて取得する
+   * @param projectIds プロジェクトIDの配列
+   * @param includeMyUploads 現在のユーザーがアップロードしたファイルも含めるか（プロジェクトの閲覧権限に関係なく）
    */
-  async listAttachmentsForProjects(projectIds: string[]): Promise<Attachment[]> {
+  async listAttachmentsForProjects(projectIds: string[], includeMyUploads: boolean = false): Promise<Attachment[]> {
     const normalized = Array.from(
       new Set(
         projectIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
       ),
     );
 
-    if (normalized.length === 0) {
-      return [];
-    }
-
     const attachmentsGroup = collectionGroup(this.db, 'attachments');
     const results: Attachment[] = [];
 
-    for (const chunk of this.chunkArray(normalized, 10)) {
-      if (chunk.length === 0) {
-        continue;
+    // プロジェクトIDでフィルタリング
+    if (normalized.length > 0) {
+      for (const chunk of this.chunkArray(normalized, 10)) {
+        if (chunk.length === 0) {
+          continue;
+        }
+        const snap = await getDocs(query(attachmentsGroup, where('projectId', 'in', chunk)));
+        for (const docSnap of snap.docs) {
+          results.push(this.hydrateAttachment(docSnap.id, docSnap.data() as Record<string, unknown>));
+        }
       }
-      const snap = await getDocs(query(attachmentsGroup, where('projectId', 'in', chunk)));
-      for (const docSnap of snap.docs) {
-        results.push(this.hydrateAttachment(docSnap.id, docSnap.data() as Record<string, unknown>));
+    }
+
+    // 現在のユーザーがアップロードしたファイルも含める場合
+    if (includeMyUploads) {
+      const uid = (await this.waitForUser())?.uid;
+      if (uid) {
+        const myUploadsSnap = await getDocs(query(attachmentsGroup, where('uploadedBy', '==', uid)));
+        for (const docSnap of myUploadsSnap.docs) {
+          const attachment = this.hydrateAttachment(docSnap.id, docSnap.data() as Record<string, unknown>);
+          // 既に追加されている場合は重複を避ける
+          if (!results.some(a => a.id === attachment.id)) {
+            results.push(attachment);
+          }
+        }
       }
     }
 

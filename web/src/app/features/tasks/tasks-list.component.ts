@@ -229,7 +229,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
         uidPromise,
       ]);
 
-      await this.loadProjectMembers(project?.memberIds ?? [], uid);
+      // プロジェクトメンバーIDとタスクの担当者IDを結合してプロファイルを読み込む
+      // 課題移動後も担当者の情報を表示できるようにするため
+      const projectMemberIds = project?.memberIds ?? [];
+      const assigneeIds = tasks
+        .flatMap(task => task.assigneeIds ?? [])
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+      const allMemberIds = Array.from(new Set([...projectMemberIds, ...assigneeIds]));
+      await this.loadProjectMembers(allMemberIds, uid);
 
       this.issueDetails = issue;
       this.projectDetails = project;
