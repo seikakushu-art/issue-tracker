@@ -73,6 +73,7 @@
   align-items: center;
   gap: 12px;
   flex: 1;
+  min-width: 0;
 }
 
 // カラーマーカーを拡大して色を認識しやすくする
@@ -84,10 +85,18 @@
   box-shadow: 0 0 0 4px var(--issue-color-soft, rgba(0, 123, 255, 0.15));
 }
 
+.summary-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .summary-text h3 {
   margin: 0;
   font-size: 20px;
   color: var(--issue-color, #333);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .summary-text h3 .issue-label {
@@ -103,6 +112,9 @@
   font-weight: 700;
   font-size: 20px;
   display: inline-block;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 
@@ -110,6 +122,10 @@
   margin: 4px 0 0;
   color: #666;
   font-size: 13px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  min-width: 0;
 }
 
 .summary-goal .goal-label {
@@ -125,6 +141,9 @@
   font-weight: 400;
   font-size: 13px;
   display: inline-block;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .summary-deadline {
@@ -197,6 +216,10 @@
   color: #555;
   line-height: 1.6;
   font-size: 14px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  min-width: 0;
 }
 
 .summary-progress {
@@ -478,6 +501,7 @@
   gap: 8px;
   flex: 1;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .task-title .pin-indicator {
@@ -608,6 +632,9 @@
   font-size: 16px;
   font-weight: 600;
   line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 // ボタンの横幅に余裕を持たせテキストを表示
 .task-actions {
@@ -670,6 +697,10 @@
   margin-bottom: 12px;
   line-height: 1.5;
   font-size: 14px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  min-width: 0;
 }
 
 .task-meta {
@@ -1129,7 +1160,8 @@
 
 .task-detail-panel {
   position: relative;
-  width: min(640px, 90vw);
+  width: 640px;
+  max-width: 640px;
   background: #fff;
   max-height: 90vh;
   overflow-y: auto;
@@ -1164,12 +1196,16 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .detail-title h2 {
   margin: 0;
   font-size: 20px;
   color: #222;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .detail-actions {
@@ -1183,6 +1219,10 @@
   color: #555;
   line-height: 1.7;
   font-size: 14px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  min-width: 0;
 }
 
 .detail-section {
@@ -1381,18 +1421,36 @@
   padding: 6px 0;
   border-bottom: 1px solid #eee;
   gap: 8px;
+  min-width: 0;
 }
 
 .detail-checklist-item label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   flex: 1;
+  min-width: 0;
+}
+
+.detail-checklist-item label input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.detail-checklist-item label span {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .detail-checklist-item span.completed {
   text-decoration: line-through;
   color: #888;
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .detail-checklist-add {
@@ -1595,6 +1653,7 @@
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid #eef2f7;
+  min-width: 0;
 }
 
 .comment-avatar {
@@ -1631,6 +1690,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .comment-meta {
@@ -1657,6 +1717,9 @@
   color: #1f2937;
   line-height: 1.6;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .comment-mentions {

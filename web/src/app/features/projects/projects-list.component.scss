@@ -246,6 +246,9 @@
   flex: 1;
   letter-spacing: -0.01em;
   transition: color 0.2s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .project-card:hover .project-title {
@@ -359,6 +362,10 @@
   color: #666;
   margin-bottom: 16px;
   line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  min-width: 0;
 }
 
 .project-members {

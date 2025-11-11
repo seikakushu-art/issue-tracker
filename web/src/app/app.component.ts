@@ -131,6 +131,8 @@ import { Project, Issue, Task } from './models/schema';
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+      min-width: 0;
     }
 
     .breadcrumb-item {
@@ -141,6 +143,9 @@ import { Project, Issue, Task } from './models/schema';
       font-size: 14px;
       cursor: pointer;
       transition: color 0.2s ease;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      min-width: 0;
     }
 
     .breadcrumb-item:hover {

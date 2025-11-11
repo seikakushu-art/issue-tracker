@@ -1,6 +1,6 @@
 .attachments-page {
     padding: 24px;
-    max-width: 1100px;
+    max-width: 1400px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -105,11 +105,13 @@
   
   .attachments-table {
     width: 100%;
+    max-width: 100%;
     border-collapse: collapse;
     background: #ffffff;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    table-layout: fixed;
   }
   
   .attachments-table th,
@@ -119,6 +121,9 @@
     border-bottom: 1px solid #e5e7eb;
     font-size: 14px;
     color: #1f2937;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
   }
   
   .attachments-table th {
@@ -134,6 +139,8 @@
   .attachments-table a {
     color: #2563eb;
     text-decoration: none;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
   
   .attachments-table a:hover {
@@ -145,8 +152,28 @@
     white-space: nowrap;
   }
 
+  .attachments-table th:nth-child(4),
+  .attachments-table td:nth-child(4) {
+    width: 90px;
+    max-width: 90px;
+  }
+
+  .attachments-table th:nth-child(5),
+  .attachments-table td:nth-child(5) {
+    width: 50px;
+    max-width: 70px;
+  }
+
+  .attachments-table th:nth-child(6),
+  .attachments-table td:nth-child(6) {
+    width: 140px;
+    max-width: 150px;
+    text-align: center;
+  }
+
   .attachments-table .actions-column {
-    width: 100px;
+    width: 70px;
+    max-width: 90px;
     text-align: center;
   }
 
@@ -201,16 +228,23 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0;
   }
   
   .task-title {
     font-weight: 600;
     color: #1f2937;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
   }
   
   .task-issue {
     font-size: 12px;
     color: #6b7280;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
   }
   
   .task-link {

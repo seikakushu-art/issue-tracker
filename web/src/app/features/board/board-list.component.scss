@@ -296,6 +296,9 @@
     margin: 0;
     font-size: 1.25rem;
     color: #0f172a;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
   }
   
   .board-post__content {
@@ -307,6 +310,9 @@
     overflow: hidden;
     position: relative;
     transition: max-height 0.3s ease;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-width: 0;
   }
 
   .board-post__content:not(.board-post__content--expanded)::after {

@@ -33,6 +33,8 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
   @Input() criteria: SmartFilterCriteria = createEmptySmartFilterCriteria();
   /** タグの選択肢 */
   @Input() tags: SmartFilterTagOption[] = [];
+  /** タグセクションを非表示にするかどうか */
+  @Input() hideTags = false;
   /** 担当者の選択肢 */
   @Input() assignees: SmartFilterAssigneeOption[] = [];
   /** ステータスの選択肢（タスクに準拠） */

@@ -658,6 +658,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .project-card__header h3 {
@@ -665,6 +666,10 @@
   font-size: 18px;
   font-weight: 600;
   color: #0f172a;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+  flex: 1;
 }
 
 .project-card__members {
@@ -786,6 +791,7 @@
   border-left-color: #e2e8f0;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  min-width: 0;
 
   &:hover {
     box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
@@ -804,6 +810,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .bottleneck-item__type {
@@ -813,6 +821,9 @@
   letter-spacing: -0.01em;
   line-height: 1.4;
   display: inline-block;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 
   &--danger {
     color: #dc2626;
@@ -854,12 +865,17 @@
 .bottleneck-item__id {
   font-size: 12px;
   color: #64748b;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 .bottleneck-item__task-name {
   font-weight: 600;
   color: #0f172a;
   font-size: 13px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .widget__loading {
@@ -958,6 +974,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .actionable-card__title-accent {
@@ -974,6 +991,9 @@
   color: #0f172a;
   cursor: pointer;
   transition: color 0.2s ease;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
   
   &:hover {
     color: #2563eb;

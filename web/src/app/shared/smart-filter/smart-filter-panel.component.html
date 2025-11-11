@@ -5,7 +5,7 @@
     </header>
   
     <div class="panel-content">
-      <section class="filter-section" *ngIf="tags.length > 0">
+      <section class="filter-section" *ngIf="!hideTags && tags.length > 0">
         <h4>タグ</h4>
         <div class="option-grid">
           <label *ngFor="let tag of tags" class="option-item">
