@@ -67,6 +67,7 @@ export class ProgressService {
 
   /**
    * プロジェクトの進捗率を計算する（配下課題の加重平均）
+   * 課題の重みは配下タスクの重要度から導出（配下タスクの重要度重みの平均値）
    * @param projectId プロジェクトID
    * @returns 進捗率（0-100）
    */
@@ -97,7 +98,8 @@ export class ProgressService {
 
       for (const issue of activeIssues) {
         const progress = issue.progress || 0;
-        const weight = 1;  // 既定の重みは1（必要に応じて課題の重要度などで重み付け可能）
+        // 課題の重みは配下タスクの重要度から導出
+        const weight = await this.calculateIssueWeight(projectId, issue.id!);
         
         totalProgressWeight += progress * weight;
         totalWeight += weight;
@@ -112,6 +114,49 @@ export class ProgressService {
     } catch (error) {
       console.error('Error calculating project progress:', error);
       return 0;
+    }
+  }
+
+  /**
+   * 課題の重みを配下タスクの重要度から導出する
+   * 配下タスクの重要度重みの平均値を課題の重みとする
+   * @param projectId プロジェクトID
+   * @param issueId 課題ID
+   * @returns 課題の重み（配下タスクの重要度重みの平均値、タスクがない場合は1）
+   */
+  private async calculateIssueWeight(projectId: string, issueId: string): Promise<number> {
+    try {
+      // 課題配下のすべてのタスクを取得
+      const tasksSnapshot = await getDocs(
+        query(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`))
+      );
+
+      const tasks: Task[] = tasksSnapshot.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as Task)
+      }));
+
+      // アーカイブされたタスクと破棄されたタスクは集計対象外
+      const activeTasks = tasks.filter(task => 
+        task.status !== 'discarded' && !task.archived
+      );
+
+      if (activeTasks.length === 0) {
+        return 1; // タスクがない場合は既定の重み1
+      }
+
+      // 各タスクの重要度から重みを計算し、平均値を求める
+      let totalWeight = 0;
+      for (const task of activeTasks) {
+        const importanceWeight = this.getImportanceWeight(task.importance);
+        totalWeight += importanceWeight;
+      }
+
+      const averageWeight = totalWeight / activeTasks.length;
+      return averageWeight;
+    } catch (error) {
+      console.error('Error calculating issue weight:', error);
+      return 1; // エラー時は既定の重み1
     }
   }
 

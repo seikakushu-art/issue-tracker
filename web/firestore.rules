@@ -50,23 +50,53 @@ allow create: if signedIn();
 allow read: if isMember(projectId);
 allow update, delete: if isMember(projectId) && role(projectId) == 'admin';
 
-
+// 課題のルール
 match /issues/{issueId} {
 allow read: if isMember(projectId);
-allow create, update: if isMember(projectId);
+// 課題の作成・更新は管理者のみ（サービス層の実装と一致）
+allow create, update: if isMember(projectId) && role(projectId) == 'admin';
 allow delete: if isMember(projectId) && role(projectId) == 'admin';
 
-
+// タスクのルール（正しいパス構造: projects/{projectId}/issues/{issueId}/tasks/{taskId}）
 match /tasks/{taskId} {
 allow read: if isMember(projectId);
-allow create, update: if isMember(projectId);
-allow delete: if isMember(projectId) && role(projectId) == 'admin';
+// タスクの作成はadmin/member（サービス層の実装と一致）
+allow create: if isMember(projectId) && (role(projectId) == 'admin' || role(projectId) == 'member');
+// タスクの更新はadmin全員、またはmemberは自分の作成または担当者のタスクのみ（サービス層の実装と一致）
+allow update: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && (
+    resource.data.createdBy == request.auth.uid ||
+    (resource.data.assigneeIds != null && request.auth.uid in resource.data.assigneeIds)
+  ))
+);
+// タスクの削除はadmin全員、またはmemberは自分の作成したタスクのみ（サービス層の実装と一致）
+allow delete: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && resource.data.createdBy == request.auth.uid)
+);
 
-
+// コメントのルール
 match /comments/{commentId} {
 allow read: if isMember(projectId);
-allow create: if isMember(projectId);
-allow delete: if isMember(projectId) && (resource.data.authorId == request.auth.uid || role(projectId) == 'admin');
+// コメントの作成はadmin/member（サービス層の実装と一致）
+allow create: if isMember(projectId) && (role(projectId) == 'admin' || role(projectId) == 'member');
+// コメントの削除は作成者本人または管理者（サービス層の実装と一致）
+allow delete: if isMember(projectId) && (resource.data.createdBy == request.auth.uid || role(projectId) == 'admin');
+}
+
+// 添付ファイルのルール
+match /attachments/{attachmentId} {
+allow read: if isMember(projectId);
+// 添付ファイルの作成はadmin/member（詳細な権限チェックはサービス層で実施）
+// サービス層でタスク編集権限をチェックしているため、ここではadmin/memberに許可
+allow create: if isMember(projectId) && (role(projectId) == 'admin' || role(projectId) == 'member');
+// 添付ファイルの削除はadmin全員、またはmemberは自分のアップロードしたファイルのみ（サービス層の実装と一致）
+allow delete: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && resource.data.uploadedBy == request.auth.uid)
+);
+}
 }
 }
 }
@@ -80,6 +110,7 @@ allow create, update, delete: if isMember(projectId) && role(projectId) == 'admi
 
 
 // フラットなコレクションを使う MVP 用（後で削除可）
+// 注意: このルールは実際には使用されていない（タスクは projects/{projectId}/issues/{issueId}/tasks/{taskId} に保存される）
 match /tasks/{taskId} {
 allow read, write: if signedIn();
 }

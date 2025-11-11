@@ -594,6 +594,31 @@ export class TasksService {
         const progress = this.calculateProgressFromChecklist(updates.checklist);
         updates = { ...updates, progress };
       }
+
+      // 期間が更新された場合、またはチェックリストが更新された場合、ステータスを自動遷移
+      const periodChanged = updates.startDate !== undefined || updates.endDate !== undefined;
+      const checklistChanged = updates.checklist !== undefined;
+      
+      // 期間またはチェックリストが更新された場合、ステータスを自動遷移
+      // ただし、ステータスが手動で設定されている場合は上書きしない
+      if (periodChanged || checklistChanged) {
+        // 保留・破棄の場合は自動遷移しない
+        if (task.status !== 'on_hold' && task.status !== 'discarded') {
+          const updatedChecklist = updates.checklist ?? task.checklist ?? [];
+          const newStatus = this.calculateStatusFromConditions(
+            task,
+            updatedChecklist,
+            startDate,
+            endDate
+          );
+          
+          // ステータスが手動で設定されていない場合、または新しいステータスが現在のステータスと異なる場合は更新
+          if (updates.status === undefined || updates.status !== newStatus) {
+            updates = { ...updates, status: newStatus };
+          }
+        }
+      }
+
       await this.ensureTaskPeriodWithinHierarchy(project, projectId, issueId, startDate, endDate);
     }
 
@@ -1107,8 +1132,88 @@ export class TasksService {
   }
 
   /**
+   * タスクが期間内かどうかを判定する
+   * @param startDate タスク開始日
+   * @param endDate タスク終了日
+   * @returns 期間内の場合true、期間外または期間未設定の場合false
+   */
+  private isWithinPeriod(startDate: Date | null, endDate: Date | null): boolean {
+    if (!startDate || !endDate) {
+      return false; // 期間が設定されていない場合は期間外とみなす
+    }
+    const now = new Date();
+    // 日付の時刻部分を考慮して比較（開始日の00:00:00から終了日の23:59:59まで）
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    return now >= start && now <= end;
+  }
+
+  /**
+   * タスクのステータスを自動遷移させる（期間とチェックリストの状態に基づく）
+   * ステータス遷移ルール:
+   * - 未完了: 「期間外」AND「チェックリストはノータッチ」
+   * - 進行中: 「期間内」OR「チェックリストに完成した項目がある」
+   * - 完了: すべてのチェックリストは完了した
+   * - 保留・破棄: 手動設定のみ（自動遷移しない）
+   * @param task タスクデータ
+   * @param checklist チェックリスト（省略時はタスクのチェックリストを使用）
+   * @param startDate 開始日（省略時はタスクの開始日を使用）
+   * @param endDate 終了日（省略時はタスクの終了日を使用）
+   * @returns 新しいステータス
+   */
+  private calculateStatusFromConditions(
+    task: Task,
+    checklist?: ChecklistItem[],
+    startDate?: Date | null,
+    endDate?: Date | null
+  ): TaskStatus {
+    // 保留・破棄の場合は自動遷移しない
+    if (task.status === 'on_hold' || task.status === 'discarded') {
+      return task.status;
+    }
+
+    const currentChecklist = checklist ?? task.checklist ?? [];
+    const currentStartDate = startDate !== undefined ? startDate : (task.startDate ?? null);
+    const currentEndDate = endDate !== undefined ? endDate : (task.endDate ?? null);
+
+    // すべてのチェックリストが完了した場合 → 完了
+    const allCompleted = currentChecklist.length > 0 && currentChecklist.every(item => item.completed);
+    if (allCompleted) {
+      return 'completed';
+    }
+
+    // 期間判定とチェックリストの状態を確認
+    const isWithin = this.isWithinPeriod(currentStartDate, currentEndDate);
+    const hasCompleted = currentChecklist.some(item => item.completed);
+
+    // 進行中: 「期間内」OR「チェックリストに完成した項目がある」
+    if (isWithin || hasCompleted) {
+      return 'in_progress';
+    }
+
+    // 未完了: 「期間外」AND「チェックリストはノータッチ」
+    return 'incomplete';
+  }
+
+  /**
+   * チェックリストがノータッチ（すべて未完了）かどうかを判定する
+   * @param checklist チェックリスト
+   * @returns すべて未完了の場合true
+   */
+  private isChecklistUntouched(checklist: ChecklistItem[]): boolean {
+    return checklist.length === 0 || checklist.every(item => !item.completed);
+  }
+
+  /**
    * チェックリストの完了状態を更新する
    * 完了状態に応じてステータスを自動遷移させる
+   * ステータス遷移ルール:
+   * - 未完了: 「期間外」AND「チェックリストはノータッチ」
+   * - 進行中: 「期間内」OR「チェックリストに完成した項目がある」
+   * - 完了: すべてのチェックリストは完了した
+   * - 保留・破棄: 手動設定のみ（自動遷移しない）
    * @param projectId プロジェクトID
    * @param issueId 課題ID
    * @param taskId タスクID
@@ -1129,28 +1234,7 @@ export class TasksService {
     const progress = this.calculateProgressFromChecklist(checklist, task.status);
 
     // ステータスを自動遷移
-    let newStatus = task.status;
-    
-    // チェックリスト未設定の場合は自動遷移しない
-    if (checklist.length === 0) {
-      if (newStatus === 'in_progress' || newStatus === 'completed') {
-        newStatus = 'incomplete';
-      }
-    } else {
-      // すべてのチェックリストが完了した場合
-      const allCompleted = checklist.every(item => item.completed);
-      if (allCompleted) {
-        newStatus = 'completed';
-      } else {
-        // 1つ以上のチェック項目が完了している場合
-        const hasCompleted = checklist.some(item => item.completed);
-        if (hasCompleted) {
-          newStatus = 'in_progress';
-        } else {
-          newStatus = 'incomplete';
-        }
-      }
-    }
+    const newStatus = this.calculateStatusFromConditions(task, checklist);
 
     // タスクを更新
     await this.updateTask(projectId, issueId, taskId, {

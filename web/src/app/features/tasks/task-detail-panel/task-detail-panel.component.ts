@@ -900,28 +900,21 @@ import {
       }
 
       try {
-       // チェックリストの状態を基に、完了確認を挟みつつステータスを更新
-        let status = this.task.status;
-        if (checklist.length > 0) {
-          const allCompleted = checklist.every((item) => item.completed);
-          const someCompleted = checklist.some((item) => item.completed);
-          const fallbackStatus: TaskStatus = someCompleted ? 'in_progress' : 'incomplete';
-
-          if (allCompleted) {
-            if (status !== 'completed' && status !== 'on_hold' && status !== 'discarded') {
-              const shouldComplete = this.confirmChecklistCompletion();
-              status = shouldComplete ? 'completed' : fallbackStatus;
-            }
-          } else if (status !== 'on_hold' && status !== 'discarded') {
-            status = fallbackStatus;
+        // すべてのチェックリストが完了した場合、完了確認のダイアログを表示
+        const allCompleted = checklist.length > 0 && checklist.every((item) => item.completed);
+        if (allCompleted && this.task.status !== 'completed' && this.task.status !== 'on_hold' && this.task.status !== 'discarded') {
+          const shouldComplete = this.confirmChecklistCompletion();
+          if (!shouldComplete) {
+            // 完了をキャンセルした場合、完了状態を解除してから更新
+            const revertedChecklist = checklist.map(item => ({ ...item, completed: false }));
+            await this.tasksService.updateChecklist(this.projectId, this.issueId, this.task.id, revertedChecklist);
+            await this.refreshTask();
+            return;
           }
         }
-        const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);
-        await this.tasksService.updateTask(this.projectId, this.issueId, this.task.id, {
-          checklist,
-          status,
-          progress,
-        });
+
+        // ステータス遷移ロジックは updateChecklist に委譲
+        await this.tasksService.updateChecklist(this.projectId, this.issueId, this.task.id, checklist);
         await this.refreshTask();
       } catch (error) {
         console.error('チェックリストの更新に失敗しました:', error);

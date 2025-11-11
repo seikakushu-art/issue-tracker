@@ -590,6 +590,35 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       // 調整後の期間でバリデーション（タスクの期間チェックなど）
       await this.validateWithinProjectPeriod(targetProjectId, adjustedStart, adjustedEnd);
 
+      // 期間が調整された場合、配下のタスクの期間をカバーできているかチェック
+      if (adjustedStart || adjustedEnd) {
+        // 移動元プロジェクトのタスクをチェック（移動前の状態）
+        const sourceTasksSnap = await getDocs(collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks`));
+        for (const docSnap of sourceTasksSnap.docs) {
+          const record = docSnap.data() as Record<string, unknown>;
+          const taskStart = this.normalizeDate(record['startDate']);
+          const taskEnd = this.normalizeDate(record['endDate']);
+          
+          // 開始日のチェック：課題の開始日がタスクの開始日より後になっている場合はエラー
+          if (adjustedStart && taskStart && taskStart < adjustedStart) {
+            throw new Error(
+              `移動先プロジェクトの期間内に収めるため課題の開始日を${adjustedStart.toLocaleDateString('ja-JP')}に調整しましたが、` +
+              `配下のタスク（開始日: ${taskStart.toLocaleDateString('ja-JP')}）の期間をカバーできません。` +
+              `移動先プロジェクトの期間を拡張するか、タスクの期間を調整してから再度お試しください。`
+            );
+          }
+          
+          // 終了日のチェック：課題の終了日がタスクの終了日より前になっている場合はエラー
+          if (adjustedEnd && taskEnd && taskEnd > adjustedEnd) {
+            throw new Error(
+              `移動先プロジェクトの期間内に収めるため課題の終了日を${adjustedEnd.toLocaleDateString('ja-JP')}に調整しましたが、` +
+              `配下のタスク（終了日: ${taskEnd.toLocaleDateString('ja-JP')}）の期間をカバーできません。` +
+              `移動先プロジェクトの期間を拡張するか、タスクの期間を調整してから再度お試しください。`
+            );
+          }
+        }
+      }
+
       // 期間が調整された場合、overridesに反映
       if (dateAdjusted) {
         if (!overrides) {

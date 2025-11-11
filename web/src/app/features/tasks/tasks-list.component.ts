@@ -2025,28 +2025,23 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     try {
-      // チェックリストの結果から次のステータスを慎重に判定
-      let status = task.status;
-      if (checklist.length > 0) {
-        const allCompleted = checklist.every(item => item.completed);
-        const someCompleted = checklist.some(item => item.completed);
-        const fallbackStatus = someCompleted ? 'in_progress' : 'incomplete';
-
-        if (allCompleted) {
-          if (status !== 'completed' && status !== 'on_hold' && status !== 'discarded') {
-            const shouldComplete = this.confirmChecklistCompletion();
-            status = shouldComplete ? 'completed' : fallbackStatus;
-          }
-        } else if (status !== 'on_hold' && status !== 'discarded') {
-          status = fallbackStatus;
+      // すべてのチェックリストが完了した場合、完了確認のダイアログを表示
+      const allCompleted = checklist.length > 0 && checklist.every(item => item.completed);
+      if (allCompleted && task.status !== 'completed' && task.status !== 'on_hold' && task.status !== 'discarded') {
+        const shouldComplete = this.confirmChecklistCompletion();
+        if (!shouldComplete) {
+          // 完了をキャンセルした場合、完了状態を解除してから更新
+          const revertedChecklist = checklist.map(item => ({ ...item, completed: false }));
+          await this.tasksService.updateChecklist(this.projectId, this.issueId, task.id, revertedChecklist);
+          await this.loadData();
+          this.refreshSelectedTask();
+          await this.updateIssueProgress();
+          return;
         }
       }
-      const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);
-      await this.tasksService.updateTask(this.projectId, this.issueId, task.id, {
-        checklist,
-        status,
-        progress
-      });
+
+      // ステータス遷移ロジックは updateChecklist に委譲
+      await this.tasksService.updateChecklist(this.projectId, this.issueId, task.id, checklist);
 
       await this.loadData();
       this.refreshSelectedTask();
