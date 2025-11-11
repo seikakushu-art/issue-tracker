@@ -2,7 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
+import { Auth, signInWithEmailAndPassword, sendPasswordResetEmail } from '@angular/fire/auth';
 import { AuthService } from '../../core/auth.service';
 
 /**
@@ -72,6 +72,18 @@ import { AuthService } from '../../core/auth.service';
             >
               {{ loading ? 'ログイン中...' : 'ログイン' }}
             </button>
+          </div>
+
+          <div class="form-secondary-actions">
+            <button
+              type="button"
+              class="btn btn-secondary btn-full"
+              (click)="sendPasswordReset()"
+              [disabled]="!loginForm.email || loading || sendingReset"
+            >
+              {{ sendingReset ? '送信中...' : 'パスワードをお忘れの方はこちら' }}
+            </button>
+            <p class="secondary-note">入力されたメール宛に15分間有効なリセットリンクを送信します。</p>
           </div>
 
           <div class="auth-footer">
@@ -217,6 +229,14 @@ import { AuthService } from '../../core/auth.service';
       margin-bottom: 24px;
     }
 
+    .form-secondary-actions {
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+
     .btn {
       padding: 12px 24px;
       border: none;
@@ -240,6 +260,17 @@ import { AuthService } from '../../core/auth.service';
       transform: translateY(-1px);
     }
 
+    .btn-secondary {
+      background: #eef2ff;
+      color: #4c51bf;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+
+
     .btn-link {
       background: none;
       color: #667eea;
@@ -261,6 +292,14 @@ import { AuthService } from '../../core/auth.service';
       cursor: not-allowed;
       transform: none;
     }
+
+    .secondary-note {
+      margin: 0;
+      color: #666;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
 
     .auth-footer {
       text-align: center;
@@ -314,6 +353,7 @@ export class LoginComponent implements OnInit {
   errorMessage = '';
   successMessage = '';
   private redirectUrl: string | null = null;
+  sendingReset = false;
 
   loginForm = {
     email: '',
@@ -410,5 +450,64 @@ export class LoginComponent implements OnInit {
    */
   goToRegister() {
     this.router.navigate(['/register']);
+  }
+  /**
+   * パスワードリセットメールを送信
+   */
+  async sendPasswordReset() {
+    // メールが空の場合は入力を促して処理を中断
+    if (!this.loginForm.email) {
+      this.errorMessage = 'パスワードリセットにはメールアドレスの入力が必要です';
+      this.successMessage = '';
+      return;
+    }
+
+    this.sendingReset = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      // 15分有効である旨をメール受信者に伝えるための案内文を用意
+      const actionCodeSettings = {
+        url: `${this.getAppOrigin()}/login`,
+        handleCodeInApp: false,
+      };
+
+      await sendPasswordResetEmail(this.auth, this.loginForm.email, actionCodeSettings);
+      this.successMessage = 'パスワードリセットメールを送信しました。メール内リンクは15分間有効です。';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error('パスワードリセットエラー:', error);
+
+      switch (error.code) {
+        case 'auth/user-not-found':
+          this.errorMessage = '入力されたメールアドレスは登録されていません';
+          break;
+        case 'auth/invalid-email':
+          this.errorMessage = 'メールアドレスの形式が正しくありません';
+          break;
+        case 'auth/missing-email':
+          this.errorMessage = 'メールアドレスを入力してください';
+          break;
+        case 'auth/too-many-requests':
+          this.errorMessage = 'リクエストが多すぎます。しばらく時間を空けて再度お試しください';
+          break;
+        default:
+          this.errorMessage = 'パスワードリセットメールの送信に失敗しました。時間を空けて再試行してください';
+      }
+    } finally {
+      this.sendingReset = false;
+    }
+  }
+
+  /**
+   * アプリのベースURLを取得
+   */
+  private getAppOrigin(): string {
+    if (typeof window !== 'undefined' && window.location) {
+      return window.location.origin;
+    }
+
+    return `https://${this.auth.app.options.authDomain ?? 'localhost'}`;
   }
 }

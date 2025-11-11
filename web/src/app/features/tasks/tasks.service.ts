@@ -118,6 +118,14 @@ export class TasksService {
     if (typeof data['taskTitle'] === 'string') {
       attachment.taskTitle = data['taskTitle'];
     }
+    if (typeof data['authorUsername'] === 'string' && data['authorUsername'].trim().length > 0) {
+      attachment.authorUsername = data['authorUsername'].trim();
+    }
+    if (typeof data['authorPhotoUrl'] === 'string' && data['authorPhotoUrl'].trim().length > 0) {
+      attachment.authorPhotoUrl = data['authorPhotoUrl'].trim();
+    } else if (data['authorPhotoUrl'] === null) {
+      attachment.authorPhotoUrl = null;
+    }
 
     return attachment;
   }
@@ -1012,7 +1020,7 @@ export class TasksService {
    * @param projectIds プロジェクトIDの配列
    * @param includeMyUploads 現在のユーザーがアップロードしたファイルも含めるか（プロジェクトの閲覧権限に関係なく）
    */
-  async listAttachmentsForProjects(projectIds: string[], includeMyUploads: boolean = false): Promise<Attachment[]> {
+  async listAttachmentsForProjects(projectIds: string[], includeMyUploads = false): Promise<Attachment[]> {
     const normalized = Array.from(
       new Set(
         projectIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)

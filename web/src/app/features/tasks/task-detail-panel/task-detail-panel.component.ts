@@ -23,7 +23,6 @@ import {
     Role,
     Tag,
     Task,
-    TaskStatus,
   } from '../../../models/schema';
   import { TasksService } from '../tasks.service';
   import { TagsService } from '../../tags/tags.service';
@@ -802,7 +801,12 @@ import {
         }
       } catch (error) {
         console.error('メンバー情報の取得に失敗しました:', error);
-        this.projectMemberProfiles = {};
+        // エラー時もフォールバックプロファイルを作成
+        const profileMap: Record<string, UserDirectoryProfile> = {};
+        for (const memberId of memberIds) {
+          profileMap[memberId] = fallbackProfile(memberId);
+        }
+        this.projectMemberProfiles = profileMap;
         this.mentionableMembers = [];
         this.mentionSelectorOpen = false;
         this.currentUserProfile = currentUid ? fallbackProfile(currentUid) : null;
@@ -832,7 +836,14 @@ import {
     }
   
     private composeAttachmentView(attachment: Attachment): TaskAttachmentView {
-      const profile = attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
+      // 保存されたauthorUsernameとauthorPhotoUrlを優先的に使用（メンバー削除後も保持）
+      const savedAuthorUsername = attachment.authorUsername && attachment.authorUsername.trim().length > 0
+        ? attachment.authorUsername
+        : null;
+      const savedAuthorPhotoUrl = attachment.authorPhotoUrl ?? null;
+      
+      // 保存された情報がない場合のみ、プロファイルから取得を試みる
+      const profile = !savedAuthorUsername && attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
       const isCurrentUser = this.currentUid !== null && attachment.uploadedBy === this.currentUid;
       const fallback = isCurrentUser ? this.currentUserProfile : undefined;
       const uploaderLabel = profile?.username ?? fallback?.username ?? attachment.uploadedBy ?? '不明なユーザー';

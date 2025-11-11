@@ -234,6 +234,28 @@
             <option [value]="168">7日間</option>
           </select>
         </div>
+        <div class="form-row">
+          <label for="inviteMaxUses">最大使用回数</label>
+          <div class="max-uses-input-group">
+            <input 
+              id="inviteMaxUses" 
+              type="number" 
+              [(ngModel)]="inviteForm.maxUses" 
+              name="maxUses"
+              min="1"
+              placeholder="無制限"
+            >
+            <button 
+              type="button" 
+              class="btn btn-secondary btn-small"
+              (click)="inviteForm.maxUses = null"
+              [class.active]="inviteForm.maxUses === null"
+            >
+              無制限
+            </button>
+          </div>
+          <p class="form-hint">空欄または「無制限」を選択すると何回でも使用可能です</p>
+        </div>
         <button type="submit" class="btn btn-primary" [disabled]="inviteLoading">
           {{ inviteLoading ? '発行中...' : '招待リンクを発行' }}
         </button>
@@ -285,6 +307,7 @@
               <th>権限</th>
               <th>期限</th>
               <th>状態</th>
+              <th>使用回数</th>
               <th>URL</th>
               <th></th>
             </tr>
@@ -294,6 +317,14 @@
               <td>{{ translateRole(invite.role) }}</td>
               <td>{{ invite.expiresAt | date:'yyyy/MM/dd HH:mm' }}</td>
               <td>{{ translateInviteStatus(invite.status) }}</td>
+              <td>
+                <span *ngIf="invite.maxUses === null || invite.maxUses === undefined">
+                  無制限
+                </span>
+                <span *ngIf="invite.maxUses !== null && invite.maxUses !== undefined">
+                  {{ invite.useCount || 0 }} / {{ invite.maxUses }}
+                </span>
+              </td>
               <td>
                 <div class="link-cell">
                   <input type="text" [value]="buildInviteUrl(invite)" readonly>

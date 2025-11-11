@@ -88,6 +88,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   inviteForm = {
     role: 'member' as Role,
     expiresInHours: 24,
+    maxUses: null as number | null,  // nullで無制限
   };
   inviteLinks: ProjectInvite[] = [];
   inviteLoading = false;
@@ -691,7 +692,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       return;
     }
     this.inviteProject = project;
-    this.inviteForm = { role: 'member', expiresInHours: 24 };
+    this.inviteForm = { role: 'member', expiresInHours: 24, maxUses: null };
     this.generatedUrl = '';
     this.inviteMessage = '';
     this.inviteError = '';
@@ -708,7 +709,15 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.inviteMessage = '';
     this.inviteError = '';
     try {
-      const { invite, url } = await this.inviteService.createInvite(this.inviteProject.id, this.inviteForm);
+      // maxUsesの値を正規化（空文字列や0以下の値はnullに変換）
+      const maxUses = this.inviteForm.maxUses && this.inviteForm.maxUses > 0 
+        ? this.inviteForm.maxUses 
+        : null;
+      
+      const { invite, url } = await this.inviteService.createInvite(this.inviteProject.id, {
+        ...this.inviteForm,
+        maxUses,
+      });
       this.generatedUrl = url;
       this.inviteLinks = [invite, ...this.inviteLinks];
       this.inviteMessage = '招待リンクを発行しました。';

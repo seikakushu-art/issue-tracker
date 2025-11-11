@@ -20,6 +20,7 @@ import { ProjectsService } from './projects.service';
 interface InviteCreationOptions {
   role: Role;
   expiresInHours: number;
+  maxUses?: number | null;  // 最大使用回数（nullまたはundefinedで無制限、0以下も無制限として扱う）
 }
 
 interface InvitePreview {
@@ -55,6 +56,8 @@ export class ProjectInviteService {
       createdBy: data['createdBy'] as string,
       createdAt: this.normalizeDate(data['createdAt']) ?? null,
       expiresAt: this.normalizeDate(data['expiresAt']) ?? new Date(),
+      maxUses: data['maxUses'] !== undefined ? (data['maxUses'] as number | null) : null,
+      useCount: (data['useCount'] as number | undefined) ?? 0,
       usedBy: (data['usedBy'] as string | null | undefined) ?? null,
       usedAt: this.normalizeDate(data['usedAt']) ?? null,
       revokedBy: (data['revokedBy'] as string | null | undefined) ?? null,
@@ -82,6 +85,9 @@ export class ProjectInviteService {
     const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin']);
     const token = this.buildToken();
     const expiresAt = new Date(Date.now() + options.expiresInHours * 60 * 60 * 1000);
+    
+    // maxUsesが0以下またはnull/undefinedの場合は無制限（nullとして保存）
+    const maxUses = options.maxUses && options.maxUses > 0 ? options.maxUses : null;
 
     const inviteRef = doc(this.invitesCol, token);
     await setDoc(inviteRef, {
@@ -92,6 +98,8 @@ export class ProjectInviteService {
       createdBy: uid,
       createdAt: serverTimestamp(),
       expiresAt: Timestamp.fromDate(expiresAt),
+      maxUses,
+      useCount: 0,
     });
 
     const invite: ProjectInvite = {
@@ -103,6 +111,8 @@ export class ProjectInviteService {
       createdBy: uid,
       createdAt: new Date(),
       expiresAt,
+      maxUses,
+      useCount: 0,
     };
 
     const url = `${location.origin}/invite/${token}`;
@@ -205,6 +215,18 @@ export class ProjectInviteService {
         throw new Error('この招待リンクは使用できません');
       }
 
+      // 使用回数チェック
+      const currentUseCount = invite.useCount ?? 0;
+      const maxUses = invite.maxUses;
+      
+      // maxUsesがnullまたはundefinedの場合は無制限
+      if (maxUses !== null && maxUses !== undefined && maxUses > 0) {
+        if (currentUseCount >= maxUses) {
+          tx.update(inviteRef, { status: 'used' });
+          throw new Error('この招待リンクの使用回数上限に達しています');
+        }
+      }
+
       const projectRef = doc(this.db, 'projects', invite.projectId);
       const projectSnap = await tx.get(projectRef);
       if (!projectSnap.exists()) {
@@ -227,11 +249,24 @@ export class ProjectInviteService {
         roles,
       });
 
-      tx.update(inviteRef, {
-        status: 'used',
-        usedBy: uid,
-        usedAt: serverTimestamp(),
-      });
+      // 使用回数をインクリメント
+      const newUseCount = currentUseCount + 1;
+      
+      // 使用回数が上限に達した場合はstatusも更新
+      if (maxUses !== null && maxUses !== undefined && maxUses > 0 && newUseCount >= maxUses) {
+        tx.update(inviteRef, {
+          useCount: newUseCount,
+          usedBy: uid,
+          usedAt: serverTimestamp(),
+          status: 'used',
+        });
+      } else {
+        tx.update(inviteRef, {
+          useCount: newUseCount,
+          usedBy: uid,
+          usedAt: serverTimestamp(),
+        });
+      }
 
       return { projectId: invite.projectId, role: roles[uid] };
     });

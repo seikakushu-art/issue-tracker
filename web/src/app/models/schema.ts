@@ -95,8 +95,10 @@ export interface ProjectInvite {
   createdBy: string;
   createdAt?: Date | null;
   expiresAt: Date;
-  usedBy?: string | null;
-  usedAt?: Date | null;
+  maxUses?: number | null;  // 最大使用回数（nullまたはundefinedで無制限）
+  useCount?: number;  // 現在の使用回数
+  usedBy?: string | null;  // 最後に使用したユーザーID（後方互換性のため残す）
+  usedAt?: Date | null;  // 最後に使用された日時（後方互換性のため残す）
   revokedBy?: string | null;
   revokedAt?: Date | null;
 }

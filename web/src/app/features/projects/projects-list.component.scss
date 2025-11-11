@@ -844,6 +844,36 @@
   font-size: 14px;
 }
 
+.max-uses-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.max-uses-input-group input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+}
+
+.max-uses-input-group .btn-small {
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.max-uses-input-group .btn-small.active {
+  background: #667eea;
+  color: white;
+}
+
+.form-hint {
+  margin: 4px 0 0 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
 .generated-link {
   display: flex;
   gap: 12px;
