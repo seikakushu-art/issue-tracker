@@ -1706,9 +1706,37 @@
 .comment-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   color: #6b7280;
+}
+
+.comment-meta__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-delete-button {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #ef4444;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.comment-delete-button:hover:not(:disabled) {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.comment-delete-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .comment-author {

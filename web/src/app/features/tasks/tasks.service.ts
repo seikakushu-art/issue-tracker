@@ -845,6 +845,33 @@ export class TasksService {
     return this.hydrateComment(createdRef.id, data as Record<string, unknown>);
   }
 
+  /**
+   * コメントを削除する
+   * - 投稿者本人または管理者のみ実行可能
+   * - 削除されたコメントはメンション通知の対象外とするため、ドキュメントごと物理削除する
+   */
+  async deleteComment(projectId: string, issueId: string, taskId: string, commentId: string): Promise<void> {
+    const { role, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+
+    const commentRef = doc(
+      this.db,
+      `projects/${projectId}/issues/${issueId}/tasks/${taskId}/comments/${commentId}`
+    );
+    const snapshot = await getDoc(commentRef);
+    if (!snapshot.exists()) {
+      throw new Error('コメントが見つかりません');
+    }
+
+    const data = snapshot.data() as Record<string, unknown>;
+    const createdBy = typeof data['createdBy'] === 'string' ? data['createdBy'] : null;
+
+    if (role !== 'admin' && createdBy !== uid) {
+      throw new Error('このコメントを削除する権限がありません');
+    }
+
+    await deleteDoc(commentRef);
+  }
+
    /**
    * タスクに紐づく添付ファイル一覧を取得する
    */

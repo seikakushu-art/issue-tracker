@@ -142,6 +142,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
     mentions: [] as string[],
   };
   commentLimitReached = false;
+  commentDeletingId: string | null = null; // コメント削除中のIDを保持して二重操作を防ぐ
 
   /** ステータス変更メニューで使用する選択肢 */
   readonly taskStatusMenuOptions: { value: TaskStatus; label: string }[] = [
@@ -294,6 +295,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
   canPostComment(): boolean {
     return this.currentRole === 'admin' || this.currentRole === 'member';
   }
+
+  canDeleteComment(comment: TaskCommentView): boolean {
+    if (!this.currentUid) {
+      return false;
+    }
+    if (this.isAdmin()) {
+      return true;
+    }
+    return this.currentRole === 'member' && comment.createdBy === this.currentUid;
+  }
+
 
   canUploadAttachment(task: Task | null): boolean {
     return this.canEditTask(task);
@@ -1046,6 +1058,29 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.commentSubmitting = false;
     }
   }
+
+  async deleteComment(comment: TaskCommentView): Promise<void> {
+    if (!this.selectedTaskId || !this.projectId || !this.issueId) {
+      return;
+    }
+    if (!this.canDeleteComment(comment) || this.commentDeletingId === comment.id) {
+      return;
+    }
+
+    this.commentDeletingId = comment.id;
+    this.commentError = '';
+    try {
+      await this.tasksService.deleteComment(this.projectId, this.issueId, this.selectedTaskId, comment.id);
+      this.comments = this.comments.filter(item => item.id !== comment.id);
+      this.updateCommentLimitState();
+    } catch (error) {
+      console.error('コメントの削除に失敗しました:', error);
+      this.commentError = error instanceof Error ? error.message : 'コメントの削除に失敗しました。';
+    } finally {
+      this.commentDeletingId = null;
+    }
+  }
+
 
   formatFileSize(bytes: number | null | undefined): string {
     if (typeof bytes !== 'number' || Number.isNaN(bytes) || bytes <= 0) {

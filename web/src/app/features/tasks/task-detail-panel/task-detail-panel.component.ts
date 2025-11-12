@@ -106,6 +106,7 @@ import {
     commentSubmitting = false;
     commentError = '';
     commentLimitReached = false;
+    commentDeletingId: string | null = null; // コメント削除中のIDを保持し、重複操作を抑止する
     commentForm = {
       text: '',
       mentions: [] as string[],
@@ -344,6 +345,16 @@ import {
         !this.commentSubmitting &&
         !this.commentLimitReached
       );
+    }
+
+    canDeleteComment(comment: TaskCommentView): boolean {
+      if (!this.currentUid) {
+        return false;
+      }
+      if (this.isAdmin()) {
+        return true;
+      }
+      return this.currentRole === 'member' && comment.createdBy === this.currentUid;
     }
   
     isMentionSelected(uid: string): boolean {
@@ -670,6 +681,29 @@ import {
         this.commentError = error instanceof Error ? error.message : 'コメントの投稿に失敗しました。';
       } finally {
         this.commentSubmitting = false;
+        this.cdr.markForCheck();
+      }
+    }
+    async deleteComment(comment: TaskCommentView): Promise<void> {
+      if (!this.task || !this.projectId || !this.issueId || !this.task.id) {
+        return;
+      }
+      if (!this.canDeleteComment(comment) || this.commentDeletingId === comment.id) {
+        return;
+      }
+
+      this.commentDeletingId = comment.id;
+      this.commentError = '';
+      try {
+        await this.tasksService.deleteComment(this.projectId, this.issueId, this.task.id, comment.id);
+        this.comments = this.comments.filter(item => item.id !== comment.id);
+        this.updateCommentLimitState();
+        await this.refreshTask();
+      } catch (error) {
+        console.error('コメントの削除に失敗しました:', error);
+        this.commentError = error instanceof Error ? error.message : 'コメントの削除に失敗しました。';
+      } finally {
+        this.commentDeletingId = null;
         this.cdr.markForCheck();
       }
     }
