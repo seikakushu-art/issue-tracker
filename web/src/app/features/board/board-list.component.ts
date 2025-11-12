@@ -21,9 +21,17 @@ export class BoardListComponent implements OnInit {
   private readonly boardService = inject(BoardService);
   private readonly projectsService = inject(ProjectsService);
 
-  readonly posts = signal<BoardPostView[]>([]);
+  readonly allPosts = signal<BoardPostView[]>([]); // 全投稿（ページング用）
+  readonly posts = signal<BoardPostView[]>([]); // 現在のページの投稿
   readonly loadingPosts = signal(false);
   readonly postsError = signal<string | null>(null);
+  readonly currentPage = signal<number>(1);
+  readonly pageSize = signal<number>(20);
+  readonly totalPages = computed(() => {
+    const total = this.allPosts().length;
+    const size = this.pageSize();
+    return total > 0 ? Math.ceil(total / size) : 1;
+  });
 
   readonly submitting = signal(false);
   readonly formError = signal<string | null>(null);
@@ -103,13 +111,55 @@ export class BoardListComponent implements OnInit {
         ...post,
         projectNames: post.projectIds.map((projectId) => this.getProjectDisplayName(projectId, allProjects)),
       }));
-      this.posts.set(enriched);
+      this.allPosts.set(enriched);
+      this.updateCurrentPagePosts();
     } catch (error) {
       console.error('Failed to load bulletin posts', error);
       this.postsError.set('掲示板の投稿を取得できませんでした。時間をおいて再度お試しください。');
+      this.allPosts.set([]);
       this.posts.set([]);
     } finally {
       this.loadingPosts.set(false);
+    }
+  }
+
+  private updateCurrentPagePosts(): void {
+    const all = this.allPosts();
+    const page = this.currentPage();
+    const size = this.pageSize();
+    const startIndex = (page - 1) * size;
+    const endIndex = startIndex + size;
+    this.posts.set(all.slice(startIndex, endIndex));
+  }
+
+  goToPage(page: number): void {
+    const total = this.totalPages();
+    if (page < 1 || page > total) {
+      return;
+    }
+    this.currentPage.set(page);
+    this.updateCurrentPagePosts();
+    // 「最新の投稿」セクションにスクロール
+    setTimeout(() => {
+      const element = document.getElementById('board-posts-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 0);
+  }
+
+  nextPage(): void {
+    const current = this.currentPage();
+    const total = this.totalPages();
+    if (current < total) {
+      this.goToPage(current + 1);
+    }
+  }
+
+  previousPage(): void {
+    const current = this.currentPage();
+    if (current > 1) {
+      this.goToPage(current - 1);
     }
   }
 
@@ -194,6 +244,7 @@ export class BoardListComponent implements OnInit {
       });
       this.successMessage.set('掲示板に投稿しました');
       this.postForm = { title: '', content: '', projectIds: [] };
+      this.currentPage.set(1); // 新規投稿後は1ページ目に戻る
       await this.loadPosts();
     } catch (error) {
       console.error('Failed to create bulletin post', error);
@@ -258,7 +309,12 @@ export class BoardListComponent implements OnInit {
 
     try {
       await this.boardService.deletePost(postId);
+      const currentPageBeforeDelete = this.currentPage();
       await this.loadPosts();
+      // 削除後に現在のページが空になった場合は前のページに移動
+      if (this.posts().length === 0 && currentPageBeforeDelete > 1) {
+        this.goToPage(currentPageBeforeDelete - 1);
+      }
       this.successMessage.set('投稿を削除しました');
     } catch (error) {
       console.error('Failed to delete bulletin post', error);

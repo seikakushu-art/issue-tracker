@@ -75,7 +75,7 @@
       </ng-template>
     </section>
   
-    <section class="board__posts" aria-labelledby="board-posts-title">
+    <section class="board__posts" id="board-posts-section" aria-labelledby="board-posts-title">
       <div class="board__posts-header">
         <h2 id="board-posts-title">最新の投稿</h2>
       </div>
@@ -90,6 +90,31 @@
         閲覧可能な投稿はまだありません。
       </p>
   
+      <div class="board__pagination" *ngIf="!loadingPosts() && !postsError() && totalPages() > 1">
+        <button
+          type="button"
+          class="pagination-button"
+          (click)="previousPage()"
+          [disabled]="currentPage() === 1"
+          aria-label="前のページ"
+        >
+          前へ
+        </button>
+        <span class="pagination-info">
+          {{ currentPage() }} / {{ totalPages() }} ページ
+          (全 {{ allPosts().length }} 件)
+        </span>
+        <button
+          type="button"
+          class="pagination-button"
+          (click)="nextPage()"
+          [disabled]="currentPage() === totalPages()"
+          aria-label="次のページ"
+        >
+          次へ
+        </button>
+      </div>
+
       <ul class="board__posts-list" *ngIf="!loadingPosts() && !postsError() && posts().length > 0">
         <li class="board-post" *ngFor="let post of posts(); trackBy: trackByPostId" [attr.id]="'post-' + post.id">
           <header class="board-post__header">
@@ -157,5 +182,30 @@
           </div>
         </li>
       </ul>
+
+      <div class="board__pagination board__pagination--bottom" *ngIf="!loadingPosts() && !postsError() && totalPages() > 1">
+        <button
+          type="button"
+          class="pagination-button"
+          (click)="previousPage()"
+          [disabled]="currentPage() === 1"
+          aria-label="前のページ"
+        >
+          前へ
+        </button>
+        <span class="pagination-info">
+          {{ currentPage() }} / {{ totalPages() }} ページ
+          (全 {{ allPosts().length }} 件)
+        </span>
+        <button
+          type="button"
+          class="pagination-button"
+          (click)="nextPage()"
+          [disabled]="currentPage() === totalPages()"
+          aria-label="次のページ"
+        >
+          次へ
+        </button>
+      </div>
     </section>
   </section>
