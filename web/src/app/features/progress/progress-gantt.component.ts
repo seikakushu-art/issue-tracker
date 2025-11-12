@@ -553,8 +553,13 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   private buildTimeline(allDates: Date[]): void {
     const today = this.toTokyoDate(new Date());
-    const baseStart = this.startOfWeek(this.addYears(today, -5));
-    const baseEnd = this.endOfWeek(this.addYears(today, 5));
+    // 今年の1月1日と12月31日を基準にする（東京時間で計算）
+    const year = today.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const yearEnd = new Date(Date.UTC(year, 11, 31));
+    const baseStart = this.startOfWeek(yearStart);
+    const baseEnd = this.endOfWeek(yearEnd);
+    
     if (allDates.length === 0) {
       this.timelineStart = baseStart;
       this.timelineEnd = baseEnd;
@@ -564,6 +569,7 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       const max = sorted[sorted.length - 1];
       const computedStart = this.startOfWeek(min);
       const computedEnd = this.endOfWeek(max);
+      // タスクの日付が今年の範囲外の場合は拡張する
       this.timelineStart = computedStart.getTime() < baseStart.getTime() ? computedStart : baseStart;
       this.timelineEnd = computedEnd.getTime() > baseEnd.getTime() ? computedEnd : baseEnd;
     }
