@@ -794,6 +794,7 @@ export class NotificationService {
     const taskDetails = await this.fetchTaskSnapshots(taskRefs);
     const projectMap = await this.fetchProjects(projectIds);
     const issueMap = await this.fetchIssueNames(issueRefs);
+    const issueArchivedMap = await this.fetchIssueArchivedStatus(issueRefs);
 
     for (const entry of commentEntries) {
       const project = projectMap.get(entry.projectId);
@@ -802,6 +803,28 @@ export class NotificationService {
     }
 
     return commentEntries
+      .filter((entry) => {
+        // プロジェクトがアーカイブされている場合は除外
+        const project = projectMap.get(entry.projectId);
+        if (!project || project.archived) {
+          return false;
+        }
+        
+        // 課題がアーカイブされている場合は除外
+        const issueArchived = issueArchivedMap.get(`${entry.projectId}/${entry.issueId}`);
+        if (issueArchived === true) {
+          return false;
+        }
+        
+        // タスクがアーカイブされている場合は除外
+        const taskKey = `${entry.projectId}/${entry.issueId}/${entry.taskId}`;
+        const task = taskDetails.get(taskKey);
+        if (task && task.archived === true) {
+          return false;
+        }
+        
+        return true;
+      })
       .map((entry) => {
         const taskKey = `${entry.projectId}/${entry.issueId}/${entry.taskId}`;
         const task = taskDetails.get(taskKey);
@@ -964,6 +987,44 @@ export class NotificationService {
         continue;
       }
       map.set(`${result.projectId}/${result.issueId}`, result.name ?? null);
+    }
+    return map;
+  }
+
+  /**
+   * 課題のアーカイブ状態をまとめて取得する
+   */
+  private async fetchIssueArchivedStatus(
+    issueRefs: Map<string, { projectId: string; issueId: string }>,
+  ): Promise<Map<string, boolean>> {
+    const entries = Array.from(issueRefs.values());
+    if (entries.length === 0) {
+      return new Map();
+    }
+
+    const results = await Promise.all(
+      entries.map(async ({ projectId, issueId }) => {
+        try {
+          const snapshot = await getDoc(doc(this.db, `projects/${projectId}/issues/${issueId}`));
+          if (!snapshot.exists()) {
+            return null;
+          }
+          const data = snapshot.data() as DocumentData;
+          const archived = (data['archived'] as boolean) ?? false;
+          return { projectId, issueId, archived };
+        } catch (error) {
+          console.error('Failed to fetch issue archived status for notification:', { projectId, issueId }, error);
+          return null;
+        }
+      }),
+    );
+
+    const map = new Map<string, boolean>();
+    for (const result of results) {
+      if (!result) {
+        continue;
+      }
+      map.set(`${result.projectId}/${result.issueId}`, result.archived);
     }
     return map;
   }

@@ -18,6 +18,7 @@ import { Storage, deleteObject, ref } from '@angular/fire/storage';
 import { Project, Role } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
+import { normalizeDate } from '../../shared/date-utils';
 //プロジェクトを作成する
 @Injectable({ providedIn: 'root' })
 export class ProjectsService {
@@ -27,32 +28,7 @@ export class ProjectsService {
   private authReady: Promise<void> | null = null;
 
   /**
-   * Firestoreから受け取った日付相当の値をDate型へ統一するユーティリティ
-   * Timestamp/Date/stringのいずれが来ても安全にDateへ変換し、解釈できない値はnullを返す
-   */
-  private normalizeDate(value: unknown): Date | null {
-    if (!value) {
-      return null;
-    }
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime()) ? null : value;
-    }
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'toDate' in value &&
-      typeof (value as { toDate: () => Date }).toDate === 'function'
-    ) {
-      const converted = (value as { toDate: () => Date }).toDate();
-      return Number.isNaN(converted.getTime()) ? null : converted;
-    }
-
-    const parsed = new Date(value as string);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  /**
-   * Firestoreから取得した生のプロジェクトデータを画面で扱いやすい形に整形する
+   * Firestoreから受け取った生のプロジェクトデータを画面で扱いやすい形に整形する
    * - ドキュメントIDをidへ格納
    * - Timestampなどの日時をDate型へ変換
    * - undefinedをnullへ揃える
@@ -66,9 +42,9 @@ export class ProjectsService {
       id,
       memberIds,
       roles,
-      startDate: this.normalizeDate(dataRecord['startDate']),
-      endDate: this.normalizeDate(dataRecord['endDate']),
-      createdAt: this.normalizeDate(dataRecord['createdAt']),
+      startDate: normalizeDate(dataRecord['startDate']),
+      endDate: normalizeDate(dataRecord['endDate']),
+      createdAt: normalizeDate(dataRecord['createdAt']),
       progress: (dataRecord['progress'] as number) ?? 0,
       archived: (dataRecord['archived'] as boolean) ?? false,
       pinnedBy: (dataRecord['pinnedBy'] as string[] | undefined) ?? [],
@@ -79,7 +55,7 @@ export class ProjectsService {
     const issuesSnap = await getDocs(collection(this.db, `projects/${projectId}/issues`));
     for (const issueDoc of issuesSnap.docs) {
       const record = issueDoc.data() as Record<string, unknown>;
-      const issueStart = this.normalizeDate(record['startDate']);
+      const issueStart = normalizeDate(record['startDate']);
       if (issueStart && issueStart < projectStart) {
         throw new Error('プロジェクトの開始日は配下の課題・タスクの開始日をカバーするよう設定してください');
       }
@@ -94,7 +70,7 @@ export class ProjectsService {
 
     for (const taskDoc of tasksSnap.docs) {
       const record = taskDoc.data() as Record<string, unknown>;
-      const taskStart = this.normalizeDate(record['startDate']);
+      const taskStart = normalizeDate(record['startDate']);
       if (taskStart && taskStart < projectStart) {
         throw new Error('プロジェクトの開始日は配下の課題・タスクの開始日をカバーするよう設定してください');
       }
@@ -105,7 +81,7 @@ export class ProjectsService {
     const issuesSnap = await getDocs(collection(this.db, `projects/${projectId}/issues`));
     for (const issueDoc of issuesSnap.docs) {
       const record = issueDoc.data() as Record<string, unknown>;
-      const issueEnd = this.normalizeDate(record['endDate']);
+      const issueEnd = normalizeDate(record['endDate']);
       if (issueEnd && issueEnd > projectEnd) {
         throw new Error('プロジェクトの終了日は配下の課題・タスクの終了日をカバーするよう設定してください');
       }
@@ -120,7 +96,7 @@ export class ProjectsService {
 
     for (const taskDoc of tasksSnap.docs) {
       const record = taskDoc.data() as Record<string, unknown>;
-      const taskEnd = this.normalizeDate(record['endDate']);
+      const taskEnd = normalizeDate(record['endDate']);
       if (taskEnd && taskEnd > projectEnd) {
         throw new Error('プロジェクトの終了日は配下の課題・タスクの終了日をカバーするよう設定してください');
       }
@@ -368,7 +344,51 @@ export class ProjectsService {
 
   async archive(id: string, archived: boolean) {
     await this.ensureProjectRole(id, ['admin']);
+    
+    // プロジェクトをアーカイブする際は、配下の課題とタスクも自動的にアーカイブする
+    if (archived) {
+      await this.archiveProjectDescendants(id, true);
+    } else {
+      // プロジェクトを復元する際は、配下の課題とタスクも復元する
+      await this.archiveProjectDescendants(id, false);
+    }
+    
     return updateDoc(doc(this.db, 'projects', id), { archived });
+  }
+
+  /**
+   * プロジェクト配下の課題とタスクを一括でアーカイブ/復元する
+   * @param projectId プロジェクトID
+   * @param archived trueでアーカイブ、falseで復元
+   */
+  private async archiveProjectDescendants(projectId: string, archived: boolean): Promise<void> {
+    // プロジェクト配下の課題を取得
+    const issuesRef = collection(this.db, `projects/${projectId}/issues`);
+    const issuesSnap = await getDocs(issuesRef);
+    
+    const updatePromises: Promise<void>[] = [];
+    
+    for (const issueDoc of issuesSnap.docs) {
+      const issueId = issueDoc.id;
+      
+      // 課題をアーカイブ/復元
+      const issueRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
+      updatePromises.push(updateDoc(issueRef, { archived }));
+      
+      // 課題配下のタスクを取得
+      const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`);
+      const tasksSnap = await getDocs(tasksRef);
+      
+      // 各タスクをアーカイブ/復元
+      for (const taskDoc of tasksSnap.docs) {
+        const taskId = taskDoc.id;
+        const taskRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
+        updatePromises.push(updateDoc(taskRef, { archived }));
+      }
+    }
+    
+    // すべての更新を並列実行
+    await Promise.all(updatePromises);
   }
   async removeProjectMember(projectId: string, memberId: string): Promise<void> {
     const { project } = await this.ensureProjectRole(projectId, ['admin']);
@@ -455,19 +475,7 @@ export class ProjectsService {
     }
 
     // --- FirestoreのTimestampが渡される場合に備えてDateへ正規化 ---
-    const normalizeDate = (value: unknown): Date | null => {
-      if (!value) {
-        return null;
-      }
-      if (value instanceof Date) {
-        return value;
-      }
-      if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
-        return (value as { toDate: () => Date }).toDate();
-      }
-      const parsed = new Date(value as string);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    };
+    // normalizeDate関数を使用（共通ユーティリティ）
 
     // --- 更新後の開始・終了日を算出（未指定の場合は既存値を利用） ---
     const currentStart = normalizeDate(current.startDate ?? null);
@@ -497,7 +505,14 @@ export class ProjectsService {
    * @returns アクティブなプロジェクト数（アーカイブされていないもの）
    */
   private async countActiveProjects(): Promise<number> {
-    const projects = await this.listMyProjects();
+    // 認証済みコンテキストから呼ばれるため、認証を確認
+    const uid = await this.getSignedInUid();
+    const q = query(
+      collection(this.db, 'projects'),
+      where('memberIds', 'array-contains', uid),
+    );
+    const snap = await getDocs(q);
+    const projects = snap.docs.map((d) => this.hydrateProject(d.id, d.data() as Project));
     return projects.filter(project => !project.archived).length;
   }
 
@@ -508,7 +523,14 @@ export class ProjectsService {
    * @param excludeProjectId 除外するプロジェクトID（更新時に使用）
    */
   private async checkNameUniqueness(name: string, excludeProjectId?: string): Promise<void> {
-    const projects = await this.listMyProjects();
+    // 認証済みコンテキストから呼ばれるため、認証を確認
+    const uid = await this.getSignedInUid();
+    const q = query(
+      collection(this.db, 'projects'),
+      where('memberIds', 'array-contains', uid),
+    );
+    const snap = await getDocs(q);
+    const projects = snap.docs.map((d) => this.hydrateProject(d.id, d.data() as Project));
     const duplicate = projects.find(
       project => project.name === name && 
                  project.id !== excludeProjectId && 

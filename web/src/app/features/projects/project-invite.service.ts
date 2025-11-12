@@ -16,6 +16,7 @@ import {
 } from '@angular/fire/firestore';
 import { ProjectInvite, Role, InviteStatus, Project } from '../../models/schema';
 import { ProjectsService } from './projects.service';
+import { normalizeDate } from '../../shared/date-utils';
 
 interface InviteCreationOptions {
   role: Role;
@@ -35,17 +36,6 @@ export class ProjectInviteService {
 
   private invitesCol = collection(this.db, 'projectInvites');
 
-  private normalizeDate(value: unknown): Date | null {
-    if (!value) return null;
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-    if (value instanceof Timestamp) return value.toDate();
-    if (typeof value === 'string') {
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-    return null;
-  }
-
   private hydrateInvite(id: string, data: Record<string, unknown>): ProjectInvite {
     return {
       id,
@@ -54,14 +44,14 @@ export class ProjectInviteService {
       role: data['role'] as Role,
       status: (data['status'] as InviteStatus) ?? 'active',
       createdBy: data['createdBy'] as string,
-      createdAt: this.normalizeDate(data['createdAt']) ?? null,
-      expiresAt: this.normalizeDate(data['expiresAt']) ?? new Date(),
+      createdAt: normalizeDate(data['createdAt']) ?? null,
+      expiresAt: normalizeDate(data['expiresAt']) ?? new Date(),
       maxUses: data['maxUses'] !== undefined ? (data['maxUses'] as number | null) : null,
       useCount: (data['useCount'] as number | undefined) ?? 0,
       usedBy: (data['usedBy'] as string | null | undefined) ?? null,
-      usedAt: this.normalizeDate(data['usedAt']) ?? null,
+      usedAt: normalizeDate(data['usedAt']) ?? null,
       revokedBy: (data['revokedBy'] as string | null | undefined) ?? null,
-      revokedAt: this.normalizeDate(data['revokedAt']) ?? null,
+      revokedAt: normalizeDate(data['revokedAt']) ?? null,
     };
   }
 
@@ -78,6 +68,10 @@ export class ProjectInviteService {
   }
 
   private isExpired(invite: ProjectInvite): boolean {
+    // expiresAtがnullまたは未設定の場合は期限切れとみなさない（無期限として扱う）
+    if (!invite.expiresAt) {
+      return false;
+    }
     return invite.expiresAt.getTime() <= Date.now();
   }
 
@@ -136,7 +130,6 @@ export class ProjectInviteService {
       if (invite.status === 'active' && this.isExpired(invite)) {
         await updateDoc(doc(this.invitesCol, docSnap.id), {
           status: 'expired',
-          revokedAt: invite.revokedAt ?? serverTimestamp(),
         });
         invite.status = 'expired';
       }
@@ -176,7 +169,6 @@ export class ProjectInviteService {
     if (invite.status === 'active' && this.isExpired(invite)) {
       await updateDoc(inviteRef, {
         status: 'expired',
-        revokedAt: serverTimestamp(),
       });
       invite = { ...invite, status: 'expired' };
     }
@@ -222,7 +214,7 @@ export class ProjectInviteService {
       // maxUsesがnullまたはundefinedの場合は無制限
       if (maxUses !== null && maxUses !== undefined && maxUses > 0) {
         if (currentUseCount >= maxUses) {
-          tx.update(inviteRef, { status: 'used' });
+          // エラーを先に投げる（トランザクションは自動的にロールバックされる）
           throw new Error('この招待リンクの使用回数上限に達しています');
         }
       }

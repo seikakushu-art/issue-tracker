@@ -22,6 +22,7 @@ import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
 import { ProjectsService } from '../projects/projects.service';
 import { TagsService } from '../tags/tags.service';
+import { normalizeDate } from '../../shared/date-utils';
 
 /**
  * 課題（Issue）管理サービス
@@ -37,37 +38,6 @@ export class IssuesService {
   private tagsService = inject(TagsService);
 
   /**
-   * Firestoreから取得した日時フィールドをDate型へ正規化するユーティリティ
-   * @param value Firestore Timestamp / string / Date など
-   */
-  private normalizeDate(value: unknown): Date | null {
-    if (!value) {
-      return null;
-    }
-
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime()) ? null : value;
-    }
-
-    if (typeof value === 'string') {
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'toDate' in value &&
-      typeof (value as { toDate: () => Date }).toDate === 'function'
-    ) {
-      const converted = (value as { toDate: () => Date }).toDate();
-      return Number.isNaN(converted.getTime()) ? null : converted;
-    }
-
-    return null;
-  }
-
-  /**
    * Firestoreから取得した課題ドキュメントをUIで扱いやすい形に整形する
    * @param id ドキュメントID
    * @param data Firestoreから取得した生データ
@@ -77,9 +47,9 @@ export class IssuesService {
     return {
       ...data,
       id,
-      startDate: this.normalizeDate(dataRecord['startDate']) ?? null,
-      endDate: this.normalizeDate(dataRecord['endDate']) ?? null,
-      createdAt: this.normalizeDate(dataRecord['createdAt']) ?? null,
+      startDate: normalizeDate(dataRecord['startDate']) ?? null,
+      endDate: normalizeDate(dataRecord['endDate']) ?? null,
+      createdAt: normalizeDate(dataRecord['createdAt']) ?? null,
       progress: dataRecord['progress'] as number ?? 0,
       archived: (dataRecord['archived'] as boolean) ?? false,
       representativeTaskId: (dataRecord['representativeTaskId'] as string | null | undefined) ?? null,
@@ -106,8 +76,8 @@ export class IssuesService {
 
     const project = projectSnap.data() as Project;
     const projectRecord = project as unknown as Record<string, unknown>;
-    const projectStart = this.normalizeDate(projectRecord['startDate']);
-    const projectEnd = this.normalizeDate(projectRecord['endDate']);
+    const projectStart = normalizeDate(projectRecord['startDate']);
+    const projectEnd = normalizeDate(projectRecord['endDate']);
 
     if (projectStart && startDate && startDate < projectStart) {
       throw new Error('課題の開始日はプロジェクト期間内に設定してください');
@@ -126,7 +96,7 @@ export class IssuesService {
     const tasksSnap = await getDocs(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
     for (const docSnap of tasksSnap.docs) {
       const record = docSnap.data() as Record<string, unknown>;
-      const taskEnd = this.normalizeDate(record['endDate']);
+      const taskEnd = normalizeDate(record['endDate']);
       if (taskEnd && taskEnd > issueEnd) {
         throw new Error('課題の終了日は配下のタスクの終了日をカバーするよう設定してください');
       }
@@ -342,13 +312,13 @@ export class IssuesService {
 
     const issue = await this.getIssue(projectId, issueId);
     if (issue) {
-      const currentStart = this.normalizeDate(issue.startDate ?? null);
-      const currentEnd = this.normalizeDate(issue.endDate ?? null);
+      const currentStart = normalizeDate(issue.startDate ?? null);
+      const currentEnd = normalizeDate(issue.endDate ?? null);
       const nextStart = updates.startDate !== undefined
-        ? this.normalizeDate(updates.startDate)
+        ? normalizeDate(updates.startDate)
         : currentStart;
       const nextEnd = updates.endDate !== undefined
-        ? this.normalizeDate(updates.endDate)
+        ? normalizeDate(updates.endDate)
         : currentEnd;
 
       if (nextStart && nextEnd && nextStart > nextEnd) {
@@ -539,14 +509,14 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       const rawIssue = issueSnap.data() as Issue;
       const rawIssueRecord = rawIssue as unknown as Record<string, unknown>;
 
-      const normalizedStart = this.normalizeDate(rawIssueRecord['startDate']);
-      const normalizedEnd = this.normalizeDate(rawIssueRecord['endDate']);
+      const normalizedStart = normalizeDate(rawIssueRecord['startDate']);
+      const normalizedEnd = normalizeDate(rawIssueRecord['endDate']);
 
       const overrideStart = overrides && Object.prototype.hasOwnProperty.call(overrides, 'startDate')
-        ? this.normalizeDate(overrides.startDate ?? null)
+        ? normalizeDate(overrides.startDate ?? null)
         : normalizedStart;
       const overrideEnd = overrides && Object.prototype.hasOwnProperty.call(overrides, 'endDate')
-        ? this.normalizeDate(overrides.endDate ?? null)
+        ? normalizeDate(overrides.endDate ?? null)
         : normalizedEnd;
 
       // 移動先プロジェクトの期間を取得
@@ -556,8 +526,8 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       }
       const targetProject = targetProjectSnap.data() as Project;
       const targetProjectRecord = targetProject as unknown as Record<string, unknown>;
-      const targetProjectStart = this.normalizeDate(targetProjectRecord['startDate']);
-      const targetProjectEnd = this.normalizeDate(targetProjectRecord['endDate']);
+      const targetProjectStart = normalizeDate(targetProjectRecord['startDate']);
+      const targetProjectEnd = normalizeDate(targetProjectRecord['endDate']);
 
       // 移動先プロジェクトのアクティブな課題数の上限チェック
       // 移動する課題がアーカイブ済みの場合は、アクティブな課題数の上限には影響しない
@@ -596,8 +566,8 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
         const sourceTasksSnap = await getDocs(collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks`));
         for (const docSnap of sourceTasksSnap.docs) {
           const record = docSnap.data() as Record<string, unknown>;
-          const taskStart = this.normalizeDate(record['startDate']);
-          const taskEnd = this.normalizeDate(record['endDate']);
+          const taskStart = normalizeDate(record['startDate']);
+          const taskEnd = normalizeDate(record['endDate']);
           
           // 開始日のチェック：課題の開始日がタスクの開始日より後になっている場合はエラー
           if (adjustedStart && taskStart && taskStart < adjustedStart) {

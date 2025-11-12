@@ -18,6 +18,7 @@ import {
   ProjectTemplateTask,
 } from '../../models/schema';
 import { ProjectsService } from './projects.service';
+import { normalizeDate } from '../../shared/date-utils';
 
 /**
  * プロジェクトテンプレートを管理するサービス
@@ -28,28 +29,6 @@ import { ProjectsService } from './projects.service';
 export class ProjectTemplatesService {
   private db = inject(Firestore);
   private projectsService = inject(ProjectsService);
-
-  /** Firestoreから取得した値をDateへ正規化するユーティリティ */
-  private normalizeDate(value: unknown): Date | null {
-    if (!value) {
-      return null;
-    }
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime()) ? null : value;
-    }
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'toDate' in value &&
-      typeof (value as { toDate: () => Date }).toDate === 'function'
-    ) {
-      const converted = (value as { toDate: () => Date }).toDate();
-      return Number.isNaN(converted.getTime()) ? null : converted;
-    }
-
-    const parsed = new Date(value as string);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
 
   /** FirestoreドキュメントをUIで扱いやすいProjectTemplateへ整形 */
   private hydrateTemplate(id: string, data: ProjectTemplate): ProjectTemplate {
@@ -62,7 +41,7 @@ export class ProjectTemplatesService {
       goal: (record['goal'] as string | null | undefined) ?? null,
       sourceProjectId: (record['sourceProjectId'] as string | null | undefined) ?? null,
       createdBy: (record['createdBy'] as string) ?? '',
-      createdAt: this.normalizeDate(record['createdAt']),
+      createdAt: normalizeDate(record['createdAt']),
       issues: this.normalizeTemplateIssues(record['issues']),
     };
   }

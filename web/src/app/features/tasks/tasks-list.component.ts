@@ -229,6 +229,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         uidPromise,
       ]);
 
+      this.currentUid = uid;
       // プロジェクトメンバーIDとタスクの担当者IDを結合してプロファイルを読み込む
       // 課題移動後も担当者の情報を表示できるようにするため
       const projectMemberIds = project?.memberIds ?? [];
@@ -241,7 +242,6 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.issueDetails = issue;
       this.projectDetails = project;
       this.tasks = tasks;
-      this.currentUid = uid;
       this.currentRole = project?.roles?.[uid] ?? null;
       this.sanitizeAllTagSelections();
       this.filterTasks();
@@ -848,15 +848,25 @@ export class TasksListComponent implements OnInit, OnDestroy {
     const profile = attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
     const isCurrentUserAttachment = this.currentUid !== null && attachment.uploadedBy === this.currentUid;
     const fallbackProfile = isCurrentUserAttachment ? this.currentUserProfile : undefined;
+    const storedUsername = typeof attachment.authorUsername === 'string' && attachment.authorUsername.trim().length > 0
+      ? attachment.authorUsername.trim()
+      : null;
+    const storedPhotoUrl = typeof attachment.authorPhotoUrl === 'string' && attachment.authorPhotoUrl.trim().length > 0
+      ? attachment.authorPhotoUrl.trim()
+      : null;
     const uploaderLabel = profile?.username
       ?? fallbackProfile?.username
+      ?? storedUsername
       ?? (attachment.uploadedBy || '不明なユーザー');
     const uploaderPhotoUrl = profile?.photoURL
       ?? fallbackProfile?.photoURL
+      ?? storedPhotoUrl
       ?? null;
 
     return {
       ...attachment,
+      authorUsername: storedUsername ?? attachment.authorUsername ?? uploaderLabel,
+      authorPhotoUrl: storedPhotoUrl ?? attachment.authorPhotoUrl ?? uploaderPhotoUrl,
       uploaderLabel,
       uploaderPhotoUrl,
     };
@@ -894,6 +904,33 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.commentError = '';
     try {
       const comments = await this.tasksService.listComments(this.projectId, this.issueId, taskId);
+      
+      // コメントの作成者IDを収集
+      const commentCreatorIds = comments
+        .map(comment => comment.createdBy)
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+      
+      // 既存のプロジェクトメンバーIDとタスクの担当者IDを取得
+      const projectMemberIds = this.projectDetails?.memberIds ?? [];
+      const assigneeIds = this.selectedTask?.assigneeIds ?? [];
+      
+      // 添付ファイルのアップローダーIDも収集（添付ファイルが読み込まれている場合）
+      const attachmentUploaderIds = this.attachments
+        .map(attachment => attachment.uploadedBy)
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+      
+      // すべてのIDを結合してプロファイルを読み込む
+      const allMemberIds = Array.from(new Set([
+        ...projectMemberIds,
+        ...assigneeIds,
+        ...commentCreatorIds,
+        ...attachmentUploaderIds,
+      ]));
+      
+      // プロファイルを読み込む（既存のプロファイルを更新）
+      await this.loadProjectMembers(allMemberIds, this.currentUid);
+      
+      // プロファイルを読み込んだ後、ビューを構築
       this.comments = comments.map(comment => this.composeCommentView(comment));
     } catch (error) {
       console.error('コメントの読み込みに失敗しました:', error);
@@ -923,6 +960,33 @@ export class TasksListComponent implements OnInit, OnDestroy {
     try {
       this.attachmentsError = '';
       const attachments = await this.tasksService.listAttachments(this.projectId, this.issueId, taskId);
+      
+      // 添付ファイルのアップローダーIDを収集
+      const attachmentUploaderIds = attachments
+        .map(attachment => attachment.uploadedBy)
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+      
+      // 既存のプロジェクトメンバーIDとタスクの担当者IDを取得
+      const projectMemberIds = this.projectDetails?.memberIds ?? [];
+      const assigneeIds = this.selectedTask?.assigneeIds ?? [];
+      
+      // コメントの作成者IDも収集（コメントが読み込まれている場合）
+      const commentCreatorIds = this.comments
+        .map(comment => comment.createdBy)
+        .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+      
+      // すべてのIDを結合してプロファイルを読み込む
+      const allMemberIds = Array.from(new Set([
+        ...projectMemberIds,
+        ...assigneeIds,
+        ...commentCreatorIds,
+        ...attachmentUploaderIds,
+      ]));
+      
+      // プロファイルを読み込む（既存のプロファイルを更新）
+      await this.loadProjectMembers(allMemberIds, this.currentUid);
+      
+      // プロファイルを読み込んだ後、ビューを構築
       this.attachments = attachments
         .map(attachment => this.composeAttachmentView(attachment))
         .sort((a, b) => {
@@ -1042,6 +1106,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
             taskTitle: this.selectedTask.title,
             projectName: this.projectDetails?.name ?? null,
             issueName: this.issueDetails?.name ?? null,
+            uploaderUsername: this.currentUserProfile?.username ?? this.currentUid ?? null,
+            uploaderPhotoUrl: this.currentUserProfile?.photoURL ?? null,
           },
         );
         this.attachments = [

@@ -581,6 +581,8 @@ import {
             taskTitle: this.task.title,
             projectName: this.project?.name ?? null,
             issueName: this.issue?.name ?? null,
+            uploaderUsername: this.currentUserProfile?.username ?? this.currentUid ?? null,
+            uploaderPhotoUrl: this.currentUserProfile?.photoURL ?? null,
           });
         }
         this.attachmentUploadMessage = '添付ファイルを追加しました。';
@@ -839,8 +841,21 @@ import {
       const profile = attachment.uploadedBy ? this.projectMemberProfiles[attachment.uploadedBy] : undefined;
       const isCurrentUser = this.currentUid !== null && attachment.uploadedBy === this.currentUid;
       const fallback = isCurrentUser ? this.currentUserProfile : undefined;
-      const uploaderLabel = profile?.username ?? fallback?.username ?? attachment.uploadedBy ?? '不明なユーザー';
-      const uploaderPhotoUrl = profile?.photoURL ?? fallback?.photoURL ?? null;
+      const storedUsername = typeof attachment.authorUsername === 'string' && attachment.authorUsername.trim().length > 0
+      ? attachment.authorUsername.trim()
+      : null;
+    const storedPhotoUrl = typeof attachment.authorPhotoUrl === 'string' && attachment.authorPhotoUrl.trim().length > 0
+      ? attachment.authorPhotoUrl.trim()
+      : null;
+    const uploaderLabel = profile?.username
+      ?? fallback?.username
+      ?? storedUsername
+      ?? attachment.uploadedBy
+      ?? '不明なユーザー';
+    const uploaderPhotoUrl = profile?.photoURL
+      ?? fallback?.photoURL
+      ?? storedPhotoUrl
+      ?? null;
   
       return {
         ...attachment,

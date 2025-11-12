@@ -24,6 +24,7 @@ import { authState } from '@angular/fire/auth';
 import { ProgressService } from '../projects/progress.service';
 import { ProjectsService } from '../projects/projects.service';
 import { Storage, deleteObject, getDownloadURL, ref, uploadBytes } from '@angular/fire/storage';
+import { normalizeDate } from '../../shared/date-utils';
 
 /**
  * 課題カードに表示する代表タスク情報
@@ -54,32 +55,6 @@ export class TasksService {
   private readonly attachmentCountLimit = 20;
   private readonly attachmentTotalSizeLimit = 500 * 1024 * 1024; // 500MB
 
-  /**
-   * Firestore から取得した日時相当の値を Date 型へ正規化する
-   */
-  private normalizeDate(value: unknown): Date | null {
-    if (!value) {
-      return null;
-    }
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime()) ? null : value;
-    }
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'toDate' in value &&
-      typeof (value as { toDate: () => Date }).toDate === 'function'
-    ) {
-      const converted = (value as { toDate: () => Date }).toDate();
-      return Number.isNaN(converted.getTime()) ? null : converted;
-    }
-    if (typeof value === 'string') {
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-    return null;
-  }
-
   private hydrateAttachment(id: string, data: Record<string, unknown>): Attachment {
     const fileSizeRaw = data['fileSize'];
     const parsedSize = typeof fileSizeRaw === 'number'
@@ -94,7 +69,7 @@ export class TasksService {
       fileUrl: typeof data['fileUrl'] === 'string' ? data['fileUrl'] : '',
       fileSize: Number.isNaN(parsedSize) ? 0 : parsedSize,
       uploadedBy: typeof data['uploadedBy'] === 'string' ? data['uploadedBy'] : '',
-      uploadedAt: this.normalizeDate(data['uploadedAt']),
+      uploadedAt: normalizeDate(data['uploadedAt']),
     };
 
     if (typeof data['storagePath'] === 'string' && data['storagePath'].trim().length > 0) {
@@ -119,6 +94,15 @@ export class TasksService {
       attachment.taskTitle = data['taskTitle'];
     }
 
+    const authorUsernameRaw = data['authorUsername'] ?? data['uploaderUsername'] ?? data['authorName'];
+    if (typeof authorUsernameRaw === 'string' && authorUsernameRaw.trim().length > 0) {
+      attachment.authorUsername = authorUsernameRaw.trim();
+    }
+    const authorPhotoRaw = data['authorPhotoUrl'] ?? data['uploaderPhotoUrl'];
+    if (typeof authorPhotoRaw === 'string' && authorPhotoRaw.trim().length > 0) {
+      attachment.authorPhotoUrl = authorPhotoRaw.trim();
+    }
+
     return attachment;
   }
 
@@ -129,8 +113,8 @@ export class TasksService {
     taskStart: Date | null,
     taskEnd: Date | null,
   ): Promise<void> {
-    const projectStart = this.normalizeDate(project.startDate ?? null);
-    const projectEnd = this.normalizeDate(project.endDate ?? null);
+    const projectStart = normalizeDate(project.startDate ?? null);
+    const projectEnd = normalizeDate(project.endDate ?? null);
 
     // タスクの開始日がプロジェクトの開始日より前の場合
     if (projectStart && taskStart && taskStart < projectStart) {
@@ -149,8 +133,8 @@ export class TasksService {
     }
 
     const issueRecord = issueSnap.data() as Record<string, unknown>;
-    const issueStart = this.normalizeDate(issueRecord['startDate']);
-    const issueEnd = this.normalizeDate(issueRecord['endDate']);
+    const issueStart = normalizeDate(issueRecord['startDate']);
+    const issueEnd = normalizeDate(issueRecord['endDate']);
 
     // タスクの開始日が課題の開始日より前の場合
     if (issueStart && taskStart && taskStart < issueStart) {
@@ -309,8 +293,8 @@ export class TasksService {
       payload['importance'] = input.importance;
     }
 
-    const startDate = this.normalizeDate(payload['startDate'] ?? null);
-    const endDate = this.normalizeDate(payload['endDate'] ?? null);
+    const startDate = normalizeDate(payload['startDate'] ?? null);
+    const endDate = normalizeDate(payload['endDate'] ?? null);
     if (startDate && endDate && startDate > endDate) {
       throw new Error('開始日は終了日以前である必要があります');
     }
@@ -392,10 +376,10 @@ export class TasksService {
       normalized.themeColor = null;
     }
 
-    normalized.startDate = this.normalizeDate(record['startDate'] ?? null);
-    normalized.endDate = this.normalizeDate(record['endDate'] ?? null);
+    normalized.startDate = normalizeDate(record['startDate'] ?? null);
+    normalized.endDate = normalizeDate(record['endDate'] ?? null);
     if (record['createdAt']) {
-      normalized.createdAt = this.normalizeDate(record['createdAt']);
+      normalized.createdAt = normalizeDate(record['createdAt']);
     }
 
     return normalized;
@@ -580,61 +564,57 @@ export class TasksService {
 
     // バリデーション: 開始日は終了日以前
     const task = await this.getTask(projectId, issueId, taskId);
-    if (task) {
-      if (role === 'member') {
-        const canEdit = task.createdBy === uid || (task.assigneeIds ?? []).includes(uid);
-        if (!canEdit) {
-          throw new Error('このタスクを編集する権限がありません');
-        }
-      }
-      const startDate = updates.startDate !== undefined
-      ? this.normalizeDate(updates.startDate)
-      : this.normalizeDate(task.startDate ?? null);
-    const endDate = updates.endDate !== undefined
-      ? this.normalizeDate(updates.endDate)
-      : this.normalizeDate(task.endDate ?? null);
-      if (startDate && endDate && startDate > endDate) {
-        throw new Error('開始日は終了日以前である必要があります');
-      }
-
-      // チェックリストが更新された場合、進捗を再計算
-      if (updates.checklist !== undefined) {
-        const progress = this.calculateProgressFromChecklist(updates.checklist);
-        updates = { ...updates, progress };
-      }
-
-      // 期間が更新された場合、またはチェックリストが更新された場合、ステータスを自動遷移
-      const periodChanged = updates.startDate !== undefined || updates.endDate !== undefined;
-      const checklistChanged = updates.checklist !== undefined;
-      
-      // 期間またはチェックリストが更新された場合、ステータスを自動遷移
-      // ただし、ステータスが手動で設定されている場合は上書きしない
-      if (periodChanged || checklistChanged) {
-        // 保留・破棄の場合は自動遷移しない
-        if (task.status !== 'on_hold' && task.status !== 'discarded') {
-          const updatedChecklist = updates.checklist ?? task.checklist ?? [];
-          const newStatus = this.calculateStatusFromConditions(
-            task,
-            updatedChecklist,
-            startDate,
-            endDate
-          );
-          
-          // ステータスが手動で設定されていない場合、または新しいステータスが現在のステータスと異なる場合は更新
-          if (updates.status === undefined || updates.status !== newStatus) {
-            updates = { ...updates, status: newStatus };
-          }
-        }
-      }
-
-      await this.ensureTaskPeriodWithinHierarchy(project, projectId, issueId, startDate, endDate);
-    }
-
     if (!task) {
-      const startDate = updates.startDate !== undefined ? this.normalizeDate(updates.startDate) : null;
-      const endDate = updates.endDate !== undefined ? this.normalizeDate(updates.endDate) : null;
-      await this.ensureTaskPeriodWithinHierarchy(project, projectId, issueId, startDate, endDate);
+      throw new Error('タスクが見つかりません');
     }
+
+    if (role === 'member') {
+      const canEdit = task.createdBy === uid || (task.assigneeIds ?? []).includes(uid);
+      if (!canEdit) {
+        throw new Error('このタスクを編集する権限がありません');
+      }
+    }
+    const startDate = updates.startDate !== undefined
+      ? normalizeDate(updates.startDate)
+      : normalizeDate(task.startDate ?? null);
+    const endDate = updates.endDate !== undefined
+      ? normalizeDate(updates.endDate)
+      : normalizeDate(task.endDate ?? null);
+    if (startDate && endDate && startDate > endDate) {
+      throw new Error('開始日は終了日以前である必要があります');
+    }
+
+    // チェックリストが更新された場合、進捗を再計算
+    if (updates.checklist !== undefined) {
+      const progress = this.calculateProgressFromChecklist(updates.checklist);
+      updates = { ...updates, progress };
+    }
+
+    // 期間が更新された場合、またはチェックリストが更新された場合、ステータスを自動遷移
+    const periodChanged = updates.startDate !== undefined || updates.endDate !== undefined;
+    const checklistChanged = updates.checklist !== undefined;
+    
+    // 期間またはチェックリストが更新された場合、ステータスを自動遷移
+    // ただし、ステータスが手動で設定されている場合は上書きしない
+    if (periodChanged || checklistChanged) {
+      // 保留・破棄の場合は自動遷移しない
+      if (task.status !== 'on_hold' && task.status !== 'discarded') {
+        const updatedChecklist = updates.checklist ?? task.checklist ?? [];
+        const newStatus = this.calculateStatusFromConditions(
+          task,
+          updatedChecklist,
+          startDate,
+          endDate
+        );
+        
+        // ステータスが手動で設定されていない場合、または新しいステータスが現在のステータスと異なる場合は更新
+        if (updates.status === undefined || updates.status !== newStatus) {
+          updates = { ...updates, status: newStatus };
+        }
+      }
+    }
+
+    await this.ensureTaskPeriodWithinHierarchy(project, projectId, issueId, startDate, endDate);
 
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -897,7 +877,13 @@ export class TasksService {
     issueId: string,
     taskId: string,
     file: File,
-    metadata: { taskTitle: string; projectName?: string | null; issueName?: string | null },
+    metadata: {
+      taskTitle: string;
+      projectName?: string | null;
+      issueName?: string | null;
+      uploaderUsername?: string | null;
+      uploaderPhotoUrl?: string | null;
+    },
   ): Promise<Attachment> {
     const { uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
 
@@ -953,6 +939,17 @@ export class TasksService {
     }
     if (metadata.issueName !== undefined) {
       payload['issueName'] = metadata.issueName;
+    }
+    if (metadata.uploaderUsername !== undefined && metadata.uploaderUsername !== null) {
+      const trimmed = metadata.uploaderUsername.trim();
+      if (trimmed.length > 0) {
+        payload['authorUsername'] = trimmed;
+      }
+    }
+    if (metadata.uploaderPhotoUrl !== undefined) {
+      const raw = metadata.uploaderPhotoUrl;
+      const normalized = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
+      payload['authorPhotoUrl'] = normalized;
     }
 
     await setDoc(docRef, payload);
@@ -1101,7 +1098,7 @@ export class TasksService {
 
   private hydrateComment(id: string, data: Record<string, unknown>): Comment {
     const mentionsRaw = Array.isArray(data['mentions']) ? data['mentions'] : [];
-    const createdAt = this.normalizeDate(data['createdAt']) ?? new Date();
+    const createdAt = normalizeDate(data['createdAt']) ?? new Date();
     const authorUsernameRaw = data['authorUsername'] ?? data['authorName'];
     const authorPhotoRaw = data['authorPhotoUrl'];
 
@@ -1250,8 +1247,8 @@ export class TasksService {
       throw new Error('タスクが見つかりません');
     }
 
-    // 進捗率を再計算
-    const progress = this.calculateProgressFromChecklist(checklist, task.status);
+    // 進捗率を再計算（チェックリストが存在する場合はstatusパラメータは無視される）
+    const progress = this.calculateProgressFromChecklist(checklist);
 
     // ステータスを自動遷移
     const newStatus = this.calculateStatusFromConditions(task, checklist);
