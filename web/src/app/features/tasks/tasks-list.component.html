@@ -535,6 +535,7 @@
             <a
               class="attachment-name"
               [href]="attachment.fileUrl"
+              (click)="downloadAttachment(attachment, $event)"
               target="_blank"
               rel="noopener"
             >

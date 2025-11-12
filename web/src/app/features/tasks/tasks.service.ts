@@ -941,8 +941,11 @@ export class TasksService {
     const storagePath = this.buildAttachmentStoragePath(projectId, issueId, taskId, docRef.id, file.name);
     const storageRef = ref(this.storage, storagePath);
 
+    // Content-Disposition: attachment を設定して、ブラウザで開かずにダウンロードさせる
+    const encodedFileName = encodeURIComponent(file.name);
     await uploadBytes(storageRef, file, {
       contentType: file.type || undefined,
+      contentDisposition: `attachment; filename="${encodedFileName}"; filename*=UTF-8''${encodedFileName}`,
     });
     const downloadUrl = await getDownloadURL(storageRef);
 

@@ -614,6 +614,27 @@ import {
     trackAttachmentById(_: number, attachment: TaskAttachmentView): string {
       return attachment.id ?? `${attachment.fileUrl}-${attachment.fileName}`;
     }
+
+    downloadAttachment(attachment: TaskAttachmentView, event: Event): void {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!attachment.fileUrl) {
+        alert('添付ファイルのダウンロードURLが見つかりませんでした');
+        return;
+      }
+
+      // getDownloadURL()で得たURLを直接<a>タグのhrefに設定
+      // Content-Disposition: attachment が設定されていれば、ブラウザで開かずにダウンロードされる
+      const anchor = document.createElement('a');
+      anchor.href = attachment.fileUrl;
+      anchor.download = attachment.fileName || 'attachment';
+      anchor.rel = 'noopener';
+      anchor.target = '_blank';
+
+      // 一時的にDOMに追加しなくてもclick()でダウンロードが開始される
+      anchor.click();
+    }
   
     formatFileSize(bytes: number | null | undefined): string {
       if (typeof bytes !== 'number' || Number.isNaN(bytes) || bytes <= 0) {

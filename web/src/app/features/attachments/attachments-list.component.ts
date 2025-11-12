@@ -210,6 +210,27 @@ export class AttachmentsListComponent implements OnInit {
     return row.id;
   }
 
+  downloadAttachment(row: AttachmentRow, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!row.fileUrl) {
+      alert('添付ファイルのダウンロードURLが見つかりませんでした');
+      return;
+    }
+
+    // getDownloadURL()で得たURLを直接<a>タグのhrefに設定
+    // Content-Disposition: attachment が設定されていれば、ブラウザで開かずにダウンロードされる
+    const anchor = document.createElement('a');
+    anchor.href = row.fileUrl;
+    anchor.download = row.fileName || 'attachment';
+    anchor.rel = 'noopener';
+    anchor.target = '_blank';
+
+    // 一時的にDOMに追加しなくてもclick()でダウンロードが開始される
+    anchor.click();
+  }
+
   canDeleteAttachment(row: AttachmentRow): boolean {
     const uid = this.currentUid();
     if (!uid || !row.projectId) {

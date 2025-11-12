@@ -1101,6 +1101,27 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return attachment.id;
   }
 
+  downloadAttachment(attachment: TaskAttachmentView, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!attachment.fileUrl) {
+      alert('添付ファイルのダウンロードURLが見つかりませんでした');
+      return;
+    }
+
+    // getDownloadURL()で得たURLを直接<a>タグのhrefに設定
+    // Content-Disposition: attachment が設定されていれば、ブラウザで開かずにダウンロードされる
+    const anchor = document.createElement('a');
+    anchor.href = attachment.fileUrl;
+    anchor.download = attachment.fileName || 'attachment';
+    anchor.rel = 'noopener';
+    anchor.target = '_blank';
+
+    // 一時的にDOMに追加しなくてもclick()でダウンロードが開始される
+    anchor.click();
+  }
+
   async onAttachmentSelected(event: Event): Promise<void> {
     const input = event.target instanceof HTMLInputElement ? event.target : null;
     if (!input || !input.files || !this.selectedTaskId || !this.selectedTask) {
