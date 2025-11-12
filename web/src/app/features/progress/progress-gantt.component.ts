@@ -109,6 +109,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   private pendingScrollLeft: number | null = null;
   /** 初期表示時のスクロール復元処理が完了したかどうか */
   private hasRestoredInitialState = false;
+  /** 開始日または終了日だけが設定されているタスクの日付にスクロールするフラグ */
+  private pendingScrollToSingleDateTask: Date | null = null;
 
   get shouldShowProjectSelectionHint(): boolean {
     return !this.selectedProjectId && this.availableProjects.length > 0;
@@ -396,7 +398,21 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       return;
     }
     const today = this.toTokyoDate(new Date());
-    const index = this.timeline.findIndex((day) => this.isSameDay(day.date, today));
+    this.scrollToDate(today);
+  }
+
+  private scrollToDate(date: Date): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!this.timelineViewport) {
+      return;
+    }
+    if (this.timeline.length === 0) {
+      return;
+    }
+    const targetDate = this.toTokyoDate(date);
+    const index = this.timeline.findIndex((day) => this.isSameDay(day.date, targetDate));
     const fallbackIndex = index >= 0 ? index : Math.floor(this.timeline.length / 2);
     const element = this.timelineViewport?.nativeElement;
     if (!element) {
@@ -406,6 +422,11 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.setScrollPosition(target);
   }
 
+
+  hasValidTaskPeriod(task: Task): boolean {
+    // 開始日と終了日の両方が設定されている場合のみ、有効な期間として扱う
+    return task.startDate instanceof Date && task.endDate instanceof Date;
+  }
 
   getTaskOffset(task: Task): string {
     if (!this.timelineStart) {
@@ -583,6 +604,18 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
           this.scrollToToday();
           this.hasRestoredInitialState = true;
         }, 0);
+      } else if (this.pendingScrollToSingleDateTask) {
+        // 開始日または終了日だけが設定されているタスクがある場合は、その日付にスクロールする
+        const targetDate = this.pendingScrollToSingleDateTask;
+        this.pendingScrollToSingleDateTask = null;
+        setTimeout(() => {
+          this.scrollToDate(targetDate);
+        }, 0);
+      } else if (allDates.length === 0) {
+        // タスクに期間が設定されていない場合は今日にスクロールする
+        setTimeout(() => {
+          this.scrollToToday();
+        }, 0);
       } else {
         // それ以外は現在地を保ったまま再描画
         setTimeout(() => this.setScrollPosition(this.currentScrollLeft, { smooth: false }), 0);
@@ -630,10 +663,6 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   private applyProjectFilters(): void {
-    if (this.viewInitialized && this.hasRestoredInitialState) {
-      // フィルター変更でタイムラインが再生成される前に位置を保持
-      this.pendingScrollLeft = this.currentScrollLeft;
-    }
     const activeId = this.selectedProjectId;
     const visible = this.ganttIssues.filter((group) => {
       const projectId = group.project.id;
@@ -661,6 +690,39 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
         return dates;
       }),
     );
+
+    // タスクの日付にスクロールする必要があるかどうかを判定
+    // 優先順位: 1. 期間が設定されているタスクの開始日 2. 開始日または終了日だけが設定されているタスクの日付
+    this.pendingScrollToSingleDateTask = null;
+    for (const group of visible) {
+      for (const task of group.tasks) {
+        const hasStartDate = task.startDate instanceof Date;
+        const hasEndDate = task.endDate instanceof Date;
+        // 期間が設定されているタスク（開始日と終了日の両方が設定されている）の場合、開始日にスクロール
+        if (hasStartDate && hasEndDate) {
+          this.pendingScrollToSingleDateTask = task.startDate instanceof Date ? task.startDate : null;
+          break;
+        } else if (hasStartDate && !hasEndDate) {
+          // 開始日だけが設定されている場合
+          this.pendingScrollToSingleDateTask = task.startDate instanceof Date ? task.startDate : null;
+          break;
+        } else if (!hasStartDate && hasEndDate) {
+          // 終了日だけが設定されている場合
+          this.pendingScrollToSingleDateTask = task.endDate instanceof Date ? task.endDate : null;
+          break;
+        }
+      }
+      if (this.pendingScrollToSingleDateTask) {
+        break;
+      }
+    }
+
+    // タスクに日付が設定されている場合のみ、スクロール位置を保持する
+    // ただし、日付が設定されているタスクがある場合は、その日付にスクロールするため位置を保持しない
+    if (this.viewInitialized && this.hasRestoredInitialState && taskDates.length > 0 && !this.pendingScrollToSingleDateTask) {
+      // フィルター変更でタイムラインが再生成される前に位置を保持
+      this.pendingScrollLeft = this.currentScrollLeft;
+    }
 
     this.buildTimeline(taskDates);
     this.cdr.markForCheck();
