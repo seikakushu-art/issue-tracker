@@ -63,6 +63,9 @@ export class AuthService {
     }
     try {
       const raw = window.localStorage.getItem(REMEMBER_EXPIRES_KEY);
+      // マーカーがない場合は、rememberをチェックしなかったセッションと判断
+      // この場合、FirebaseのbrowserSessionPersistenceに依存するため、
+      // ブラウザを閉じると自動的にログアウトされる
       if (!raw) {
         return true;
       }
@@ -71,9 +74,11 @@ export class AuthService {
         this.clearRememberMarker();
         return true;
       }
+      // 有効期限が切れていない場合は有効
       if (expiresAt > Date.now()) {
         return true;
       }
+      // 有効期限が切れている場合は無効
       this.clearRememberMarker();
       return false;
     } catch (error) {
