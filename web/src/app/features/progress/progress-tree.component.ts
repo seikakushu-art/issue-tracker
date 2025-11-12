@@ -106,15 +106,26 @@ export class ProgressTreeComponent implements OnInit {
       const taskIndex = new Map<string, { title: string; issue: Issue; project: Project }>();
       const treeProjects: TreeProject[] = [];
 
-      for (const project of projects) {
-        const issues = await this.issuesService.listIssues(project.id!, false);
+      // プロジェクトごとにissuesとtasksを並列取得
+      const projectDataResults = await Promise.all(
+        projects.map(async (project) => {
+          const [issues, allTasks] = await Promise.all([
+            this.issuesService.listIssues(project.id!, false),
+            this.tasksService.listTasksByProject(project.id!, false),
+          ]);
+          return { project, issues, allTasks };
+        }),
+      );
+
+      for (const { project, issues, allTasks } of projectDataResults) {
         const treeIssues: TreeIssue[] = [];
 
         for (const issue of issues) {
           if (!issue.id) {
             continue;
           }
-          const tasks = await this.tasksService.listTasks(project.id!, issue.id, false);
+          // プロジェクト単位で取得したタスクから、該当issueのタスクをフィルタリング
+          const tasks = allTasks.filter((task) => task.issueId === issue.id);
           const normalizedTasks = tasks.map((task) => this.normalizeTaskDates(task));
 
           for (const task of normalizedTasks) {

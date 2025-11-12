@@ -162,21 +162,27 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       const projects = (await this.projectsService.listMyProjects())
         .filter((project): project is Project & { id: string } => Boolean(project.id))
         .filter((project) => !project.archived);
+      
+      // プロジェクトごとにissuesとtasksを並列取得
       const issueResults = await Promise.all(
         projects.map(async (project) => {
-          const issues = await this.issuesService.listIssues(project.id!, false);
-          return { project, issues };
+          const [issues, allTasks] = await Promise.all([
+            this.issuesService.listIssues(project.id!, false),
+            this.tasksService.listTasksByProject(project.id!, false),
+          ]);
+          return { project, issues, allTasks };
         }),
       );
 
       const ganttIssues: GanttIssue[] = [];
 
-      for (const { project, issues } of issueResults) {
+      for (const { project, issues, allTasks } of issueResults) {
         for (const issue of issues) {
           if (!issue.id) {
             continue;
           }
-          const tasks = await this.tasksService.listTasks(project.id!, issue.id, false);
+          // プロジェクト単位で取得したタスクから、該当issueのタスクをフィルタリング
+          const tasks = allTasks.filter((task) => task.issueId === issue.id);
           const hydratedTasks = tasks.map((task) => this.normalizeTaskDates(task));
           ganttIssues.push({ project, issue, tasks: hydratedTasks, collapsed: false });
         }

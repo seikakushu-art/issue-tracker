@@ -157,6 +157,7 @@
                           (mouseleave)="handleTimelineCellHover(null)"
                         ></div>
                         <button
+                          *ngIf="hasValidTaskPeriod(task)"
                           type="button"
                           class="gantt-bar"
                           [style.backgroundColor]="getTaskTheme(task, group.issue)"

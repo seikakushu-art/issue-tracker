@@ -756,9 +756,30 @@
     background: #ffe4e6;
   }
 
-
   .gantt-cell.today {
+    position: relative;
+    z-index: 3;
+  }
+
+  .gantt-cell.today::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 5;
     background: rgba(37, 99, 235, 0.08);
+    pointer-events: none;
+  }
+
+  .gantt-cell.today.weekend::after {
+    background: rgba(37, 99, 235, 0.12);
+  }
+
+  .gantt-cell.today.holiday::after {
+    background: rgba(37, 99, 235, 0.12);
+  }
+
+  .gantt-cell.today.holiday.weekend::after {
+    background: rgba(37, 99, 235, 0.15);
   }
 
   .gantt-cell.is-highlighted {
