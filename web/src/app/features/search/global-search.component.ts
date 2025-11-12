@@ -231,8 +231,8 @@ export class GlobalSearchComponent implements OnInit {
     projects: (Project & { id: string })[],
   ): Promise<SearchResultItem[]> {
     try {
-      const posts = await this.boardService.listAccessiblePosts();
-      return posts
+      const result = await this.boardService.listAccessiblePosts();
+      return result.posts
         .filter((post): post is { id: string } & typeof post => Boolean(post.id))
         .map((post) => {
           const projectNames = post.projectIds.map(

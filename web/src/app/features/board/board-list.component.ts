@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BulletinPost, Project, Role } from '../../models/schema';
-import { BoardService } from './board.service';
+import { BoardService, ListAccessiblePostsResult } from './board.service';
 import { ProjectsService } from '../projects/projects.service';
 import { getAvatarColor, getAvatarInitial } from '../../shared/avatar-utils';
 
@@ -27,6 +27,7 @@ export class BoardListComponent implements OnInit {
   readonly postsError = signal<string | null>(null);
   readonly currentPage = signal<number>(1);
   readonly pageSize = signal<number>(20);
+  readonly hasMorePosts = signal<boolean>(false); // 500件を超えているか
   readonly totalPages = computed(() => {
     const total = this.allPosts().length;
     const size = this.pageSize();
@@ -102,22 +103,25 @@ export class BoardListComponent implements OnInit {
   private async loadPosts(): Promise<void> {
     this.loadingPosts.set(true);
     this.postsError.set(null);
+    this.hasMorePosts.set(false);
     try {
       // 最大500件まで閲覧可能
-      const posts = await this.boardService.listAccessiblePosts({ limit: 500 });
+      const result: ListAccessiblePostsResult = await this.boardService.listAccessiblePosts({ limit: 500 });
       // 全てのプロジェクト（アーカイブ含む）を取得してプロジェクト名を解決
       const allProjects = await this.projectsService.listMyProjects();
-      const enriched = posts.map((post) => ({
+      const enriched = result.posts.map((post) => ({
         ...post,
         projectNames: post.projectIds.map((projectId) => this.getProjectDisplayName(projectId, allProjects)),
       }));
       this.allPosts.set(enriched);
+      this.hasMorePosts.set(result.hasMore);
       this.updateCurrentPagePosts();
     } catch (error) {
       console.error('Failed to load bulletin posts', error);
       this.postsError.set('掲示板の投稿を取得できませんでした。時間をおいて再度お試しください。');
       this.allPosts.set([]);
       this.posts.set([]);
+      this.hasMorePosts.set(false);
     } finally {
       this.loadingPosts.set(false);
     }

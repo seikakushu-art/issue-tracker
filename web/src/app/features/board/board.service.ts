@@ -23,6 +23,11 @@ interface ListOptions {
   limit?: number;
 }
 
+export interface ListAccessiblePostsResult {
+  posts: BulletinPost[];
+  hasMore: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BoardService {
   private readonly db = inject(Firestore);
@@ -237,14 +242,14 @@ export class BoardService {
     return ref.id;
   }
 
-  async listAccessiblePosts(options?: ListOptions): Promise<BulletinPost[]> {
+  async listAccessiblePosts(options?: ListOptions): Promise<ListAccessiblePostsResult> {
     const projects = await this.projectsService.listMyProjects();
     // アーカイブされていないプロジェクトのみを対象とする
     const accessibleProjects = projects
       .filter((project): project is Project & { id: string } => Boolean(project.id))
       .filter((project) => !project.archived);
     if (accessibleProjects.length === 0) {
-      return [];
+      return { posts: [], hasMore: false };
     }
     const accessibleIds = accessibleProjects.map((project) => project.id!);
     const accessibleSet = new Set(accessibleIds);
@@ -252,9 +257,10 @@ export class BoardService {
     const chunks = this.chunkProjectIds(accessibleIds);
     const collectionRef = collection(this.db, 'bulletinPosts');
     const requestedLimit = options?.limit ?? 500;
+    const checkLimit = requestedLimit + 1; // 500件超えているかチェックするため+1件取得
 
     // 各チャンククエリでorderByとlimitを使用して効率的に取得
-    // 複数チャンクがある場合に備えて、各チャンクでrequestedLimit件取得
+    // 複数チャンクがある場合に備えて、各チャンクでcheckLimit件取得
     const snapshots = await Promise.all(
       chunks.map((ids) => {
         if (ids.length === 0) {
@@ -264,7 +270,7 @@ export class BoardService {
           collectionRef,
           where('projectIds', 'array-contains-any', ids),
           orderBy('createdAt', 'desc'),
-          limit(requestedLimit),
+          limit(checkLimit),
         );
         return getDocs(q);
       }),
@@ -292,8 +298,14 @@ export class BoardService {
       return right - left;
     });
 
+    // 500件を超えているかチェック
+    const hasMore = posts.length > requestedLimit;
+
     // 最終的にrequestedLimit件に制限
-    return posts.slice(0, requestedLimit);
+    return {
+      posts: posts.slice(0, requestedLimit),
+      hasMore,
+    };
   }
 
   async deletePost(postId: string): Promise<void> {

@@ -89,6 +89,9 @@
       <p class="board__posts-empty" *ngIf="!loadingPosts() && !postsError() && posts().length === 0">
         閲覧可能な投稿はまだありません。
       </p>
+      <p class="board__posts-warning" *ngIf="!loadingPosts() && !postsError() && hasMorePosts()">
+        ⚠️ 閲覧可能な投稿が500件を超えています。最新の500件のみ表示しています。それより古い投稿を確認するには、不要な投稿を削除してください。
+      </p>
   
       <div class="board__pagination" *ngIf="!loadingPosts() && !postsError() && totalPages() > 1">
         <button

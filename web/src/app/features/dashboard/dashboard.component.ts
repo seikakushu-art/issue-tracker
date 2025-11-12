@@ -457,8 +457,8 @@ export class DashboardComponent implements OnInit {
     this.bulletinLoading.set(true);
     this.bulletinError.set(null);
     try {
-      const posts = await this.boardService.listAccessiblePosts({ limit: 5 });
-      const transformed = posts
+      const result = await this.boardService.listAccessiblePosts({ limit: 5 });
+      const transformed = result.posts
         .filter((post): post is BulletinPostWithRequiredId => Boolean(post.id))
         .map((post) => ({
           id: post.id!,

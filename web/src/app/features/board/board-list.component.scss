@@ -191,16 +191,28 @@
   
   .board__posts-loading,
   .board__posts-error,
-  .board__posts-empty {
+  .board__posts-empty,
+  .board__posts-warning {
     display: flex;
     align-items: center;
     gap: 8px;
     color: #64748b;
     margin: 0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    line-height: 1.6;
   }
   
   .board__posts-error {
     color: #dc2626;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+  }
+
+  .board__posts-warning {
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    color: #92400e;
   }
   
   .board__posts-list {
