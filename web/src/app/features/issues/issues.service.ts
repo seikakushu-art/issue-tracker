@@ -492,12 +492,12 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
         archived: boolean;
         progress: number | null;
       }>,
-    ): Promise<{ finalName: string; dateAdjusted: boolean; originalStart?: Date | null; originalEnd?: Date | null; adjustedStart?: Date | null; adjustedEnd?: Date | null; removedAssignees?: { taskId: string; assigneeIds: string[] }[]; skippedTags?: string[] }> {
+    ): Promise<{ finalName: string; removedAssignees?: { taskId: string; assigneeIds: string[] }[]; skippedTags?: string[]; periodsReset?: boolean; issuePeriodReset?: boolean; tasksPeriodResetCount?: number }> {
       await this.projectsService.ensureProjectRole(currentProjectId, ['admin']);
       await this.projectsService.ensureProjectRole(targetProjectId, ['admin']);
       if (currentProjectId === targetProjectId) {
         const originalName = overrides?.name ?? (await this.getIssue(currentProjectId, issueId))?.name ?? '';
-        return { finalName: originalName, dateAdjusted: false };
+        return { finalName: originalName };
       }
   
       const sourceIssueRef = doc(this.db, `projects/${currentProjectId}/issues/${issueId}`);
@@ -512,22 +512,12 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       const normalizedStart = normalizeDate(rawIssueRecord['startDate']);
       const normalizedEnd = normalizeDate(rawIssueRecord['endDate']);
 
-      const overrideStart = overrides && Object.prototype.hasOwnProperty.call(overrides, 'startDate')
-        ? normalizeDate(overrides.startDate ?? null)
-        : normalizedStart;
-      const overrideEnd = overrides && Object.prototype.hasOwnProperty.call(overrides, 'endDate')
-        ? normalizeDate(overrides.endDate ?? null)
-        : normalizedEnd;
-
-      // 移動先プロジェクトの期間を取得
+      // 移動先プロジェクトを取得（メンバーIDの取得などに使用）
       const targetProjectSnap = await getDoc(doc(this.db, 'projects', targetProjectId));
       if (!targetProjectSnap.exists()) {
         throw new Error('移動先のプロジェクトが見つかりません');
       }
       const targetProject = targetProjectSnap.data() as Project;
-      const targetProjectRecord = targetProject as unknown as Record<string, unknown>;
-      const targetProjectStart = normalizeDate(targetProjectRecord['startDate']);
-      const targetProjectEnd = normalizeDate(targetProjectRecord['endDate']);
 
       // 移動先プロジェクトのアクティブな課題数の上限チェック
       // 移動する課題がアーカイブ済みの場合は、アクティブな課題数の上限には影響しない
@@ -539,66 +529,6 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
         // （移動先プロジェクトにはまだ存在しないため）
         if (activeIssueCount >= MAX_ACTIVE_ISSUES) {
           throw new Error(`移動先のプロジェクトのアクティブな課題の上限（${MAX_ACTIVE_ISSUES}件）に達しています。課題を移動するには、移動先プロジェクトの既存の課題をアーカイブするか削除してください。`);
-        }
-      }
-
-      // 課題の期間が移動先プロジェクトの期間を超える場合、自動的に調整する
-      let adjustedStart = overrideStart;
-      let adjustedEnd = overrideEnd;
-      let dateAdjusted = false;
-
-      if (targetProjectStart && adjustedStart && adjustedStart < targetProjectStart) {
-        adjustedStart = targetProjectStart;
-        dateAdjusted = true;
-      }
-
-      if (targetProjectEnd && adjustedEnd && adjustedEnd > targetProjectEnd) {
-        adjustedEnd = targetProjectEnd;
-        dateAdjusted = true;
-      }
-
-      // 調整後の期間でバリデーション（タスクの期間チェックなど）
-      await this.validateWithinProjectPeriod(targetProjectId, adjustedStart, adjustedEnd);
-
-      // 期間が調整された場合、配下のタスクの期間をカバーできているかチェック
-      if (adjustedStart || adjustedEnd) {
-        // 移動元プロジェクトのタスクをチェック（移動前の状態）
-        const sourceTasksSnap = await getDocs(collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks`));
-        for (const docSnap of sourceTasksSnap.docs) {
-          const record = docSnap.data() as Record<string, unknown>;
-          const taskStart = normalizeDate(record['startDate']);
-          const taskEnd = normalizeDate(record['endDate']);
-          
-          // 開始日のチェック：課題の開始日がタスクの開始日より後になっている場合はエラー
-          if (adjustedStart && taskStart && taskStart < adjustedStart) {
-            throw new Error(
-              `移動先プロジェクトの期間内に収めるため課題の開始日を${adjustedStart.toLocaleDateString('ja-JP')}に調整しましたが、` +
-              `配下のタスク（開始日: ${taskStart.toLocaleDateString('ja-JP')}）の期間をカバーできません。` +
-              `移動先プロジェクトの期間を拡張するか、タスクの期間を調整してから再度お試しください。`
-            );
-          }
-          
-          // 終了日のチェック：課題の終了日がタスクの終了日より前になっている場合はエラー
-          if (adjustedEnd && taskEnd && taskEnd > adjustedEnd) {
-            throw new Error(
-              `移動先プロジェクトの期間内に収めるため課題の終了日を${adjustedEnd.toLocaleDateString('ja-JP')}に調整しましたが、` +
-              `配下のタスク（終了日: ${taskEnd.toLocaleDateString('ja-JP')}）の期間をカバーできません。` +
-              `移動先プロジェクトの期間を拡張するか、タスクの期間を調整してから再度お試しください。`
-            );
-          }
-        }
-      }
-
-      // 期間が調整された場合、overridesに反映
-      if (dateAdjusted) {
-        if (!overrides) {
-          overrides = {};
-        }
-        if (adjustedStart !== overrideStart) {
-          overrides.startDate = adjustedStart;
-        }
-        if (adjustedEnd !== overrideEnd) {
-          overrides.endDate = adjustedEnd;
         }
       }
 
@@ -623,10 +553,6 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
         }
       }
 
-      // 元の期間を保存（通知用）
-      const originalStart = overrideStart;
-      const originalEnd = overrideEnd;
-  
       const tasksSnap = await getDocs(collection(this.db, `projects/${currentProjectId}/issues/${issueId}/tasks`));
       const tasks = tasksSnap.docs.map(docSnap => ({ id: docSnap.id, ...(docSnap.data() as Task) }));
 
@@ -791,27 +717,50 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       }
   
       const targetIssueRef = doc(this.db, `projects/${targetProjectId}/issues/${issueId}`);
+      
+      // 課題の期間をリセット（移動時に期間をクリア）
+      const hadIssueStartDate = normalizedStart !== null;
+      const hadIssueEndDate = normalizedEnd !== null;
+      
       const payload = {
         ...rawIssue,
         projectId: targetProjectId,
+        startDate: null, // 期間をリセット
+        endDate: null, // 期間をリセット
       } as Record<string, unknown>;
-  
+
       if (overrides) {
         for (const [key, value] of Object.entries(overrides)) {
           if (value !== undefined) {
-            payload[key] = value;
+            // startDate/endDateはリセットするため、overridesで上書きしない
+            if (key !== 'startDate' && key !== 'endDate') {
+              payload[key] = value;
+            }
           }
         }
       }
-  
+
       await setDoc(targetIssueRef, payload);
 
       // 課題名とプロジェクト名を取得（添付ファイル一覧で表示するため）
       const targetProjectName = targetProject.name || null;
       const issueName = targetName;
 
+      // タスクの期間リセット情報を収集
+      let tasksWithPeriodReset = 0;
+      
       for (const task of tasks) {
         const { id: taskId, ...taskData } = task;
+        
+        // タスクの期間をリセット（移動時に期間をクリア）
+        const taskRecord = taskData as unknown as Record<string, unknown>;
+        const taskStartDate = normalizeDate(taskRecord['startDate']);
+        const taskEndDate = normalizeDate(taskRecord['endDate']);
+        const hadTaskPeriod = taskStartDate !== null || taskEndDate !== null;
+        
+        if (hadTaskPeriod) {
+          tasksWithPeriodReset++;
+        }
         
         // タスクのタグIDを移動先プロジェクトのタグIDにマッピング
         let mappedTagIds: string[] | undefined;
@@ -831,6 +780,8 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
           projectId: targetProjectId,
           issueId,
           tagIds: mappedTagIds ?? task.tagIds, // マッピングされたタグIDを使用
+          startDate: null, // 期間をリセット
+          endDate: null, // 期間をリセット
         } as Record<string, unknown>;
   
         await setDoc(
@@ -957,15 +908,13 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       
       return {
         finalName: targetName,
-        dateAdjusted,
-        originalStart: dateAdjusted ? originalStart : undefined,
-        originalEnd: dateAdjusted ? originalEnd : undefined,
-        adjustedStart: dateAdjusted ? adjustedStart : undefined,
-        adjustedEnd: dateAdjusted ? adjustedEnd : undefined,
         removedAssignees: tasksWithRemovedAssignees.length > 0
           ? tasksWithRemovedAssignees.map(item => ({ taskId: item.taskId, assigneeIds: item.removedAssignees }))
           : undefined,
         skippedTags: skippedTags.length > 0 ? skippedTags : undefined,
+        periodsReset: hadIssueStartDate || hadIssueEndDate || tasksWithPeriodReset > 0,
+        issuePeriodReset: hadIssueStartDate || hadIssueEndDate,
+        tasksPeriodResetCount: tasksWithPeriodReset,
       };
     }
 }

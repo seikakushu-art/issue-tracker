@@ -653,23 +653,6 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
             messages.push(`移動先に同じ名前の課題があったため、課題名を「${result.finalName}」に変更しました。`);
           }
           
-          if (result.dateAdjusted) {
-            const dateMessages: string[] = [];
-            if (result.originalStart && result.adjustedStart && result.originalStart !== result.adjustedStart) {
-              const originalStartStr = result.originalStart instanceof Date ? result.originalStart.toLocaleDateString('ja-JP') : String(result.originalStart);
-              const adjustedStartStr = result.adjustedStart instanceof Date ? result.adjustedStart.toLocaleDateString('ja-JP') : String(result.adjustedStart);
-              dateMessages.push(`開始日を${originalStartStr}から${adjustedStartStr}に変更`);
-            }
-            if (result.originalEnd && result.adjustedEnd && result.originalEnd !== result.adjustedEnd) {
-              const originalEndStr = result.originalEnd instanceof Date ? result.originalEnd.toLocaleDateString('ja-JP') : String(result.originalEnd);
-              const adjustedEndStr = result.adjustedEnd instanceof Date ? result.adjustedEnd.toLocaleDateString('ja-JP') : String(result.adjustedEnd);
-              dateMessages.push(`終了日を${originalEndStr}から${adjustedEndStr}に変更`);
-            }
-            if (dateMessages.length > 0) {
-              messages.push(`移動先プロジェクトの期間内に収めるため、${dateMessages.join('、')}しました。`);
-            }
-          }
-          
           if (result.removedAssignees && result.removedAssignees.length > 0) {
             const removedCount = result.removedAssignees.reduce((sum, item) => sum + item.assigneeIds.length, 0);
             messages.push(`移動先プロジェクトのメンバーでない担当者（${removedCount}人）をタスクから削除しました。`);
@@ -677,6 +660,19 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
           
           if (result.skippedTags && result.skippedTags.length > 0) {
             messages.push(`移動先プロジェクトのタグ上限（20個）に達しているため、以下のタグは追加されませんでした: ${result.skippedTags.join('、')}`);
+          }
+          
+          if (result.periodsReset) {
+            const periodMessages: string[] = [];
+            if (result.issuePeriodReset) {
+              periodMessages.push('課題の期間をリセットしました');
+            }
+            if (result.tasksPeriodResetCount && result.tasksPeriodResetCount > 0) {
+              periodMessages.push(`配下のタスク${result.tasksPeriodResetCount}件の期間をリセットしました`);
+            }
+            if (periodMessages.length > 0) {
+              messages.push(`プロジェクト移動に伴い、${periodMessages.join('、')}。`);
+            }
           }
           
           alert(messages.join('\n'));

@@ -83,7 +83,7 @@ export class BoardListComponent implements OnInit {
   private getProjectDisplayName(projectId: string, allProjects: Project[]): string {
     const project = allProjects.find(p => p.id === projectId);
     if (!project) {
-      return '削除されたプロジェクト';
+      return '閲覧できないプロジェクト';
     }
     if (project.archived) {
       return 'アーカイブされたプロジェクト';
