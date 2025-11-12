@@ -278,8 +278,20 @@
           </div>
           <div class="comment-body">
             <div class="comment-meta">
-              <span class="comment-author">{{ comment.authorUsername }}</span>
-              <time class="comment-time">{{ comment.createdAt | date:'yyyy/MM/dd HH:mm' }}</time>
+              <div class="comment-meta__info">
+                <span class="comment-author">{{ comment.authorUsername }}</span>
+                <time class="comment-time">{{ comment.createdAt | date:'yyyy/MM/dd HH:mm' }}</time>
+              </div>
+              <button
+                type="button"
+                class="comment-delete-button"
+                *ngIf="canDeleteComment(comment)"
+                (click)="deleteComment(comment)"
+                [disabled]="commentDeletingId === comment.id"
+                aria-label="このコメントを削除"
+              >
+                {{ commentDeletingId === comment.id ? '削除中...' : '削除' }}
+              </button>
             </div>
             <p class="comment-text">
               <ng-container *ngFor="let segment of parseCommentText(comment.text, comment.mentions || [])">
