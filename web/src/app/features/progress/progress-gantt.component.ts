@@ -242,12 +242,24 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
     this.cdr.markForCheck();
   }
 
+  handleTaskLabelHover(task: Task): void {
+    // マウスがタスク名に移動したときにスクロール
+    this.handleTaskHover(task);
+    this.focusTaskOnTimeline(task);
+  }
+
   selectTask(issue: GanttIssue, task: Task): void {
     // クリック時にパネルへ最新情報を反映させる（ナビゲーションは行わない）
     this.selectedTask = task;
     this.selectedIssue = issue.issue;
     this.selectedProject = issue.project;
     this.cdr.markForCheck();
+  }
+
+  handleTaskLabelActivate(issue: GanttIssue, task: Task): void {
+    // ラベル操作時は詳細パネルを開くのと同時にタイムラインも中央へ寄せる
+    this.selectTask(issue, task);
+    this.focusTaskOnTimeline(task);
   }
 
   onSidebarTaskSelect(projectId: string | undefined, issueId: string | undefined, task: Task): void {
@@ -963,19 +975,31 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   private focusTaskOnTimeline(task: Task): void {
-    if (!this.timelineViewport || !this.timelineStart) {
+    if (!this.timelineViewport || !this.timelineStart || this.timeline.length === 0) {
       return;
     }
+
+    // タスクに設定された開始・終了日をそれぞれ取得（どちらか片方でもスクロールしたい）
     const start = this.getEffectiveStart(task);
-    if (!start) {
+    const end = this.getEffectiveEnd(task);
+    if (!start && !end) {
       return;
     }
-    const index = Math.max(0, Math.min(this.timeline.length - 1, this.diffInDays(start, this.timelineStart)));
-    const element = this.timelineViewport.nativeElement;
+
+    const clampIndex = (value: number): number =>
+      Math.max(0, Math.min(this.timeline.length - 1, value));
+    const startIndex = start ? clampIndex(this.diffInDays(start, this.timelineStart)) : null;
+    const endIndex = end ? clampIndex(this.diffInDays(end, this.timelineStart)) : startIndex;
+
+    // 両端インデックスの平均値を中心として算出し、バーが概ね中央に来るように調整
+    const resolvedStart = startIndex ?? endIndex ?? 0;
+    const resolvedEnd = endIndex ?? startIndex ?? resolvedStart;
+    const centerIndex = (resolvedStart + resolvedEnd) / 2;
+    const element = this.timelineViewport?.nativeElement;
     if (!element) {
       return;
     }
-    const target = index * this.dayCellWidth - element.clientWidth / 3;
+    const target = centerIndex * this.dayCellWidth - element.clientWidth / 2 + this.dayCellWidth / 2;
     this.setScrollPosition(target);
   }
 

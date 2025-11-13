@@ -134,13 +134,13 @@
                       class="gantt-row__label"
                       role="button"
                       tabindex="0"
-                        (click)="selectTask(group, task)"
-                        (keydown.enter)="selectTask(group, task)"
-                        (keydown.space)="selectTask(group, task)"
-                        (mouseenter)="handleTaskHover(task)"
-                        (mouseleave)="handleTaskHover(null)"
-                        [class.is-highlighted]="isTaskHighlighted(task)"
-                      >
+                      (click)="handleTaskLabelActivate(group, task)"
+                      (keydown.enter)="handleTaskLabelActivate(group, task)"
+                      (keydown.space)="handleTaskLabelActivate(group, task)"
+                      (mouseenter)="handleTaskLabelHover(task)"
+                      (mouseleave)="handleTaskHover(null)"
+                      [class.is-highlighted]="isTaskHighlighted(task)"
+                    >
                       <div class="task-label">
                         <span class="task-color-indicator" aria-hidden="true"></span>
                         <span class="task-title" [title]="task.title">{{ task.title }}</span>
