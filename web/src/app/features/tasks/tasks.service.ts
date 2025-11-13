@@ -597,19 +597,22 @@ export class TasksService {
     // 期間またはチェックリストが更新された場合、ステータスを自動遷移
     // ただし、ステータスが手動で設定されている場合は上書きしない
     if (periodChanged || checklistChanged) {
-      // 保留・破棄の場合は自動遷移しない
-      if (task.status !== 'on_hold' && task.status !== 'discarded') {
-        const updatedChecklist = updates.checklist ?? task.checklist ?? [];
-        const newStatus = this.calculateStatusFromConditions(
-          task,
-          updatedChecklist,
-          startDate,
-          endDate
-        );
-        
-        // ステータスが手動で設定されていない場合、または新しいステータスが現在のステータスと異なる場合は更新
-        if (updates.status === undefined || updates.status !== newStatus) {
-          updates = { ...updates, status: newStatus };
+      // ステータスが明示的に設定されている場合は自動遷移しない
+      if (updates.status === undefined) {
+        // 保留・破棄の場合は自動遷移しない
+        if (task.status !== 'on_hold' && task.status !== 'discarded') {
+          const updatedChecklist = updates.checklist ?? task.checklist ?? [];
+          const newStatus = this.calculateStatusFromConditions(
+            task,
+            updatedChecklist,
+            startDate,
+            endDate
+          );
+          
+          // 新しいステータスが現在のステータスと異なる場合は更新
+          if (newStatus !== task.status) {
+            updates = { ...updates, status: newStatus };
+          }
         }
       }
     }
@@ -1220,8 +1223,19 @@ export class TasksService {
     startDate?: Date | null,
     endDate?: Date | null
   ): TaskStatus {
-    // 保留・破棄の場合は自動遷移しない
-    if (task.status === 'on_hold' || task.status === 'discarded') {
+    // 破棄の場合は自動遷移しない
+    if (task.status === 'discarded') {
+      return task.status;
+    }
+    
+    // 保留の場合は、チェックリストがすべて完了した場合のみ完了に遷移
+    // それ以外は保留のまま（呼び出し側で確認ダイアログを表示）
+    if (task.status === 'on_hold') {
+      const currentChecklist = checklist ?? task.checklist ?? [];
+      const allCompleted = currentChecklist.length > 0 && currentChecklist.every(item => item.completed);
+      if (allCompleted) {
+        return 'completed';
+      }
       return task.status;
     }
 

@@ -976,12 +976,16 @@ import {
       try {
         // すべてのチェックリストが完了した場合、完了確認のダイアログを表示
         const allCompleted = checklist.length > 0 && checklist.every((item) => item.completed);
-        if (allCompleted && this.task.status !== 'completed' && this.task.status !== 'on_hold' && this.task.status !== 'discarded') {
+        if (allCompleted && this.task.status !== 'completed' && this.task.status !== 'discarded') {
           const shouldComplete = this.confirmChecklistCompletion();
           if (!shouldComplete) {
-            // 完了をキャンセルした場合、完了状態を解除してから更新
-            const revertedChecklist = checklist.map(item => ({ ...item, completed: false }));
-            await this.tasksService.updateChecklist(this.projectId, this.issueId, this.task.id, revertedChecklist);
+            // 「いいえ」を選んだ場合、チェックリストは完成したまま、進捗率を100%にし、ステータスはそのまま
+            // ステータスを明示的に現在のステータスに設定して、自動遷移を防ぐ
+            await this.tasksService.updateTask(this.projectId, this.issueId, this.task.id, {
+              checklist,
+              progress: 100,
+              status: this.task.status, // 現在のステータスを明示的に設定して自動遷移を防ぐ
+            });
             await this.refreshTask();
             return;
           }
