@@ -297,11 +297,13 @@
                                 </div>
                             </div>
                             <div class="actionable-card__mentions" *ngIf="card.mentionCount > 0">
-                                <h4>メンション {{ card.mentionCount }}件</h4>
+                                <h4>最新のメンション {{ card.mentions.length }}件</h4>
                                 <ul>
                                     <li *ngFor="let mention of card.mentions">
-                                        <span class="mention-date">{{ mention.createdAt | date: 'MM/dd HH:mm' }}</span>
-                                        <span class="mention-text">{{ mention.text }}</span>
+                                        <button type="button" class="mention-item" (click)="goToTaskDetailWithComment(card, mention.id)">
+                                            <span class="mention-date">{{ mention.createdAt | date: 'MM/dd HH:mm' }}</span>
+                                            <span class="mention-text">{{ mention.text }}</span>
+                                        </button>
                                     </li>
                                 </ul>
                             </div>

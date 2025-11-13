@@ -1664,6 +1664,21 @@
   padding: 12px 0;
   border-bottom: 1px solid #eef2f7;
   min-width: 0;
+  transition: background-color 0.3s ease;
+
+  &.comment-highlight {
+    background-color: #fff3cd;
+    animation: highlight-fade 2s ease-out;
+  }
+}
+
+@keyframes highlight-fade {
+  0% {
+    background-color: #fff3cd;
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .comment-avatar {

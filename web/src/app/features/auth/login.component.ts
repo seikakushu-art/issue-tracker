@@ -25,6 +25,12 @@ import { AuthService } from '../../core/auth.service';
         </div>
 
         <form class="auth-form" (ngSubmit)="login()">
+          <!-- エラーメッセージ -->
+          <div *ngIf="errorMessage" class="error-message">
+            <i class="icon-error"></i>
+            {{ errorMessage }}
+          </div>
+
           <div class="form-group">
             <label for="email">メールアドレス</label>
             <input 
@@ -98,12 +104,6 @@ import { AuthService } from '../../core/auth.service';
             </button>
           </div>
         </form>
-
-        <!-- エラーメッセージ -->
-        <div *ngIf="errorMessage" class="error-message">
-          <i class="icon-error"></i>
-          {{ errorMessage }}
-        </div>
 
         <!-- 成功メッセージ -->
         <div *ngIf="successMessage" class="success-message">
@@ -323,6 +323,7 @@ import { AuthService } from '../../core/auth.service';
       display: flex;
       align-items: center;
       gap: 8px;
+      margin-bottom: 20px;
     }
 
     .success-message {

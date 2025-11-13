@@ -36,6 +36,7 @@ interface NotificationListItem {
   issueId: string;
   taskId: string;
   isUnread: boolean;
+  commentId?: string; // メンション通知の場合のコメントID
 }
 
 @Component({
@@ -296,6 +297,7 @@ export class DashboardComponent implements OnInit {
         projectId: mention.projectId,
         issueId: mention.issueId,
         taskId: mention.taskId,
+        commentId: mention.id, // コメントIDを追加
         isUnread: !readKeys.has(key),
       } satisfies NotificationListItem;
     });
@@ -786,11 +788,12 @@ export class DashboardComponent implements OnInit {
   openNotification(item: NotificationListItem): void {
     // 通知を既読にする
     this.markNotificationAsRead(item.key);
-    // タスク詳細へ遷移
+    // タスク詳細へ遷移（メンション通知の場合はコメントIDも含める）
     this.goToTaskDetail({
       projectId: item.projectId,
       issueId: item.issueId,
       taskId: item.taskId,
+      commentId: item.commentId,
     });
   }
 
@@ -886,9 +889,23 @@ export class DashboardComponent implements OnInit {
     return issueName ? `${projectName} / ${issueName}` : projectName;
   }
    /** 通知一覧からタスクの詳細へ遷移する */
-   goToTaskDetail(task: { projectId: string; issueId: string; taskId: string }): void {
+   goToTaskDetail(task: { projectId: string; issueId: string; taskId: string; commentId?: string }): void {
+    const queryParams: Record<string, string> = { focus: task.taskId };
+    if (task.commentId) {
+      queryParams['commentId'] = task.commentId;
+    }
     void this.router.navigate(['/projects', task.projectId, 'issues', task.issueId], {
-      queryParams: { focus: task.taskId },
+      queryParams,
+    });
+  }
+
+  /** 要対応タスクカードのメンションからタスク詳細へ遷移する */
+  goToTaskDetailWithComment(card: ActionableTaskCard, commentId: string): void {
+    this.goToTaskDetail({
+      projectId: card.projectId,
+      issueId: card.issueId,
+      taskId: card.taskId,
+      commentId,
     });
   }
 

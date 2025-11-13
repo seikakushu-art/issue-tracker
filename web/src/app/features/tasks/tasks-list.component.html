@@ -595,7 +595,7 @@
       </div>
 
       <div *ngIf="!commentsLoading && comments.length > 0" class="comments-list">
-        <article class="comment-item" *ngFor="let comment of comments">
+        <article class="comment-item" [id]="'comment-' + comment.id" *ngFor="let comment of comments">
           <div class="comment-avatar">
             <ng-container *ngIf="comment.authorPhotoUrl; else commentAvatarFallback">
               <img [src]="comment.authorPhotoUrl" [alt]="comment.authorUsername + 'のアイコン'">

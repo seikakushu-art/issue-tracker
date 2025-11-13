@@ -229,13 +229,30 @@ export class DashboardService {
       for (const issue of project.issues) {
         const issueUpdatedAt = issue.createdAt ? this.normalizeDate(issue.createdAt) : null;
         for (const task of issue.tasks) {
-          // 現在のユーザーが担当しているタスクのみを対象とする
-          if (!task.assigneeIds || !task.assigneeIds.includes(currentUserId)) {
+          // アーカイブされたタスクは検知対象外
+          if (task.archived) {
             continue;
           }
 
-          // アーカイブされたタスクは検知対象外
-          if (task.archived) {
+          // 重要度が高く未割り当てのタスクを検知
+          if (
+            task.status !== 'completed' &&
+            task.status !== 'discarded' &&
+            (!task.assigneeIds || task.assigneeIds.length === 0) &&
+            (task.importance === 'Critical' || task.importance === 'High')
+          ) {
+            insights.push({
+              type: 'critical_unassigned',
+              label: '重要度が高く未割り当て',
+              projectId: project.id!,
+              issueId: issue.id!,
+              taskId: task.id!,
+              severity: 'warning',
+            });
+          }
+
+          // 現在のユーザーが担当しているタスクのみを対象とする
+          if (!task.assigneeIds || !task.assigneeIds.includes(currentUserId)) {
             continue;
           }
 

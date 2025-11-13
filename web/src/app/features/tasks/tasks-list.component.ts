@@ -83,6 +83,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   selectedTaskId: string | null = null;
   selectedTask: Task | null = null;
   pendingFocusTaskId: string | null = null;
+  pendingCommentId: string | null = null;
   newChecklistText = '';
   currentRole: Role | null = null;
   currentUid: string | null = null;
@@ -193,7 +194,9 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((params) => {
       const focus = params.get('focus');
+      const commentId = params.get('commentId');
       this.pendingFocusTaskId = focus;
+      this.pendingCommentId = commentId;
       if (focus) {
         this.trySelectTaskById(focus);
       }
@@ -944,6 +947,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
       
       // プロファイルを読み込んだ後、ビューを構築
       this.comments = comments.map(comment => this.composeCommentView(comment));
+      
+      // コメントIDが指定されている場合は、そのコメントまでスクロール
+      if (this.pendingCommentId) {
+        setTimeout(() => {
+          this.scrollToComment(this.pendingCommentId);
+          this.pendingCommentId = null;
+        }, 100); // DOM更新を待つ
+      }
     } catch (error) {
       console.error('コメントの読み込みに失敗しました:', error);
       this.commentError = 'コメントの読み込みに失敗しました。';
@@ -951,6 +962,22 @@ export class TasksListComponent implements OnInit, OnDestroy {
     } finally {
       this.commentsLoading = false;
       this.updateCommentLimitState();
+    }
+  }
+
+  /** 指定されたコメントIDまでスクロールする */
+  private scrollToComment(commentId: string | null): void {
+    if (!commentId) {
+      return;
+    }
+    const element = document.getElementById(`comment-${commentId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // ハイライト効果を追加（オプション）
+      element.classList.add('comment-highlight');
+      setTimeout(() => {
+        element.classList.remove('comment-highlight');
+      }, 2000);
     }
   }
 
