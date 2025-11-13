@@ -342,14 +342,36 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
           aValue = a.name;
           bValue = b.name;
           break;
-        case 'startDate':
-          aValue = this.normalizeToDate(a.startDate) ?? new Date(0);
-          bValue = this.normalizeToDate(b.startDate) ?? new Date(0);
+        case 'startDate': {
+          const aStartDate = this.normalizeToDate(a.startDate);
+          const bStartDate = this.normalizeToDate(b.startDate);
+          // 開始日があるプロジェクトを優先的に先に表示
+          if (aStartDate && !bStartDate) {
+            return -1; // aを前に
+          }
+          if (!aStartDate && bStartDate) {
+            return 1; // bを前に
+          }
+          // 両方とも開始日がある、または両方ともない場合は日付で比較
+          aValue = aStartDate ?? new Date(0);
+          bValue = bStartDate ?? new Date(0);
           break;
-        case 'endDate':
-          aValue = this.normalizeToDate(a.endDate) ?? new Date(0);
-          bValue = this.normalizeToDate(b.endDate) ?? new Date(0);
+        }
+        case 'endDate': {
+          const aEndDate = this.normalizeToDate(a.endDate);
+          const bEndDate = this.normalizeToDate(b.endDate);
+          // 終了日があるプロジェクトを優先的に先に表示
+          if (aEndDate && !bEndDate) {
+            return -1; // aを前に
+          }
+          if (!aEndDate && bEndDate) {
+            return 1; // bを前に
+          }
+          // 両方とも終了日がある、または両方ともない場合は日付で比較
+          aValue = aEndDate ?? new Date(0);
+          bValue = bEndDate ?? new Date(0);
           break;
+        }
         case 'progress':
           aValue = a.progress || 0;
           bValue = b.progress || 0;
@@ -358,10 +380,23 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
           aValue = this.normalizeToDate(a.createdAt) ?? new Date(0);
           bValue = this.normalizeToDate(b.createdAt) ?? new Date(0);
           break;
-        case 'period':
-          aValue = this.getProjectDuration(a);
-          bValue = this.getProjectDuration(b);
+        case 'period': {
+          const aDuration = this.getProjectDuration(a);
+          const bDuration = this.getProjectDuration(b);
+          // 期間が計算できるプロジェクト（開始日と終了日の両方がある）を優先的に先に表示
+          const aHasPeriod = this.normalizeToDate(a.startDate) && this.normalizeToDate(a.endDate);
+          const bHasPeriod = this.normalizeToDate(b.startDate) && this.normalizeToDate(b.endDate);
+          if (aHasPeriod && !bHasPeriod) {
+            return -1; // aを前に
+          }
+          if (!aHasPeriod && bHasPeriod) {
+            return 1; // bを前に
+          }
+          // 両方とも期間がある、または両方ともない場合は期間で比較
+          aValue = aDuration;
+          bValue = bDuration;
           break;
+        }
         case 'issueCount':
           aValue = this.getIssueCount(a.id!);
           bValue = this.getIssueCount(b.id!);

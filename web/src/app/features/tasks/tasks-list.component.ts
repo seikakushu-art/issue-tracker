@@ -539,14 +539,36 @@ export class TasksListComponent implements OnInit, OnDestroy {
           aValue = a.title.toLowerCase();
           bValue = b.title.toLowerCase();
           break;
-        case 'startDate':
-          aValue = this.normalizeDate(a.startDate)?.getTime() || 0;
-          bValue = this.normalizeDate(b.startDate)?.getTime() || 0;
+        case 'startDate': {
+          const aStartDate = this.normalizeDate(a.startDate);
+          const bStartDate = this.normalizeDate(b.startDate);
+          // 開始日があるタスクを優先的に先に表示
+          if (aStartDate && !bStartDate) {
+            return -1; // aを前に
+          }
+          if (!aStartDate && bStartDate) {
+            return 1; // bを前に
+          }
+          // 両方とも開始日がある、または両方ともない場合は日付で比較
+          aValue = aStartDate?.getTime() || 0;
+          bValue = bStartDate?.getTime() || 0;
           break;
-        case 'endDate':
-          aValue = this.normalizeDate(a.endDate)?.getTime() || 0;
-          bValue = this.normalizeDate(b.endDate)?.getTime() || 0;
+        }
+        case 'endDate': {
+          const aEndDate = this.normalizeDate(a.endDate);
+          const bEndDate = this.normalizeDate(b.endDate);
+          // 終了日があるタスクを優先的に先に表示
+          if (aEndDate && !bEndDate) {
+            return -1; // aを前に
+          }
+          if (!aEndDate && bEndDate) {
+            return 1; // bを前に
+          }
+          // 両方とも終了日がある、または両方ともない場合は日付で比較
+          aValue = aEndDate?.getTime() || 0;
+          bValue = bEndDate?.getTime() || 0;
           break;
+        }
         case 'progress':
           aValue = this.getTaskProgress(a);
           bValue = this.getTaskProgress(b);
@@ -559,10 +581,23 @@ export class TasksListComponent implements OnInit, OnDestroy {
           aValue = this.normalizeDate(a.createdAt)?.getTime() || 0;
           bValue = this.normalizeDate(b.createdAt)?.getTime() || 0;
           break;
-        case 'period':
-          aValue = this.getTaskDuration(a);
-          bValue = this.getTaskDuration(b);
+        case 'period': {
+          const aDuration = this.getTaskDuration(a);
+          const bDuration = this.getTaskDuration(b);
+          // 期間が計算できるタスク（開始日と終了日の両方がある）を優先的に先に表示
+          const aHasPeriod = this.normalizeDate(a.startDate) && this.normalizeDate(a.endDate);
+          const bHasPeriod = this.normalizeDate(b.startDate) && this.normalizeDate(b.endDate);
+          if (aHasPeriod && !bHasPeriod) {
+            return -1; // aを前に
+          }
+          if (!aHasPeriod && bHasPeriod) {
+            return 1; // bを前に
+          }
+          // 両方とも期間がある、または両方ともない場合は期間で比較
+          aValue = aDuration;
+          bValue = bDuration;
           break;
+        }
         default:
           return 0;
       }

@@ -445,14 +445,36 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
           aValue = a.name;
           bValue = b.name;
           break;
-        case 'startDate':
-          aValue = a.startDate || new Date(0);
-          bValue = b.startDate || new Date(0);
+        case 'startDate': {
+          const aStartDate = a.startDate;
+          const bStartDate = b.startDate;
+          // 開始日がある課題を優先的に先に表示
+          if (aStartDate && !bStartDate) {
+            return -1; // aを前に
+          }
+          if (!aStartDate && bStartDate) {
+            return 1; // bを前に
+          }
+          // 両方とも開始日がある、または両方ともない場合は日付で比較
+          aValue = aStartDate || new Date(0);
+          bValue = bStartDate || new Date(0);
           break;
-        case 'endDate':
-          aValue = a.endDate || new Date(0);
-          bValue = b.endDate || new Date(0);
+        }
+        case 'endDate': {
+          const aEndDate = a.endDate;
+          const bEndDate = b.endDate;
+          // 終了日がある課題を優先的に先に表示
+          if (aEndDate && !bEndDate) {
+            return -1; // aを前に
+          }
+          if (!aEndDate && bEndDate) {
+            return 1; // bを前に
+          }
+          // 両方とも終了日がある、または両方ともない場合は日付で比較
+          aValue = aEndDate || new Date(0);
+          bValue = bEndDate || new Date(0);
           break;
+        }
         case 'progress':
           aValue = a.progress || 0;
           bValue = b.progress || 0;
@@ -461,10 +483,23 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
           aValue = a.createdAt || new Date(0);
           bValue = b.createdAt || new Date(0);
           break;
-        case 'period':
-          aValue = this.getIssueDuration(a);
-          bValue = this.getIssueDuration(b);
+        case 'period': {
+          const aDuration = this.getIssueDuration(a);
+          const bDuration = this.getIssueDuration(b);
+          // 期間が計算できる課題（開始日と終了日の両方がある）を優先的に先に表示
+          const aHasPeriod = a.startDate && a.endDate;
+          const bHasPeriod = b.startDate && b.endDate;
+          if (aHasPeriod && !bHasPeriod) {
+            return -1; // aを前に
+          }
+          if (!aHasPeriod && bHasPeriod) {
+            return 1; // bを前に
+          }
+          // 両方とも期間がある、または両方ともない場合は期間で比較
+          aValue = aDuration;
+          bValue = bDuration;
           break;
+        }
         case 'taskCount':
           aValue = this.getTaskCount(a.id ?? '');
           bValue = this.getTaskCount(b.id ?? '');

@@ -88,6 +88,21 @@ export class IssuesService {
     }
   }
 
+  private async ensureIssueStartCoversTasks(
+    projectId: string,
+    issueId: string,
+    issueStart: Date,
+  ): Promise<void> {
+    const tasksSnap = await getDocs(collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`));
+    for (const docSnap of tasksSnap.docs) {
+      const record = docSnap.data() as Record<string, unknown>;
+      const taskStart = normalizeDate(record['startDate']);
+      if (taskStart && taskStart < issueStart) {
+        throw new Error('課題の開始日は配下のタスクの開始日をカバーするよう設定してください');
+      }
+    }
+  }
+
   private async ensureIssueEndCoversTasks(
     projectId: string,
     issueId: string,
@@ -328,6 +343,9 @@ export class IssuesService {
         await this.validateWithinProjectPeriod(projectId, nextStart ?? null, nextEnd ?? null);
       }
 
+      if (nextStart) {
+        await this.ensureIssueStartCoversTasks(projectId, issueId, nextStart);
+      }
       if (nextEnd) {
         await this.ensureIssueEndCoversTasks(projectId, issueId, nextEnd);
       }

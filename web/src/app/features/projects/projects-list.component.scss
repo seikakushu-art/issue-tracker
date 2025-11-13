@@ -772,10 +772,15 @@
 
 .template-select-row select {
   flex: 1;
+  min-width: 0; // flexアイテムの最小幅を0にして、縮小を許可
+  max-width: 100%; // 親要素の幅を超えないように
   padding: 6px 8px;
   border: 1px solid #cfd6de;
   border-radius: 4px;
   background: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .template-loading {
