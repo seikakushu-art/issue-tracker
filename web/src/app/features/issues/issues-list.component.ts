@@ -80,8 +80,10 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   private memberColorCache = new Map<string, string>();
   private memberProfiles: Record<string, UserDirectoryProfile> = {};
 
-  // 所属プロジェクトの選択肢を保持
+  // 所属プロジェクトの選択肢を保持（管理者用）
   availableProjects: Project[] = [];
+  // 参加している全プロジェクト（プロジェクト名取得用）
+  private allMyProjects: Project[] = [];
 
   // スマートフィルターとタスクキャッシュ
   private issueTasksMap: Record<string, Task[]> = {};
@@ -179,15 +181,51 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   try {
     const projectsServiceAny = this.projectsService as unknown as { listMyProjects: () => Promise<Project[]> };
     const projects: Project[] = await projectsServiceAny.listMyProjects();
-    this.availableProjects = projects.filter((project): project is Project => Boolean(project.id) && project.currentRole === 'admin');
+    this.allMyProjects = projects.filter((project): project is Project => Boolean(project.id));
+    this.availableProjects = this.allMyProjects.filter(project => project.currentRole === 'admin');
   } catch (error) {
     console.error('プロジェクト一覧の取得に失敗しました:', error);
     this.availableProjects = [];
+    this.allMyProjects = [];
   }
 }
 
   isAdmin(): boolean {
     return this.currentRole === 'admin';
+  }
+
+  canCreateIssue(): boolean {
+    return this.currentRole === 'admin' || this.currentRole === 'member';
+  }
+
+  canEditIssue(issue: Issue): boolean {
+    if (this.currentRole === 'admin') {
+      return true;
+    }
+    if (this.currentRole === 'member' && issue.createdBy === this.currentUid) {
+      return true;
+    }
+    return false;
+  }
+
+  canDeleteIssue(issue: Issue): boolean {
+    if (this.currentRole === 'admin') {
+      return true;
+    }
+    if (this.currentRole === 'member' && issue.createdBy === this.currentUid) {
+      return true;
+    }
+    return false;
+  }
+
+  /** 課題の所属プロジェクト名を取得 */
+  getIssueProjectName(issue: Issue): string {
+    if (issue.projectId === this.projectId && this.projectDetails) {
+      return this.projectDetails.name;
+    }
+    // 他のプロジェクトの場合は、allMyProjectsから探す
+    const project = this.allMyProjects.find(p => p.id === issue.projectId);
+    return project?.name ?? issue.projectId;
   }
 
 /**
@@ -572,7 +610,7 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    * 新規課題作成モーダルを開く
    */
   openCreateModal() {
-    if (!this.isAdmin()) {
+    if (!this.canCreateIssue()) {
       alert('課題を作成する権限がありません');
       return;
     }
@@ -594,7 +632,7 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    */
   editIssue(issue: Issue, event: Event) {
     event.stopPropagation();
-    if (!this.isAdmin()) {
+    if (!this.canEditIssue(issue)) {
       alert('課題を編集する権限がありません');
       return;
     }
@@ -616,7 +654,7 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    */
   async archiveIssue(issue: Issue, event: Event) {
     event.stopPropagation();
-    if (!this.isAdmin()) {
+    if (!this.canEditIssue(issue)) {
       alert('課題を変更する権限がありません');
       return;
     }
@@ -637,7 +675,7 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    async deleteIssue(issue: Issue, event: Event) {
     event.stopPropagation(); // カード遷移を阻止
 
-    if (!this.isAdmin()) {
+    if (!this.canDeleteIssue(issue)) {
       alert('課題を削除する権限がありません');
       return;
     }
@@ -665,9 +703,17 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    * 課題を保存
    */
   async saveIssue() {
-    if (!this.isAdmin()) {
-      alert('課題を変更する権限がありません');
-      return;
+    // 新規作成時はcanCreateIssue、編集時はcanEditIssueでチェック
+    if (this.editingIssue) {
+      if (!this.canEditIssue(this.editingIssue)) {
+        alert('課題を変更する権限がありません');
+        return;
+      }
+    } else {
+      if (!this.canCreateIssue()) {
+        alert('課題を作成する権限がありません');
+        return;
+      }
     }
     const trimmedName = this.issueForm.name.trim();
     if (!trimmedName) {

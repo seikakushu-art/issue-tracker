@@ -472,7 +472,7 @@ export class DashboardComponent implements OnInit {
           postedAt: post.createdAt ?? new Date(),
           excerpt: this.buildExcerpt(post.content),
           href: '/board',
-          fragment: post.id!,
+          fragment: `post-${post.id}`,
         } satisfies BulletinPreviewItem));
       if (transformed.length === 0) {
         this.bulletinPosts.set([]);
@@ -580,9 +580,10 @@ export class DashboardComponent implements OnInit {
       const queryParams: Record<string, string> = {
         smartFilter: insight.type,
       };
-      // taskIdがある場合はタスク詳細画面に遷移（focusパラメータを使用）
+      // taskIdがある場合はタスク詳細画面に遷移（focusパラメータとopenDetailパラメータを使用）
       if (insight.taskId) {
         queryParams['focus'] = insight.taskId;
+        queryParams['openDetail'] = 'true';
       }
       void this.router.navigate(
         ['/projects', insight.projectId, 'issues', insight.issueId],
@@ -902,7 +903,7 @@ export class DashboardComponent implements OnInit {
   }
    /** 通知一覧からタスクの詳細へ遷移する */
    goToTaskDetail(task: { projectId: string; issueId: string; taskId: string; commentId?: string }): void {
-    const queryParams: Record<string, string> = { focus: task.taskId };
+    const queryParams: Record<string, string> = { focus: task.taskId, openDetail: 'true' };
     if (task.commentId) {
       queryParams['commentId'] = task.commentId;
     }

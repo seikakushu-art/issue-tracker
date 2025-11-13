@@ -84,6 +84,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   selectedTask: Task | null = null;
   pendingFocusTaskId: string | null = null;
   pendingCommentId: string | null = null;
+  pendingOpenDetail: boolean = false;
   newChecklistText = '';
   currentRole: Role | null = null;
   currentUid: string | null = null;
@@ -204,10 +205,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((params) => {
       const focus = params.get('focus');
       const commentId = params.get('commentId');
+      const openDetail = params.get('openDetail') === 'true';
       this.pendingFocusTaskId = focus;
       this.pendingCommentId = commentId;
+      this.pendingOpenDetail = openDetail;
       if (focus) {
-        this.trySelectTaskById(focus);
+        // タスクが既に読み込まれている場合は即座に選択
+        const target = this.tasks.find((task) => task.id === focus);
+        if (target) {
+          this.trySelectTaskById(focus, openDetail);
+        }
+        // タスクがまだ読み込まれていない場合は、loadData内で処理される
       }
     });
     this.loadSortPreferences();
@@ -266,7 +274,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.filterTasks();
       this.updateIssueProgress();
       if (this.pendingFocusTaskId) {
-        this.trySelectTaskById(this.pendingFocusTaskId);
+        this.trySelectTaskById(this.pendingFocusTaskId, this.pendingOpenDetail);
       }
       if (this.selectedTaskId) {
         const refreshed = tasks.find(task => task.id === this.selectedTaskId);
@@ -1017,7 +1025,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         setTimeout(() => {
           this.scrollToComment(this.pendingCommentId);
           this.pendingCommentId = null;
-        }, 100); // DOM更新を待つ
+        }, 300); // 詳細パネルのアニメーション完了を待つ
       }
     } catch (error) {
       console.error('コメントの読み込みに失敗しました:', error);
@@ -1036,8 +1044,19 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
     const element = document.getElementById(`comment-${commentId}`);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // ハイライト効果を追加（オプション）
+      // 詳細パネル内のスクロールコンテナを取得
+      const detailPanel = element.closest('.task-detail-panel');
+      if (detailPanel) {
+        // 詳細パネル内のスクロールコンテナに対してスクロール
+        const elementTop = element.getBoundingClientRect().top;
+        const panelTop = detailPanel.getBoundingClientRect().top;
+        const scrollTop = detailPanel.scrollTop + (elementTop - panelTop) - (detailPanel.clientHeight / 2) + (element.clientHeight / 2);
+        detailPanel.scrollTo({ top: scrollTop, behavior: 'smooth' });
+      } else {
+        // フォールバック: 通常のscrollIntoView
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      // ハイライト効果を追加
       element.classList.add('comment-highlight');
       setTimeout(() => {
         element.classList.remove('comment-highlight');
@@ -1510,17 +1529,25 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   /** 指定IDのタスクを選択候補として適用する */
-  private trySelectTaskById(taskId: string | null): void {
+  private trySelectTaskById(taskId: string | null, openDetail: boolean = false): void {
     if (!taskId) {
       return;
     }
     const target = this.tasks.find((task) => task.id === taskId);
     if (target) {
-      // 検索結果からの遷移時は詳細パネルを開かずにスクロールのみ
-      setTimeout(() => {
-        this.scrollToTask(taskId);
-      }, 100);
-      this.pendingFocusTaskId = null;
+      // コメントIDが指定されている場合、またはopenDetailフラグがtrueの場合は、タスクを選択して詳細パネルを開く
+      if (this.pendingCommentId || openDetail) {
+        this.selectTask(target);
+        this.pendingFocusTaskId = null;
+        this.pendingOpenDetail = false;
+      } else {
+        // 検索結果からの遷移時は詳細パネルを開かずにスクロールのみ
+        setTimeout(() => {
+          this.scrollToTask(taskId);
+        }, 100);
+        this.pendingFocusTaskId = null;
+        this.pendingOpenDetail = false;
+      }
     }
   }
 

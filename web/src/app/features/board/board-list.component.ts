@@ -83,16 +83,20 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
     if (!postId) {
       return;
     }
-    // フラグメントが "post-{id}" 形式の場合は "post-" プレフィックスを削除
-    const actualPostId = postId.startsWith('post-') ? postId.substring(5) : postId;
+    // フラグメントが "post-{id}" 形式の場合は検索結果からの遷移（ハイライト適用）
+    // そうでない場合は「もっと見る」からの遷移（ハイライトなし）
+    const isFromSearch = postId.startsWith('post-');
+    const actualPostId = isFromSearch ? postId.substring(5) : postId;
     const element = document.getElementById(actualPostId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // ハイライト効果を適用（2秒間）
-      element.classList.add('post-highlight');
-      setTimeout(() => {
-        element.classList.remove('post-highlight');
-      }, 2000);
+      // 検索結果からの遷移の場合のみハイライト効果を適用（2秒間）
+      if (isFromSearch) {
+        element.classList.add('post-highlight');
+        setTimeout(() => {
+          element.classList.remove('post-highlight');
+        }, 2000);
+      }
     } else {
       // 投稿が現在のページにない場合は、該当投稿を含むページを探して移動
       const allPosts = this.allPosts();

@@ -75,7 +75,7 @@
       </button>
       <h2>課題一覧</h2>
     </div>
-    <button class="btn btn-primary" *ngIf="isAdmin()" (click)="openCreateModal()">
+    <button class="btn btn-primary" *ngIf="canCreateIssue()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規課題
     </button>
   </div>
@@ -159,20 +159,18 @@
          >
            <i class="icon-pin" aria-hidden="true"></i>
          </button>
-         <ng-container *ngIf="isAdmin()">
-           <button class="btn-icon" (click)="editIssue(issue, $event)" title="編集">
-             <i class="icon-edit" aria-hidden="true"></i>
-             <span class="action-label">📝編集</span>
-           </button>
-           <button class="btn-icon" (click)="archiveIssue(issue, $event)" title="アーカイブ">
-             <i class="icon-archive" aria-hidden="true"></i>
-             <span class="action-label">{{ issue.archived ? '復元' : 'アーカイブ' }}</span>
-           </button>
-           <button class="btn-icon" (click)="deleteIssue(issue, $event)" title="削除">
-             <i class="icon-delete" aria-hidden="true"></i>
-             <span class="action-label">削除</span>
-           </button>
-         </ng-container>
+         <button class="btn-icon" *ngIf="canEditIssue(issue)" (click)="editIssue(issue, $event)" title="編集">
+           <i class="icon-edit" aria-hidden="true"></i>
+           <span class="action-label">📝編集</span>
+         </button>
+         <button class="btn-icon" *ngIf="canEditIssue(issue)" (click)="archiveIssue(issue, $event)" title="アーカイブ">
+           <i class="icon-archive" aria-hidden="true"></i>
+           <span class="action-label">{{ issue.archived ? '復元' : 'アーカイブ' }}</span>
+         </button>
+         <button class="btn-icon" *ngIf="canDeleteIssue(issue)" (click)="deleteIssue(issue, $event)" title="削除">
+           <i class="icon-delete" aria-hidden="true"></i>
+           <span class="action-label">削除</span>
+         </button>
        </div>
         <div class="issue-title">
           <div
@@ -295,7 +293,9 @@
       </div>
       <div class="form-group">
         <label for="projectId">所属プロジェクト</label>
+        <!-- 管理者の場合は選択肢を表示 -->
         <select
+          *ngIf="isAdmin()"
           id="projectId"
           [(ngModel)]="issueForm.projectId"
           name="projectId"
@@ -305,7 +305,11 @@
             {{ project.name }}
           </option>
         </select>
-        <small class="hint" *ngIf="editingIssue">選択したプロジェクトへ課題と配下タスクをまとめて移動します。</small>
+        <!-- メンバーの場合はプロジェクト名のみ表示 -->
+        <div *ngIf="!isAdmin() && editingIssue" class="project-name-display">
+          {{ getIssueProjectName(editingIssue) }}
+        </div>
+        <small class="hint" *ngIf="editingIssue && isAdmin()">選択したプロジェクトへ課題と配下タスクをまとめて移動します。</small>
         <small class="hint" *ngIf="!editingIssue">新規課題は現在表示中のプロジェクトに登録されます。</small>
       </div>
 

@@ -119,6 +119,7 @@ export interface Issue {
   archived: boolean;  // アーカイブ状態
   progress?: number;  // 進捗率（0-100、配下タスクの加重平均から自動集計）
   createdAt?: Date | null;
+  createdBy?: string;  // 作成者のユーザーID
   representativeTaskId?: string | null;  // 課題カードに表示する代表タスクID
   pinnedBy?: string[];  // ピン止めしたユーザーID配列
 }

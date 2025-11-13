@@ -50,6 +50,7 @@ export class IssuesService {
       startDate: normalizeDate(dataRecord['startDate']) ?? null,
       endDate: normalizeDate(dataRecord['endDate']) ?? null,
       createdAt: normalizeDate(dataRecord['createdAt']) ?? null,
+      createdBy: typeof dataRecord['createdBy'] === 'string' ? dataRecord['createdBy'] : undefined,
       progress: dataRecord['progress'] as number ?? 0,
       archived: (dataRecord['archived'] as boolean) ?? false,
       representativeTaskId: (dataRecord['representativeTaskId'] as string | null | undefined) ?? null,
@@ -165,7 +166,8 @@ export class IssuesService {
     goal?: string;
     themeColor?: string;
   }): Promise<string> {
-    await this.projectsService.ensureProjectRole(projectId, ['admin']);
+    const user = await this.requireUser();
+    await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     
     // アクティブな課題数の上限チェック（50件）
     const activeIssueCount = await this.countActiveIssues(projectId);
@@ -189,6 +191,7 @@ export class IssuesService {
       name: input.name,
       archived: false,
       createdAt: serverTimestamp(),
+      createdBy: user.uid,
       representativeTaskId: null,
     };
 
@@ -319,36 +322,50 @@ export class IssuesService {
       representativeTaskId: string | null;
     }>
   ): Promise<void> {
-    await this.projectsService.ensureProjectRole(projectId, ['admin']);
+    const user = await this.requireUser();
+    const issue = await this.getIssue(projectId, issueId);
+    if (!issue) {
+      throw new Error('課題が見つかりません');
+    }
+    
+    // 管理者または作成者のみ更新可能
+    const project = await this.projectsService.getProject(projectId);
+    if (!project) {
+      throw new Error('プロジェクトが見つかりません');
+    }
+    const currentRole = project.roles?.[user.uid] ?? null;
+    const isAdmin = currentRole === 'admin';
+    const isCreator = issue.createdBy === user.uid;
+    
+    if (!isAdmin && !isCreator) {
+      throw new Error('課題を編集する権限がありません');
+    }
     // 名称変更の場合、重複チェック
     if (updates.name !== undefined) {
       await this.checkNameUniqueness(projectId, updates.name, issueId);
     }
 
-    const issue = await this.getIssue(projectId, issueId);
-    if (issue) {
-      const currentStart = normalizeDate(issue.startDate ?? null);
-      const currentEnd = normalizeDate(issue.endDate ?? null);
-      const nextStart = updates.startDate !== undefined
-        ? normalizeDate(updates.startDate)
-        : currentStart;
-      const nextEnd = updates.endDate !== undefined
-        ? normalizeDate(updates.endDate)
-        : currentEnd;
+    const currentStart = normalizeDate(issue.startDate ?? null);
+    const currentEnd = normalizeDate(issue.endDate ?? null);
+    const nextStart = updates.startDate !== undefined
+      ? normalizeDate(updates.startDate)
+      : currentStart;
+    const nextEnd = updates.endDate !== undefined
+      ? normalizeDate(updates.endDate)
+      : currentEnd;
 
-      if (nextStart && nextEnd && nextStart > nextEnd) {
-        throw new Error('開始日は終了日以前である必要があります');
-      }
-      if (updates.startDate !== undefined || updates.endDate !== undefined) {
-        await this.validateWithinProjectPeriod(projectId, nextStart ?? null, nextEnd ?? null);
-      }
+    if (nextStart && nextEnd && nextStart > nextEnd) {
+      throw new Error('開始日は終了日以前である必要があります');
+    }
+    if (updates.startDate !== undefined || updates.endDate !== undefined) {
+      await this.validateWithinProjectPeriod(projectId, nextStart ?? null, nextEnd ?? null);
+    }
 
-      if (nextStart) {
-        await this.ensureIssueStartCoversTasks(projectId, issueId, nextStart);
-      }
-      if (nextEnd) {
-        await this.ensureIssueEndCoversTasks(projectId, issueId, nextEnd);
-      }
+    if (nextStart) {
+      await this.ensureIssueStartCoversTasks(projectId, issueId, nextStart);
+    }
+    if (nextEnd) {
+      await this.ensureIssueEndCoversTasks(projectId, issueId, nextEnd);
     }
 
     const docRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
@@ -404,7 +421,24 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
    * @param archived アーカイブ状態
    */
   async archiveIssue(projectId: string, issueId: string, archived: boolean): Promise<void> {
-    await this.projectsService.ensureProjectRole(projectId, ['admin']);
+    const user = await this.requireUser();
+    const issue = await this.getIssue(projectId, issueId);
+    if (!issue) {
+      throw new Error('課題が見つかりません');
+    }
+    
+    // 管理者または作成者のみアーカイブ可能
+    const project = await this.projectsService.getProject(projectId);
+    if (!project) {
+      throw new Error('プロジェクトが見つかりません');
+    }
+    const currentRole = project.roles?.[user.uid] ?? null;
+    const isAdmin = currentRole === 'admin';
+    const isCreator = issue.createdBy === user.uid;
+    
+    if (!isAdmin && !isCreator) {
+      throw new Error('課題をアーカイブする権限がありません');
+    }
     
     // 課題をアーカイブする際は、配下のタスクも自動的にアーカイブする
     if (archived) {
@@ -448,7 +482,24 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
    * @param issueId 課題ID
    */
   async deleteIssue(projectId: string, issueId: string): Promise<void> {
-    await this.projectsService.ensureProjectRole(projectId, ['admin']);
+    const user = await this.requireUser();
+    const issue = await this.getIssue(projectId, issueId);
+    if (!issue) {
+      throw new Error('課題が見つかりません');
+    }
+    
+    // 管理者または作成者のみ削除可能
+    const project = await this.projectsService.getProject(projectId);
+    if (!project) {
+      throw new Error('プロジェクトが見つかりません');
+    }
+    const currentRole = project.roles?.[user.uid] ?? null;
+    const isAdmin = currentRole === 'admin';
+    const isCreator = issue.createdBy === user.uid;
+    
+    if (!isAdmin && !isCreator) {
+      throw new Error('課題を削除する権限がありません');
+    }
     
     // 課題配下のタスクを取得
     const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`);

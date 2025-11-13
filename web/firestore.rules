@@ -53,9 +53,18 @@ allow update, delete: if isMember(projectId) && role(projectId) == 'admin';
 // 課題のルール
 match /issues/{issueId} {
 allow read: if isMember(projectId);
-// 課題の作成・更新は管理者のみ（サービス層の実装と一致）
-allow create, update: if isMember(projectId) && role(projectId) == 'admin';
-allow delete: if isMember(projectId) && role(projectId) == 'admin';
+// 課題の作成はadmin/member（サービス層の実装と一致）
+allow create: if isMember(projectId) && (role(projectId) == 'admin' || role(projectId) == 'member');
+// 課題の更新はadmin全員、またはmemberは自分の作成した課題のみ（サービス層の実装と一致）
+allow update: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && resource.data.createdBy == request.auth.uid)
+);
+// 課題の削除はadmin全員、またはmemberは自分の作成した課題のみ（サービス層の実装と一致）
+allow delete: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && resource.data.createdBy == request.auth.uid)
+);
 
 // タスクのルール（正しいパス構造: projects/{projectId}/issues/{issueId}/tasks/{taskId}）
 match /tasks/{taskId} {
