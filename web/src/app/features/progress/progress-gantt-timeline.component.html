@@ -16,7 +16,10 @@
           [style.gridTemplateColumns]="'var(--label-width) ' + gridTemplate"
         >
           <div class="gantt-timeline__header-label">
-            <span>課題 / タスク</span>
+            <div class="header-label-content">
+              <span *ngIf="projectName" class="header-label-project" [title]="projectName">{{ projectName }}</span>
+              <span class="header-label-title">課題 / タスク</span>
+            </div>
           </div>
           <div class="gantt-timeline__months" [style.gridTemplateColumns]="gridTemplate">
             <div

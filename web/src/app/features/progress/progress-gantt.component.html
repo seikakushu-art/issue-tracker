@@ -40,7 +40,7 @@
               </select>
             </label>
           </div>
-          <span class="gantt-controls__hint">タイムラインは過去・未来5年までスクロールできます。</span>
+          <span class="gantt-controls__hint">まずは表示するプロジェクトを選択してください。</span>
         </div>
       </div>
     </div>
@@ -76,6 +76,7 @@
           [gridTemplate]="getGridTemplate()"
           [labelColumnWidth]="labelColumnWidth"
           [dayCellWidth]="dayCellWidth"
+          [projectName]="getSelectedProjectName()"
           [highlightedDayIndex]="hoveredDayIndex"
           [highlightedTaskRange]="hoveredTaskRange"
           (scrolled)="onTimelineScroll($event)"

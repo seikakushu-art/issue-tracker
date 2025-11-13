@@ -96,6 +96,47 @@
     color: #1e293b;
     box-shadow: inset -1px 0 0 #e2e8f0;
   }
+
+  .header-label-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .header-label-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.2;
+  }
+
+  .header-label-project-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .header-label-project-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    flex-shrink: 0;
+  }
+
+  .header-label-project {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    min-width: 0;
+    letter-spacing: -0.01em;
+  }
   
   .gantt-timeline__months,
   .gantt-timeline__days {

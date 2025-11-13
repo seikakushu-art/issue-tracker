@@ -24,6 +24,7 @@ export class ProgressGanttTimelineComponent {
   @Input() gridTemplate = '';
   @Input() labelColumnWidth = 280;
   @Input() dayCellWidth = 48;
+  @Input() projectName: string | null = null;
     /** 表示側で強調したい日付インデックス */
   @Input() highlightedDayIndex: number | null = null;
   /** タスク選択に応じて強調したい日付範囲 [start, end] */

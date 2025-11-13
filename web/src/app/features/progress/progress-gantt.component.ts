@@ -182,7 +182,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
             continue;
           }
           // プロジェクト単位で取得したタスクから、該当issueのタスクをフィルタリング
-          const tasks = allTasks.filter((task) => task.issueId === issue.id);
+          // 破棄されたタスクは除外
+          const tasks = allTasks.filter((task) => task.issueId === issue.id && task.status !== 'discarded');
           const hydratedTasks = tasks.map((task) => this.normalizeTaskDates(task));
           ganttIssues.push({ project, issue, tasks: hydratedTasks, collapsed: false });
         }
@@ -265,6 +266,14 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   trackByProjectId(_: number, project: Project): string | undefined {
     return project.id ?? project.name;
+  }
+
+  getSelectedProjectName(): string | null {
+    if (!this.selectedProjectId) {
+      return null;
+    }
+    const project = this.availableProjects.find((p) => p.id === this.selectedProjectId);
+    return project?.name ?? null;
   }
 
   handleProjectSelectChange(event: Event): void {
