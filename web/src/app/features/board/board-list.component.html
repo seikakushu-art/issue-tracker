@@ -78,6 +78,10 @@
     <section class="board__posts" id="board-posts-section" aria-labelledby="board-posts-title">
       <div class="board__posts-header">
         <h2 id="board-posts-title">最新の投稿</h2>
+        <a class="search-button" routerLink="/search">
+          <span class="search-button__icon" aria-hidden="true">🔍</span>
+          検索
+        </a>
       </div>
   
       <div class="board__posts-loading" *ngIf="loadingPosts()">

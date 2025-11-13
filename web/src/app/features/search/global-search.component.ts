@@ -19,6 +19,7 @@ interface SearchResultItem {
   description?: string;
   routerLink: (string | number)[];
   fragment?: string;
+  queryParams?: Record<string, string>;
   titleLower: string;
   contextLower: string | null;
   descriptionLower: string | null;
@@ -127,6 +128,12 @@ export class GlobalSearchComponent implements OnInit {
         }, 300);
       });
       event.preventDefault();
+    } else if (item.type === 'task' && item.queryParams) {
+      // タスクの場合は、queryParamsを使って遷移
+      this.router.navigate(item.routerLink, { queryParams: item.queryParams }).then(() => {
+        // 遷移は完了するが、スクロールはtasks-list.component.tsで処理される
+      });
+      event.preventDefault();
     }
     // プロジェクト以外は通常のルーターリンクを使用
   }
@@ -164,16 +171,27 @@ export class GlobalSearchComponent implements OnInit {
       );
 
       const issueEntries = issuesByProject.flat();
-      const issueItems = issueEntries.map(({ issue, project }) =>
-        this.createItem({
+      const issueItems = issueEntries.map(({ issue, project }) => {
+        const item = this.createItem({
           id: issue.id!,
           type: 'issue',
           title: issue.name,
-          context: undefined,
+          context: `プロジェクト: ${project.name}`,
           description: issue.description,
           routerLink: ['/projects', project.id!, 'issues', issue.id!],
-        }),
-      );
+        });
+        // 課題のcontext（プロジェクト名）は検索対象から除外
+        item.contextLower = null;
+        return item;
+      });
+
+      // 課題IDから課題情報を取得するためのマップを作成
+      const issueMap = new Map<string, { issue: Issue & { id: string }; project: Project & { id: string } }>();
+      issueEntries.forEach(({ issue, project }) => {
+        if (issue.id) {
+          issueMap.set(issue.id, { issue, project });
+        }
+      });
 
       const tasksByProject = await Promise.all(
         validProjects.map(async (project) => {
@@ -191,15 +209,26 @@ export class GlobalSearchComponent implements OnInit {
 
       const taskItems = tasksByProject
         .flat()
-        .map(({ task }) => {
-          return this.createItem({
+        .map(({ task, project }) => {
+          const issueInfo = task.issueId ? issueMap.get(task.issueId) : undefined;
+          const contextParts: string[] = [];
+          if (issueInfo) {
+            contextParts.push(`課題: ${issueInfo.issue.name}`);
+          }
+          contextParts.push(`プロジェクト: ${project.name}`);
+          
+          const item = this.createItem({
             id: task.id!,
             type: 'task',
             title: task.title,
-            context: undefined,
+            context: contextParts.join(' / '),
             description: task.description,
             routerLink: ['/projects', task.projectId, 'issues', task.issueId],
+            queryParams: { focus: task.id! },
           });
+          // タスクのcontext（課題名・プロジェクト名）は検索対象から除外
+          item.contextLower = null;
+          return item;
         })
         .filter((item): item is SearchResultItem => Boolean(item));
 
@@ -264,6 +293,7 @@ export class GlobalSearchComponent implements OnInit {
     description?: string | null;
     routerLink: (string | number)[];
     fragment?: string;
+    queryParams?: Record<string, string>;
   }): SearchResultItem {
     const title = input.title ?? '';
     const context = input.context?.trim() || undefined;
@@ -276,6 +306,7 @@ export class GlobalSearchComponent implements OnInit {
       description,
       routerLink: [...input.routerLink],
       fragment: input.fragment ?? undefined,
+      queryParams: input.queryParams,
       titleLower: title.toLowerCase(),
       contextLower: context ? context.toLowerCase() : null,
       descriptionLower: description ? description.toLowerCase() : null,

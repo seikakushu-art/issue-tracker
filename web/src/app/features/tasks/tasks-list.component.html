@@ -140,6 +140,7 @@
     <div
       *ngFor="let task of filteredTasks"
       class="task-card"
+      [id]="'task-' + task.id"
       [class.completed]="task.status === 'completed'"
       [class.discarded]="task.status === 'discarded'"
       [class.archived]="task.archived"

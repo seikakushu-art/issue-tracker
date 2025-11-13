@@ -187,6 +187,36 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 16px;
+  }
+
+  .board__posts-header .search-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    height: fit-content;
+    box-sizing: border-box;
+    line-height: 1.5;
+    min-height: 36px;
+  }
+
+  .board__posts-header .search-button:hover,
+  .board__posts-header .search-button:focus {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #334155;
+  }
+
+  .board__posts-header .search-button__icon {
+    font-size: 1rem;
   }
   
   .board__posts-loading,

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewChecked, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { BulletinPost, Project, Role } from '../../models/schema';
 import { BoardService, ListAccessiblePostsResult } from './board.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -14,7 +14,7 @@ interface BoardPostView extends BulletinPost {
 @Component({
   selector: 'app-board-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './board-list.component.html',
   styleUrls: ['./board-list.component.scss'],
 })
@@ -83,14 +83,20 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
     if (!postId) {
       return;
     }
-    const element = document.getElementById(postId);
+    // フラグメントが "post-{id}" 形式の場合は "post-" プレフィックスを削除
+    const actualPostId = postId.startsWith('post-') ? postId.substring(5) : postId;
+    const element = document.getElementById(actualPostId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // ハイライト効果は適用しない（掲示板プレビューからの遷移時はスクロールのみ）
+      // ハイライト効果を適用（2秒間）
+      element.classList.add('post-highlight');
+      setTimeout(() => {
+        element.classList.remove('post-highlight');
+      }, 2000);
     } else {
       // 投稿が現在のページにない場合は、該当投稿を含むページを探して移動
       const allPosts = this.allPosts();
-      const targetPost = allPosts.find((post) => post.id === postId);
+      const targetPost = allPosts.find((post) => post.id === actualPostId);
       if (targetPost) {
         const postIndex = allPosts.indexOf(targetPost);
         const targetPage = Math.floor(postIndex / this.pageSize()) + 1;

@@ -1480,6 +1480,22 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.resetAttachmentState();
       void this.loadTaskComments(task.id);
       void this.loadTaskAttachments(task.id);
+      // タスクカードまでスクロール
+      setTimeout(() => {
+        this.scrollToTask(task.id!);
+      }, 100);
+    }
+  }
+
+  private scrollToTask(taskId: string): void {
+    const element = document.getElementById(`task-${taskId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // ハイライト効果を追加（2秒間）
+      element.classList.add('task-highlight');
+      setTimeout(() => {
+        element.classList.remove('task-highlight');
+      }, 2000);
     }
   }
 
@@ -1500,7 +1516,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
     const target = this.tasks.find((task) => task.id === taskId);
     if (target) {
-      this.selectTask(target);
+      // 検索結果からの遷移時は詳細パネルを開かずにスクロールのみ
+      setTimeout(() => {
+        this.scrollToTask(taskId);
+      }, 100);
       this.pendingFocusTaskId = null;
     }
   }
