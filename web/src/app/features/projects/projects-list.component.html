@@ -66,6 +66,7 @@
   <div class="projects-grid">
     <div 
       *ngFor="let project of filteredProjects" 
+      [id]="'project-' + project.id"
       class="project-card"
       [class.archived]="project.archived"
       [class.pinned]="isPinned(project)"

@@ -227,6 +227,10 @@ export class DashboardService {
 
     for (const project of projects) {
       for (const issue of project.issues) {
+        // アーカイブされた課題は検知対象外
+        if (issue.archived) {
+          continue;
+        }
         const issueUpdatedAt = issue.createdAt ? this.normalizeDate(issue.createdAt) : null;
         for (const task of issue.tasks) {
           // アーカイブされたタスクは検知対象外
@@ -295,9 +299,10 @@ export class DashboardService {
         }
 
         // 進捗が停滞している課題の判定は、現在のユーザーが担当しているタスクを含む課題のみを対象とする
-        // アーカイブされたタスクは除外
+        // アーカイブされたタスクと破棄されたタスクは除外
         const userTasks = issue.tasks.filter((task) => 
           !task.archived &&
+          task.status !== 'discarded' &&
           task.assigneeIds && 
           task.assigneeIds.includes(currentUserId)
         );

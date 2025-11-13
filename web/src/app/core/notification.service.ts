@@ -466,6 +466,19 @@ export class NotificationService {
         })
       );
 
+      // 課題のアーカイブ状態を取得
+      const issueRefs = new Map<string, { projectId: string; issueId: string }>();
+      for (const item of enriched) {
+        const key = `${item.task.projectId}/${item.task.issueId}`;
+        if (!issueRefs.has(key)) {
+          issueRefs.set(key, {
+            projectId: item.task.projectId,
+            issueId: item.task.issueId,
+          });
+        }
+      }
+      const issueArchivedMap = await this.fetchIssueArchivedStatus(issueRefs);
+
       // 削除/アーカイブされたプロジェクト、またはメンバーとして削除されたプロジェクトのタスクを除外
       const filteredEnriched = enriched.filter((item) => {
         const project = projectMap.get(item.task.projectId);
@@ -473,6 +486,13 @@ export class NotificationService {
         if (!project || project.archived) {
           return false;
         }
+        
+        // 課題がアーカイブされている場合は除外
+        const issueArchived = issueArchivedMap.get(`${item.task.projectId}/${item.task.issueId}`);
+        if (issueArchived === true) {
+          return false;
+        }
+        
         // アクセス可能なプロジェクトのみを対象とする（メンバーとして削除されたプロジェクトを除外）
         return accessibleProjects.has(item.task.projectId);
       });

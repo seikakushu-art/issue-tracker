@@ -474,6 +474,25 @@
   transform: translateY(-2px);
 }
 
+.issue-card.issue-highlight {
+  animation: highlight-fade 4s ease-out;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3), 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@keyframes highlight-fade {
+  0% {
+    background-color: rgba(37, 99, 235, 0.1);
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3), 0 4px 12px rgba(0,0,0,0.15);
+  }
+  100% {
+    background-color: white;
+    border-color: #e1e5e9;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+}
+
 .theme-strip {
   position: absolute;
   inset: 0 0 auto 0;

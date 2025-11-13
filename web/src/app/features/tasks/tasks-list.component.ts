@@ -214,7 +214,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    void this.router.navigate(['/projects', this.projectId]);
+    // 現在の課題IDをクエリパラメータとして渡す
+    const queryParams: Record<string, string> = {};
+    if (this.issueId) {
+      queryParams['focus'] = this.issueId;
+    }
+
+    void this.router.navigate(['/projects', this.projectId], { queryParams });
   }
 
   /** データ読み込み */

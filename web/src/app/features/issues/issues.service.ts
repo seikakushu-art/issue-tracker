@@ -405,7 +405,40 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
    */
   async archiveIssue(projectId: string, issueId: string, archived: boolean): Promise<void> {
     await this.projectsService.ensureProjectRole(projectId, ['admin']);
+    
+    // 課題をアーカイブする際は、配下のタスクも自動的にアーカイブする
+    if (archived) {
+      await this.archiveIssueDescendants(projectId, issueId, true);
+    } else {
+      // 課題を復元する際は、配下のタスクも復元する
+      await this.archiveIssueDescendants(projectId, issueId, false);
+    }
+    
     await this.updateIssue(projectId, issueId, { archived });
+  }
+
+  /**
+   * 課題配下のタスクを一括でアーカイブ/復元する
+   * @param projectId プロジェクトID
+   * @param issueId 課題ID
+   * @param archived trueでアーカイブ、falseで復元
+   */
+  private async archiveIssueDescendants(projectId: string, issueId: string, archived: boolean): Promise<void> {
+    // 課題配下のタスクを取得
+    const tasksRef = collection(this.db, `projects/${projectId}/issues/${issueId}/tasks`);
+    const tasksSnap = await getDocs(tasksRef);
+    
+    const updatePromises: Promise<void>[] = [];
+    
+    // 各タスクをアーカイブ/復元
+    for (const taskDoc of tasksSnap.docs) {
+      const taskId = taskDoc.id;
+      const taskRef = doc(this.db, `projects/${projectId}/issues/${issueId}/tasks/${taskId}`);
+      updatePromises.push(updateDoc(taskRef, { archived }));
+    }
+    
+    // すべての更新を並列実行
+    await Promise.all(updatePromises);
   }
 
   /**

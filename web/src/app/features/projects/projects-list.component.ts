@@ -171,6 +171,14 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
           this.editingProject = refreshedEditing;
         }
       }
+
+      // クエリパラメータからfocus（プロジェクトID）を取得してスクロール
+      const focusProjectId = this.route.snapshot.queryParamMap.get('focus');
+      if (focusProjectId) {
+        setTimeout(() => {
+          this.scrollToProject(focusProjectId);
+        }, 100);
+      }
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
     }
@@ -425,6 +433,21 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
    */
   selectProject(project: Project) {
     this.router.navigate(['/projects', project.id]);
+  }
+
+  /**
+   * 指定されたプロジェクトまでスクロールしてハイライトする
+   */
+  private scrollToProject(projectId: string): void {
+    const element = document.getElementById(`project-${projectId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // 一時的にハイライトを適用
+      element.classList.add('project-highlight');
+      setTimeout(() => {
+        element.classList.remove('project-highlight');
+      }, 4000);
+    }
   }
 
   goToDashboard(): void {

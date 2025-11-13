@@ -130,6 +130,7 @@
   <div class="issues-grid">
     <div
       *ngFor="let issue of filteredIssues"
+      [id]="'issue-' + issue.id"
       class="issue-card"
       [class.archived]="issue.archived"
       [class.pinned]="isIssuePinned(issue)"

@@ -487,6 +487,12 @@ export class DashboardComponent implements OnInit {
       this.bulletinLoading.set(false);
     }
   }
+  /** 最新の投稿IDを取得（掲示板への遷移時にスクロール用） */
+  getLatestPostId(): string | null {
+    const posts = this.bulletinPosts();
+    return posts.length > 0 ? posts[0].id : null;
+  }
+
   /** 重要タスクリストを再取得する */
   async refreshActionableTasks(): Promise<void> {
     this.actionableLoading.set(true);

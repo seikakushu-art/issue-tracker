@@ -159,6 +159,14 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       this.filterIssues();
       await this.refreshTaskSummaries();
       await this.loadTagsForProject(this.projectId); // 直近で作成されたタグも反映
+
+      // クエリパラメータからfocus（課題ID）を取得してスクロール
+      const focusIssueId = this.route.snapshot.queryParamMap.get('focus');
+      if (focusIssueId) {
+        setTimeout(() => {
+          this.scrollToIssue(focusIssueId);
+        }, 100);
+      }
     } catch (error) {
       console.error('課題の読み込みに失敗しました:', error);
     }
@@ -293,7 +301,13 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
   }
 
   goToProjectsList(): void {
-    void this.router.navigate(['/projects']);
+    // 現在のプロジェクトIDをクエリパラメータとして渡す
+    const queryParams: Record<string, string> = {};
+    if (this.projectId) {
+      queryParams['focus'] = this.projectId;
+    }
+
+    void this.router.navigate(['/projects'], { queryParams });
   }
 
   /** スマートフィルターの開閉をトグル */
@@ -519,6 +533,21 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    */
   selectIssue(issue: Issue) {
     this.router.navigate(['/projects', this.projectId, 'issues', issue.id]);
+  }
+
+  /**
+   * 指定された課題までスクロールしてハイライトする
+   */
+  private scrollToIssue(issueId: string): void {
+    const element = document.getElementById(`issue-${issueId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // 一時的にハイライトを適用
+      element.classList.add('issue-highlight');
+      setTimeout(() => {
+        element.classList.remove('issue-highlight');
+      }, 4000);
+    }
   }
 
   /**

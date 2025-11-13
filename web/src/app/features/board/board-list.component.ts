@@ -83,7 +83,7 @@ export class BoardListComponent implements OnInit {
     }
     const element = document.getElementById(postId);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       // ハイライト効果を追加（オプション）
       element.classList.add('post-highlight');
       setTimeout(() => {
