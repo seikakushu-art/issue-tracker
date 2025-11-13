@@ -49,12 +49,17 @@ export class ProjectSidebarComponent implements OnInit {
   /** エラー発生時のメッセージを控える。 */
   loadError = '';
 
+  /** サイドバーの折り畳み状態 */
+  collapsed = false;
+
   /** localStorage用のキー */
   private readonly SORT_BY_KEY = 'project-sidebar-sort-by';
   private readonly SORT_ORDER_KEY = 'project-sidebar-sort-order';
+  private readonly COLLAPSED_KEY = 'project-sidebar-collapsed';
 
   async ngOnInit(): Promise<void> {
     this.loadSortPreferences();
+    this.loadCollapsedState();
     await this.loadProjects();
   }
 
@@ -122,6 +127,45 @@ export class ProjectSidebarComponent implements OnInit {
     } catch (error) {
       console.warn('並び替え設定の保存に失敗しました:', error);
     }
+  }
+
+  /**
+   * localStorageから折り畳み状態を読み込む
+   */
+  private loadCollapsedState(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem(this.COLLAPSED_KEY);
+      if (saved === 'true') {
+        this.collapsed = true;
+      }
+    } catch (error) {
+      console.warn('折り畳み状態の読み込みに失敗しました:', error);
+    }
+  }
+
+  /**
+   * 折り畳み状態をlocalStorageに保存する
+   */
+  private saveCollapsedState(): void {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(this.COLLAPSED_KEY, String(this.collapsed));
+    } catch (error) {
+      console.warn('折り畳み状態の保存に失敗しました:', error);
+    }
+  }
+
+  /**
+   * サイドバーの折り畳み状態を切り替える
+   */
+  toggleCollapse(): void {
+    this.collapsed = !this.collapsed;
+    this.saveCollapsedState();
   }
 
   /** 選択中の条件に基づいてプロジェクト一覧を並べ替える。 */
