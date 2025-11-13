@@ -537,8 +537,13 @@ import {
         alert('チェックリスト項目は100文字以内で入力してください');
         return;
       }
+      const currentChecklist = this.task.checklist ?? [];
+      if (currentChecklist.length >= 200) {
+        alert('チェックリスト項目は最大200個までです');
+        return;
+      }
       const nextChecklist: ChecklistItem[] = [
-        ...(this.task.checklist ?? []),
+        ...currentChecklist,
         { id: this.generateChecklistId(), text, completed: false },
       ];
       this.newChecklistText = '';
@@ -601,7 +606,7 @@ import {
         await this.refreshTask();
       } catch (error) {
         console.error('添付ファイルの追加に失敗しました:', error);
-        this.attachmentUploadError = '添付ファイルの追加に失敗しました。時間を置いて再試行してください。';
+        this.attachmentUploadError = error instanceof Error ? error.message : '添付ファイルの追加に失敗しました。時間を置いて再試行してください。';
       } finally {
         this.attachmentUploading = false;
         if (input) {

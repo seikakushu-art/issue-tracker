@@ -183,6 +183,15 @@ export class TasksListComponent implements OnInit, OnDestroy {
     Low: { label: '普通', weight: 1 }
   };
 
+  // ステータスの優先順位（数値が小さいほど優先度が高い）
+  private statusPriority: Record<TaskStatus, number> = {
+    incomplete: 1,    // 未完了（最優先）
+    in_progress: 2,   // 進行中
+    on_hold: 3,       // 保留
+    completed: 4,     // 完了
+    discarded: 5      // 破棄（最低優先度）
+  };
+
   readonly attachmentLimit = 20;
 
   ngOnInit() {
@@ -579,10 +588,19 @@ export class TasksListComponent implements OnInit, OnDestroy {
           aValue = this.getTaskProgress(a);
           bValue = this.getTaskProgress(b);
           break;
-        case 'importance':
-          aValue = this.getImportanceWeight(a.importance);
-          bValue = this.getImportanceWeight(b.importance);
+        case 'importance': {
+          const aImportance = this.getImportanceWeight(a.importance);
+          const bImportance = this.getImportanceWeight(b.importance);
+          // 重要度が同じ場合はステータス順で並び替え
+          if (aImportance === bImportance) {
+            aValue = this.statusPriority[a.status];
+            bValue = this.statusPriority[b.status];
+          } else {
+            aValue = aImportance;
+            bValue = bImportance;
+          }
           break;
+        }
         case 'createdAt':
           aValue = this.normalizeDate(a.createdAt)?.getTime() || 0;
           bValue = this.normalizeDate(b.createdAt)?.getTime() || 0;
@@ -803,6 +821,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
   /** 重要度の重みを取得 */
   private getImportanceWeight(importance?: Importance): number {
     return this.importanceDisplay[importance ?? 'Low'].weight;
+  }
+
+  /** スマートフィルターが適用されているかどうかを判定（テンプレート用） */
+  isSmartFilterEmpty(criteria: SmartFilterCriteria): boolean {
+    return isSmartFilterEmpty(criteria);
   }
 
   private resetCommentState(): void {

@@ -584,8 +584,12 @@ export class TasksService {
       throw new Error('開始日は終了日以前である必要があります');
     }
 
-    // チェックリストが更新された場合、進捗を再計算
-    if (updates.checklist !== undefined) {
+    // 完了ステータスの場合は進捗率を必ず100%にする
+    const finalStatus = updates.status !== undefined ? updates.status : task.status;
+    if (finalStatus === 'completed') {
+      updates = { ...updates, progress: 100 };
+    } else if (updates.checklist !== undefined) {
+      // チェックリストが更新された場合、進捗を再計算（完了ステータスでない場合のみ）
       const progress = this.calculateProgressFromChecklist(updates.checklist);
       updates = { ...updates, progress };
     }
@@ -1295,11 +1299,11 @@ export class TasksService {
       throw new Error('タスクが見つかりません');
     }
 
-    // 進捗率を再計算（チェックリストが存在する場合はstatusパラメータは無視される）
-    const progress = this.calculateProgressFromChecklist(checklist);
-
     // ステータスを自動遷移
     const newStatus = this.calculateStatusFromConditions(task, checklist);
+
+    // 完了ステータスの場合は進捗率を必ず100%にする
+    const progress = newStatus === 'completed' ? 100 : this.calculateProgressFromChecklist(checklist);
 
     // タスクを更新
     await this.updateTask(projectId, issueId, taskId, {

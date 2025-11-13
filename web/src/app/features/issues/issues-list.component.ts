@@ -315,6 +315,11 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     this.smartFilterVisible = !this.smartFilterVisible;
   }
 
+  /** スマートフィルターが適用されているかどうかを判定（テンプレート用） */
+  isSmartFilterEmpty(criteria: SmartFilterCriteria): boolean {
+    return isSmartFilterEmpty(criteria);
+  }
+
   /** スマートフィルター適用時の処理 */
   onSmartFilterApply(criteria: SmartFilterCriteria): void {
     this.smartFilterCriteria = criteria;

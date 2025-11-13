@@ -84,11 +84,7 @@ export class BoardListComponent implements OnInit {
     const element = document.getElementById(postId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // ハイライト効果を追加（オプション）
-      element.classList.add('post-highlight');
-      setTimeout(() => {
-        element.classList.remove('post-highlight');
-      }, 2000);
+      // ハイライト効果は適用しない（掲示板プレビューからの遷移時はスクロールのみ）
     } else {
       // 投稿が現在のページにない場合は、該当投稿を含むページを探して移動
       const allPosts = this.allPosts();

@@ -82,7 +82,11 @@
 
   <div class="filters">
     <div class="filter-group filter-group--smart">
-      <button type="button" class="smart-filter-button" (click)="toggleSmartFilterPanel()">
+      <button 
+        type="button" 
+        class="smart-filter-button" 
+        [class.smart-filter-button--active]="!isSmartFilterEmpty(smartFilterCriteria)"
+        (click)="toggleSmartFilterPanel()">
         <span class="smart-filter-button__icon" aria-hidden="true">⚙️</span>
         スマートフィルター
       </button>

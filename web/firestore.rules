@@ -97,6 +97,23 @@ allow delete: if isMember(projectId) && (
   (role(projectId) == 'member' && resource.data.uploadedBy == request.auth.uid)
 );
 }
+
+// タグのルール
+match /tags/{tagId} {
+allow read: if isMember(projectId);
+// タグの作成はadmin/member（サービス層の実装と一致）
+allow create: if isMember(projectId) && (role(projectId) == 'admin' || role(projectId) == 'member');
+// タグの更新はadmin全員、またはmemberは自分が作成したタグのみ（サービス層の実装と一致）
+allow update: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && resource.data.createdBy == request.auth.uid)
+);
+// タグの削除はadmin全員、またはmemberは自分が作成したタグのみ（サービス層の実装と一致）
+allow delete: if isMember(projectId) && (
+  role(projectId) == 'admin' ||
+  (role(projectId) == 'member' && resource.data.createdBy == request.auth.uid)
+);
+}
 }
 }
 }

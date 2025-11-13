@@ -16,6 +16,7 @@ import { Role, Tag } from '../../models/schema';
 import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { authState } from '@angular/fire/auth';
+import { ProjectsService } from '../projects/projects.service';
 
 type TagWithId = Tag & { id: string };
 
@@ -27,6 +28,7 @@ type TagWithId = Tag & { id: string };
 export class TagsService {
   private db = inject(Firestore);
   private auth = inject(Auth);
+  private projectsService = inject(ProjectsService);
   private authReady: Promise<void> | null = null;
   // プロジェクト単位で色割り当てを保持（projectId -> (tagId -> color)）
   private colorAssignments = new Map<string, Map<string, string>>();
@@ -207,6 +209,8 @@ export class TagsService {
     name: string;
     color?: string;
   }): Promise<string> {
+    // プロジェクトのadmin/memberのみタグを作成可能
+    await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     const user = await this.requireUser();
 
     const trimmedName = input.name.trim();
@@ -332,6 +336,20 @@ export class TagsService {
       color: string | null;
     }>
   ): Promise<void> {
+    const user = await this.requireUser();
+    const tag = await this.getTag(projectId, tagId);
+    if (!tag) {
+      throw new Error('指定したタグが見つかりません');
+    }
+    
+    // プロジェクトのadmin/memberのみタグを更新可能
+    const { role } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+    
+    // memberは自分が作成したタグのみ更新可能
+    if (role === 'member' && (!tag.createdBy || tag.createdBy !== user.uid)) {
+      throw new Error('このタグを更新する権限がありません');
+    }
+    
     let cachedTags: TagWithId[] | null = null;
 
     if (updates.name !== undefined || updates.color !== undefined) {
@@ -376,10 +394,18 @@ export class TagsService {
     if (!tag) {
       throw new Error('指定したタグが見つかりません');
     }
-    if (requesterRole !== 'admin') {
-      if (!tag.createdBy || tag.createdBy !== user.uid) {
-        throw new Error('タグを削除する権限がありません');
-      }
+    
+    // プロジェクトのadmin/memberのみタグを削除可能
+    const { role } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+    
+    // memberは自分が作成したタグのみ削除可能
+    if (role === 'member' && (!tag.createdBy || tag.createdBy !== user.uid)) {
+      throw new Error('このタグを削除する権限がありません');
+    }
+    
+    // requesterRoleパラメータは後方互換性のため残すが、実際の権限チェックは上記で実施
+    if (requesterRole !== 'admin' && (!tag.createdBy || tag.createdBy !== user.uid)) {
+      throw new Error('タグを削除する権限がありません');
     }
     const docRef = doc(this.db, `projects/${projectId}/tags/${tagId}`);
     await deleteDoc(docRef);

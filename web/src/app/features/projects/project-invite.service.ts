@@ -229,6 +229,12 @@ export class ProjectInviteService {
       const memberIds = new Set<string>((projectData.memberIds ?? []) as string[]);
       const roles = { ...(projectData.roles ?? {}) } as Record<string, Role>;
 
+      // プロジェクトのメンバー数の上限チェック（50人）
+      const MAX_PROJECT_MEMBERS = 50;
+      if (!memberIds.has(uid) && memberIds.size >= MAX_PROJECT_MEMBERS) {
+        throw new Error('プロジェクトの参加人数の上限（50人）に達しています。');
+      }
+
       memberIds.add(uid);
       const currentRole = roles[uid];
       const isInviteCreator = invite.createdBy === uid;
