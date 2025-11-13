@@ -170,11 +170,12 @@
             <p
               class="board-post__content"
               [class.board-post__content--expanded]="isPostExpanded(post.id)"
+              [attr.data-post-content-id]="post.id"
             >
               {{ post.content }}
             </p>
             <button
-              *ngIf="post.content && post.content.length > 200"
+              *ngIf="needsExpansionButton(post.id, post.content)"
               type="button"
               class="board-post__expand-button"
               (click)="togglePostExpansion(post.id)"

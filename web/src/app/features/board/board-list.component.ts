@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { AfterViewChecked, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { BulletinPost, Project, Role } from '../../models/schema';
@@ -18,7 +18,7 @@ interface BoardPostView extends BulletinPost {
   templateUrl: './board-list.component.html',
   styleUrls: ['./board-list.component.scss'],
 })
-export class BoardListComponent implements OnInit {
+export class BoardListComponent implements OnInit, AfterViewChecked {
   private readonly boardService = inject(BoardService);
   private readonly projectsService = inject(ProjectsService);
   private readonly route = inject(ActivatedRoute);
@@ -45,6 +45,8 @@ export class BoardListComponent implements OnInit {
   readonly accessibleProjects = signal<Project[]>([]);
   private readonly currentUid = signal<string | null>(null);
   private readonly expandedPosts = signal<Set<string>>(new Set());
+  private readonly postsNeedingExpansion = signal<Set<string>>(new Set()); // 実際に切り詰められている投稿のID
+  private lastCheckedPostsLength = 0; // チェック済みの投稿数を追跡
 
   postForm: { title: string; content: string; projectIds: string[] } = {
     title: '',
@@ -307,6 +309,51 @@ export class BoardListComponent implements OnInit {
       return false;
     }
     return this.expandedPosts().has(postId);
+  }
+
+  ngAfterViewChecked(): void {
+    // 投稿が変更された場合のみチェック（パフォーマンス最適化）
+    const currentPosts = this.posts();
+    if (currentPosts.length !== this.lastCheckedPostsLength) {
+      this.checkPostsNeedingExpansion();
+      this.lastCheckedPostsLength = currentPosts.length;
+    }
+  }
+
+  /**
+   * 各投稿の実際の要素の高さをチェックし、切り詰められている投稿を特定
+   */
+  private checkPostsNeedingExpansion(): void {
+    const posts = this.posts();
+    const needingExpansion = new Set<string>();
+
+    for (const post of posts) {
+      if (!post.id || !post.content || post.content.length <= 200) {
+        continue;
+      }
+
+      const element = document.querySelector(`[data-post-content-id="${post.id}"]`) as HTMLElement;
+      if (element && element.scrollHeight > element.clientHeight) {
+        needingExpansion.add(post.id);
+      }
+    }
+
+    this.postsNeedingExpansion.set(needingExpansion);
+  }
+
+  /**
+   * 投稿が実際に切り詰められているか（全文表示ボタンが必要か）を判定
+   */
+  needsExpansionButton(postId: string | undefined, content: string | null | undefined): boolean {
+    if (!postId || !content) {
+      return false;
+    }
+    // まず、文字数で簡易チェック（200文字未満なら確実に不要）
+    if (content.length <= 200) {
+      return false;
+    }
+    // 実際に切り詰められている投稿のセットを確認
+    return this.postsNeedingExpansion().has(postId);
   }
 
   togglePostExpansion(postId: string | undefined): void {
