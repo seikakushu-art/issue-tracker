@@ -1155,27 +1155,31 @@ export class TasksService {
     checklist: ChecklistItem[],
     status?: TaskStatus
   ): number {
-    if (!checklist || checklist.length === 0) {
-      // チェックリスト未設定時、ステータス基準で計算
-      switch (status) {
-        case 'completed':
-          return 100;
-        case 'in_progress':
-          return 50;
-        case 'on_hold':
-          return 25;
-        case 'discarded':
-          return 0;
-        case 'incomplete':
-        default:
-          return 0;
-      }
+    // チェックリストがある場合は、チェックリストの完了率を返す
+    if (checklist && checklist.length > 0) {
+      const completedCount = checklist.filter(item => item.completed).length;
+      const totalCount = checklist.length;
+      const progress = Math.round((completedCount / totalCount) * 100 * 10) / 10; // 小数点1位で四捨五入
+      return progress;
     }
 
-    const completedCount = checklist.filter(item => item.completed).length;
-    const totalCount = checklist.length;
-    const progress = Math.round((completedCount / totalCount) * 100 * 10) / 10; // 小数点1位で四捨五入
-    return progress;
+    // チェックリスト未設定時、ステータス基準で計算
+    // ただし、保留/進行中ステータスは自動計算しない（呼び出し側で現在の進捗率を維持する）
+    switch (status) {
+      case 'completed':
+        return 100;
+      case 'discarded':
+        return 0;
+      case 'in_progress':
+      case 'on_hold':
+        // 保留/進行中は自動計算しない（呼び出し側で現在の進捗率を維持）
+        // この場合は呼び出し側で現在の進捗率を使用する必要がある
+        // エラーを投げるのではなく、0を返す（呼び出し側で適切に処理される）
+        return 0;
+      case 'incomplete':
+      default:
+        return 0;
+    }
   }
 
   /**

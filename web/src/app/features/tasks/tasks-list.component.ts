@@ -1763,12 +1763,40 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     try {
       const checklist = Array.isArray(task.checklist) ? task.checklist : [];
-      const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);
+      const updateData: { status: TaskStatus; progress?: number } = { status };
+      
+      // 完了ステータスに変更する場合
+      if (status === 'completed') {
+        // チェックリストがある場合、未完成の項目があるかチェック
+        if (checklist.length > 0) {
+          const incompleteCount = checklist.filter(item => !item.completed).length;
+          if (incompleteCount > 0) {
+            const message = `未完成のチェックリスト項目が${incompleteCount}件あります。\n完了ステータスに変更すると進捗率が100%になりますが、よろしいですか？`;
+            const shouldComplete = confirm(message);
+            if (!shouldComplete) {
+              return; // キャンセルした場合は処理を中断
+            }
+          }
+        }
+        // 完了ステータスの場合は進捗率を100%にする
+        updateData.progress = 100;
+      } else if (status === 'on_hold' || status === 'in_progress') {
+        // 保留/進行中ステータスに変更する場合
+        if (checklist.length === 0) {
+          // チェックリストがない場合は進捗率を0にする
+          updateData.progress = 0;
+        } else {
+          // チェックリストがある場合はその進捗率を設定
+          const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);
+          updateData.progress = progress;
+        }
+      } else {
+        // その他のステータスの場合は進捗率を再計算
+        const progress = this.tasksService.calculateProgressFromChecklist(checklist, status);
+        updateData.progress = progress;
+      }
 
-      await this.tasksService.updateTask(this.projectId, this.issueId, task.id, {
-        status,
-        progress,
-      });
+      await this.tasksService.updateTask(this.projectId, this.issueId, task.id, updateData);
       this.statusMenuTaskId = null; // 成功時はメニューを閉じておく
 
       await this.loadData();
@@ -2008,7 +2036,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
   private async updateIssueProgress() {
     if (!this.issueDetails?.id) return;
 
-    const activeTasks = this.tasks.filter(t => !t.archived);
+    // 破棄されたタスクとアーカイブされたタスクは集計対象外
+    const activeTasks = this.tasks.filter(t => t.status !== 'discarded' && !t.archived);
     if (activeTasks.length === 0) {
       this.issueProgress = 0;
       this.taskPreview = [];
@@ -2020,9 +2049,20 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     for (const task of activeTasks) {
       const weight = this.getImportanceWeight(task.importance);
-      const progress = typeof task.progress === 'number'
-        ? task.progress
-        : this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
+      // 保留/進行中ステータスの場合は現在の進捗率を維持
+      let progress: number;
+      if (task.status === 'on_hold' || task.status === 'in_progress') {
+        // 保留/進行中は現在の進捗率を使用（チェックリストがある場合はその進捗率）
+        if (task.checklist && task.checklist.length > 0) {
+          progress = this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
+        } else {
+          progress = typeof task.progress === 'number' ? task.progress : 0;
+        }
+      } else {
+        progress = typeof task.progress === 'number'
+          ? task.progress
+          : this.tasksService.calculateProgressFromChecklist(task.checklist, task.status);
+      }
       totalProgressWeight += progress * weight;
       totalWeight += weight;
     }

@@ -89,6 +89,7 @@
                       <div class="task-main">
                         <span class="task-color-chip" aria-hidden="true"></span>
                         <span class="task-title">{{ treeTask.task.title }}</span>
+                        <span class="status-badge" [class]="'status-' + getStatusClass(treeTask.task.status)">{{ getStatusLabel(treeTask.task.status) }}</span>
                         <span class="task-progress" *ngIf="treeTask.task.progress !== undefined">{{ treeTask.task.progress }}%</span>
                       </div>
                       <div class="task-sub">

@@ -3,7 +3,7 @@ import { CommonModule, registerLocaleData } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import localeJa from '@angular/common/locales/ja';
 import { Router } from '@angular/router';
-import { Issue, Project, Task } from '../../models/schema';
+import { Issue, Project, Task, TaskStatus } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
 import { IssuesService } from '../issues/issues.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -307,18 +307,33 @@ goToTaskDetail(): void {
     }
   }
 
-  getStatusClass(task: Task): string {
-    switch (task.status) {
+  getStatusClass(status: TaskStatus): string {
+    switch (status) {
       case 'completed':
-        return 'status-completed';
+        return 'completed';
       case 'in_progress':
-        return 'status-in-progress';
+        return 'in-progress';
       case 'on_hold':
-        return 'status-on-hold';
+        return 'on-hold';
       case 'discarded':
-        return 'status-discarded';
+        return 'discarded';
       default:
-        return 'status-incomplete';
+        return 'incomplete';
+    }
+  }
+
+  getStatusLabel(status: TaskStatus): string {
+    switch (status) {
+      case 'in_progress':
+        return '進行中';
+      case 'completed':
+        return '完了';
+      case 'on_hold':
+        return '保留';
+      case 'discarded':
+        return '破棄';
+      default:
+        return '未完了';
     }
   }
 

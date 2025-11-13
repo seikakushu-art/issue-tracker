@@ -942,10 +942,11 @@
 .form-row--dates {
   flex-wrap: nowrap; // 日付入力欄を同じ行に保つ
   align-items: flex-end; // ラベルと入力欄の位置を整えて視線移動を抑える
+  gap: 32px; // 開始日と終了日の間に余白を開ける
 }
 
 .form-row--dates .form-group {
-  flex: 1 1 0; // 各入力欄が均等に広がるようにする
+  flex: 1; // 重要度・ステータスと同じflex設定にする
   min-width: 0; // 狭い画面でも崩れないように縮小を許可
 }
 
@@ -974,6 +975,23 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+}
+
+// タイトル入力欄、説明欄、達成目標欄は少し狭くする
+#title,
+#description,
+#goal {
+  max-width: 680px;
+}
+
+// 開始日はもっと狭くする
+#startDate {
+  max-width: 200px;
+}
+
+// 終了日は開始日と同じ幅にする
+#endDate {
+  max-width: 200px;
 }
 
 .form-group input:focus,
