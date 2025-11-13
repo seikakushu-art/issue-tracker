@@ -33,7 +33,7 @@ import { Project, Issue, Task } from './models/schema';
               [class.active]="last"
               (click)="navigateToCrumb(crumb)" (keydown.enter)="navigateToCrumb(crumb)" role="button" tabindex="0"
             >
-              {{ crumb.label }}
+              <span class="breadcrumb-item__label">{{ crumb.label }}</span>
               <i *ngIf="!last" class="icon-chevron-right"></i>
             </span>
           </nav>
@@ -131,8 +131,10 @@ import { Project, Issue, Task } from './models/schema';
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       min-width: 0;
+      flex: 1;
+      overflow: hidden;
     }
 
     .breadcrumb-item {
@@ -143,9 +145,23 @@ import { Project, Issue, Task } from './models/schema';
       font-size: 14px;
       cursor: pointer;
       transition: color 0.2s ease;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
       min-width: 0;
+      flex-shrink: 1;
+    }
+    
+    .breadcrumb-item__label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    
+    .breadcrumb-item:last-child {
+      flex-shrink: 0;
+    }
+    
+    .breadcrumb-item:last-child .breadcrumb-item__label {
+      flex-shrink: 0;
     }
 
     .breadcrumb-item:hover {

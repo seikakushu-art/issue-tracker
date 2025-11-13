@@ -17,8 +17,7 @@ import { AuthService } from '../../core/auth.service';
     <section class="settings">
       <div class="settings__card">
         <header class="settings__header">
-          <h1>ユーザー設定</h1>
-          <p>プロフィール情報を編集し、ダッシュボードに反映します。</p>
+          <h1>プロフィール</h1>
         </header>
 
         <form class="settings__form" (ngSubmit)="save()">
@@ -57,11 +56,6 @@ import { AuthService } from '../../core/auth.service';
               <p class="icon-preview__placeholder">現在アイコンは設定されていません。</p>
             </ng-template>
 
-            <div class="form-group__actions">
-              <button type="button" class="btn btn-tertiary" (click)="clearIconSelection()" [disabled]="loading">
-                アイコンをリセット
-              </button>
-            </div>
           </div>
 
           <div class="form-actions">
@@ -456,21 +450,30 @@ export class UserSettingsComponent implements OnDestroy {
 
     const file = input.files?.[0];
     if (!file) {
-      this.clearIconSelection();
+      this.selectedIconFile = null;
+      this.revokeIconPreview();
+      this.iconPreviewUrl = this.originalPhotoUrl;
+      if (this.iconInputElement) {
+        this.iconInputElement.value = '';
+      }
       return;
     }
 
     if (!file.type.startsWith('image/')) {
       this.errorMessage = '画像ファイルを選択してください。';
       input.value = '';
-      this.clearIconSelection();
+      this.selectedIconFile = null;
+      this.revokeIconPreview();
+      this.iconPreviewUrl = this.originalPhotoUrl;
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
       this.errorMessage = 'アイコン画像は 2MB 以下のファイルを選択してください。';
       input.value = '';
-      this.clearIconSelection();
+      this.selectedIconFile = null;
+      this.revokeIconPreview();
+      this.iconPreviewUrl = this.originalPhotoUrl;
       return;
     }
 
@@ -479,17 +482,6 @@ export class UserSettingsComponent implements OnDestroy {
     this.updateIconPreview(file);
   }
 
-  /**
-   * アイコン選択をリセットして既存画像へ戻す
-   */
-  clearIconSelection(): void {
-    this.selectedIconFile = null;
-    this.revokeIconPreview();
-    this.iconPreviewUrl = this.originalPhotoUrl;
-    if (this.iconInputElement) {
-      this.iconInputElement.value = '';
-    }
-  }
 
   private updateIconPreview(file: File): void {
     this.revokeIconPreview();
