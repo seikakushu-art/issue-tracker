@@ -2,9 +2,6 @@
     <header class="tree-header">
       <div class="tree-header__titles">
         <h1>進行状況（ツリー）</h1>
-        <p class="tree-header__caption">
-          プロジェクト → 課題 → タスクの階層のツリー表示
-        </p>
       </div>
       <div class="tree-header__actions">
         <label class="tree-header__filter">
@@ -13,6 +10,12 @@
             <option *ngFor="let option of projectFilterOptions" [value]="option.id">{{ option.label }}</option>
           </select>
         </label>
+        <div class="tree-header__filter">
+          <label>
+            <input type="checkbox" [(ngModel)]="showArchived" (change)="loadData()">
+            アーカイブ済みも表示
+          </label>
+        </div>
         <button class="tree-header__refresh" type="button" (click)="loadData()" [disabled]="loading">
           <i class="icon-rotate"></i>
           <span>最新の状態を取得</span>

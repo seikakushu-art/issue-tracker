@@ -54,10 +54,34 @@
     border-color: #6366f1;
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
   }
+
+  .tree-header__filter > label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-direction: row;
+    font-size: 14px;
+  }
+
+  .tree-header__filter input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+  }
   .tree-header__titles {
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .tree-header__title-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
   }
   
   .tree-header__titles h1 {

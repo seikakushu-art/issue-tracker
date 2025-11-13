@@ -79,6 +79,8 @@ export class ProgressTreeComponent implements OnInit {
     { id: 'all', label: 'すべてのプロジェクト' },
   ];
 
+  showArchived = false;
+
   readonly tokyoTimezone = 'Asia/Tokyo';
 
   ngOnInit(): void {
@@ -99,7 +101,7 @@ export class ProgressTreeComponent implements OnInit {
       const projects = (await this.projectsService
         .listMyProjects())
         .filter((project): project is Project & { id: string } => Boolean(project.id))
-        .filter((project) => !project.archived);
+        .filter((project) => this.showArchived || !project.archived);
 
       const taskIndex = new Map<string, { title: string; issue: Issue; project: Project }>();
       const treeProjects: TreeProject[] = [];
