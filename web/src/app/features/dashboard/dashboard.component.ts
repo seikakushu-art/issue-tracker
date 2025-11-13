@@ -571,14 +571,16 @@ export class DashboardComponent implements OnInit {
   /** スマートフィルター用リンクを遷移 */
   goToSmartFilter(insight: BottleneckInsight): void {
     if (insight.issueId) {
+      const queryParams: Record<string, string> = {
+        smartFilter: insight.type,
+      };
+      // taskIdがある場合はタスク詳細画面に遷移（focusパラメータを使用）
+      if (insight.taskId) {
+        queryParams['focus'] = insight.taskId;
+      }
       void this.router.navigate(
         ['/projects', insight.projectId, 'issues', insight.issueId],
-        {
-          queryParams: {
-            smartFilter: insight.type,
-            taskId: insight.taskId ?? null,
-          },
-        },
+        { queryParams },
       );
       return;
     }
@@ -871,6 +873,10 @@ export class DashboardComponent implements OnInit {
       default:
         return cloned.sort((a, b) => {
           if (a.overdue === b.overdue) {
+            if (a.progress === b.progress) {
+              // 進捗率が同じ場合は重要タスク数（多い順）で並ぶ
+              return b.highPriorityBacklog - a.highPriorityBacklog;
+            }
             return a.progress - b.progress;
           }
           return a.overdue ? -1 : 1;

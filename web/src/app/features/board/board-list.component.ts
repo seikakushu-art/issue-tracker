@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { BulletinPost, Project, Role } from '../../models/schema';
 import { BoardService, ListAccessiblePostsResult } from './board.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -20,6 +21,8 @@ interface BoardPostView extends BulletinPost {
 export class BoardListComponent implements OnInit {
   private readonly boardService = inject(BoardService);
   private readonly projectsService = inject(ProjectsService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly allPosts = signal<BoardPostView[]>([]); // 全投稿（ページング用）
   readonly posts = signal<BoardPostView[]>([]); // 現在のページの投稿
@@ -63,6 +66,45 @@ export class BoardListComponent implements OnInit {
 
   ngOnInit(): void {
     void this.initializeBoard();
+    // fragmentが指定されている場合は該当投稿までスクロール
+    this.route.fragment.subscribe((fragment) => {
+      if (fragment) {
+        setTimeout(() => {
+          this.scrollToPost(fragment);
+        }, 300); // 投稿読み込みを待つ
+      }
+    });
+  }
+
+  /** 指定された投稿IDまでスクロールする */
+  private scrollToPost(postId: string | null): void {
+    if (!postId) {
+      return;
+    }
+    const element = document.getElementById(postId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // ハイライト効果を追加（オプション）
+      element.classList.add('post-highlight');
+      setTimeout(() => {
+        element.classList.remove('post-highlight');
+      }, 2000);
+    } else {
+      // 投稿が現在のページにない場合は、該当投稿を含むページを探して移動
+      const allPosts = this.allPosts();
+      const targetPost = allPosts.find((post) => post.id === postId);
+      if (targetPost) {
+        const postIndex = allPosts.indexOf(targetPost);
+        const targetPage = Math.floor(postIndex / this.pageSize()) + 1;
+        if (targetPage !== this.currentPage()) {
+          this.goToPage(targetPage);
+          // ページ移動後に再度スクロールを試みる
+          setTimeout(() => {
+            this.scrollToPost(postId);
+          }, 500);
+        }
+      }
+    }
   }
 
   async initializeBoard(): Promise<void> {
