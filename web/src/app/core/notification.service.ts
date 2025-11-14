@@ -723,13 +723,21 @@ export class NotificationService {
 
     const projectMap = await this.fetchProjects(projectIds);
     const issueMap = await this.fetchIssueNames(issueRefs);
-    for (const task of tasks) {
+    
+    // アーカイブされたプロジェクトのタスクを除外
+    const filteredTasks = tasks.filter((task) => {
+      const project = projectMap.get(task.projectId);
+      // プロジェクトが存在しない、またはアーカイブされている場合は除外
+      return project && !project.archived;
+    });
+    
+    for (const task of filteredTasks) {
       const project = projectMap.get(task.projectId);
       task.projectName = this.getProjectDisplayName(project);
       task.issueName = issueMap.get(`${task.projectId}/${task.issueId}`) ?? null;
     }
 
-    tasks.sort((a, b) => {
+    filteredTasks.sort((a, b) => {
       const importanceA = a.importance ? this.importanceRank[a.importance] : Number.MAX_SAFE_INTEGER;
       const importanceB = b.importance ? this.importanceRank[b.importance] : Number.MAX_SAFE_INTEGER;
       if (importanceA !== importanceB) {
@@ -743,7 +751,7 @@ export class NotificationService {
       return a.title.localeCompare(b.title);
     });
 
-    return tasks.slice(0, limitSize);
+    return filteredTasks.slice(0, limitSize);
     } catch (error) {
       console.error('[通知デバッグ] fetchDueTodayNotifications エラー:', error);
       throw error;

@@ -209,10 +209,20 @@ export class DashboardComponent implements OnInit {
     if (!dueDate) {
       return `due:${taskId}`;
     }
-    // 期限の日付部分（YYYY-MM-DD）を含める（東京時間ベース）
-    const tokyoDateParts = this.getTokyoDateParts(dueDate);
-    const dateStr = `${tokyoDateParts.year}-${String(tokyoDateParts.month + 1).padStart(2, '0')}-${String(tokyoDateParts.day).padStart(2, '0')}`;
-    return `due:${taskId}:${dateStr}`;
+    const now = new Date();
+    const isOverdue = this.notificationService.isOverdue(dueDate, now);
+    
+    if (isOverdue) {
+      // 期限超過の場合は今日の日付を使用（毎日新しい通知として扱う）
+      const todayParts = this.getTokyoDateParts(now);
+      const dateStr = `${todayParts.year}-${String(todayParts.month + 1).padStart(2, '0')}-${String(todayParts.day).padStart(2, '0')}`;
+      return `due:${taskId}:${dateStr}`;
+    } else {
+      // 本日締切の場合は期限日の日付を使用
+      const tokyoDateParts = this.getTokyoDateParts(dueDate);
+      const dateStr = `${tokyoDateParts.year}-${String(tokyoDateParts.month + 1).padStart(2, '0')}-${String(tokyoDateParts.day).padStart(2, '0')}`;
+      return `due:${taskId}:${dateStr}`;
+    }
   }
 
   /** 東京時間での日付部分を取得するヘルパー */

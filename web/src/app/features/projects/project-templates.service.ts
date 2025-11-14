@@ -7,8 +7,10 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  where,
   deleteDoc,
   doc,
+  getDoc,
 } from '@angular/fire/firestore';
 import {
   ChecklistItem,
@@ -170,10 +172,16 @@ export class ProjectTemplatesService {
 
   /**
    * テンプレート一覧を取得（作成日の新しい順）
+   * 現在のユーザーが作成したテンプレートのみを取得
    */
   async listTemplates(): Promise<ProjectTemplate[]> {
+    const uid = await this.projectsService.getSignedInUid();
     const templatesRef = collection(this.db, 'projectTemplates');
-    const templatesQuery = query(templatesRef, orderBy('createdAt', 'desc'));
+    const templatesQuery = query(
+      templatesRef,
+      where('createdBy', '==', uid),
+      orderBy('createdAt', 'desc')
+    );
     const snapshot = await getDocs(templatesQuery);
     return snapshot.docs.map((doc) => this.hydrateTemplate(doc.id, doc.data() as ProjectTemplate));
   }
@@ -232,7 +240,7 @@ export class ProjectTemplatesService {
 
   /**
    * テンプレート名の重複をチェックする
-   * 同じ名前のテンプレートが存在する場合、エラーをスローする
+   * 同じユーザーが同じ名前のテンプレートを作成している場合、エラーをスローする
    * @param name テンプレート名
    */
   private async checkNameUniqueness(name: string): Promise<void> {
@@ -318,12 +326,25 @@ export class ProjectTemplatesService {
   }
   /**
    * 指定したテンプレートを削除
+   * 作成者のみが削除可能
    */
   async deleteTemplate(templateId: string): Promise<void> {
     if (!templateId) {
       return;
     }
+    const uid = await this.projectsService.getSignedInUid();
     const templateRef = doc(this.db, 'projectTemplates', templateId);
+    const templateSnap = await getDoc(templateRef);
+    
+    if (!templateSnap.exists()) {
+      throw new Error('テンプレートが見つかりません');
+    }
+    
+    const templateData = templateSnap.data() as ProjectTemplate;
+    if (templateData.createdBy !== uid) {
+      throw new Error('テンプレートを削除する権限がありません');
+    }
+    
     await deleteDoc(templateRef);
   }
 }

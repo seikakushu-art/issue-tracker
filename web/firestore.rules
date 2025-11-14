@@ -134,6 +134,13 @@ allow create, update, delete: if isMember(projectId) && role(projectId) == 'admi
 }
 }
 
+// プロジェクトテンプレートのルール
+match /projectTemplates/{templateId} {
+allow read: if signedIn() && resource.data.createdBy == request.auth.uid;
+allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+}
+
 
 // フラットなコレクションを使う MVP 用（後で削除可）
 // 注意: このルールは実際には使用されていない（タスクは projects/{projectId}/issues/{issueId}/tasks/{taskId} に保存される）
