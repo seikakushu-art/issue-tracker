@@ -84,6 +84,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   selectedTask: Task | null = null;
   pendingFocusTaskId: string | null = null;
   pendingCommentId: string | null = null;
+  pendingAttachmentId: string | null = null;
   pendingOpenDetail = false;
   newChecklistText = '';
   currentRole: Role | null = null;
@@ -205,9 +206,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.route.queryParamMap.pipe(takeUntil(this.destroy$)).subscribe((params) => {
       const focus = params.get('focus');
       const commentId = params.get('commentId');
+      const attachmentId = params.get('attachmentId');
       const openDetail = params.get('openDetail') === 'true';
       this.pendingFocusTaskId = focus;
       this.pendingCommentId = commentId;
+      this.pendingAttachmentId = attachmentId;
       this.pendingOpenDetail = openDetail;
       if (focus) {
         // タスクが既に読み込まれている場合は即座に選択
@@ -1078,6 +1081,33 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** 指定された添付ファイルIDまでスクロールする */
+  private scrollToAttachment(attachmentId: string | null): void {
+    if (!attachmentId) {
+      return;
+    }
+    const element = document.getElementById(`attachment-${attachmentId}`);
+    if (element) {
+      // 詳細パネル内のスクロールコンテナを取得
+      const detailPanel = element.closest('.task-detail-panel');
+      if (detailPanel) {
+        // 詳細パネル内のスクロールコンテナに対してスクロール
+        const elementTop = element.getBoundingClientRect().top;
+        const panelTop = detailPanel.getBoundingClientRect().top;
+        const scrollTop = detailPanel.scrollTop + (elementTop - panelTop) - (detailPanel.clientHeight / 2) + (element.clientHeight / 2);
+        detailPanel.scrollTo({ top: scrollTop, behavior: 'smooth' });
+      } else {
+        // フォールバック: 通常のscrollIntoView
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      // ハイライト効果を追加
+      element.classList.add('attachment-highlight');
+      setTimeout(() => {
+        element.classList.remove('attachment-highlight');
+      }, 2000);
+    }
+  }
+
   private updateAttachmentLimitState(): void {
     this.attachmentLimitReached = this.attachments.length >= this.attachmentLimit;
   }
@@ -1131,6 +1161,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
           return timeB - timeA;
         });
       this.updateAttachmentLimitState();
+
+      // 添付ファイルIDが指定されている場合は、その添付ファイルまでスクロール
+      if (this.pendingAttachmentId) {
+        setTimeout(() => {
+          this.scrollToAttachment(this.pendingAttachmentId);
+          this.pendingAttachmentId = null;
+        }, 300); // 詳細パネルのアニメーション完了を待つ
+      }
     } catch (error) {
       console.error('添付ファイルの読み込みに失敗しました:', error);
       this.attachmentsError = error instanceof Error ? error.message : '添付ファイルの読み込みに失敗しました。';
@@ -1549,8 +1587,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
     const target = this.tasks.find((task) => task.id === taskId);
     if (target) {
-      // コメントIDが指定されている場合、またはopenDetailフラグがtrueの場合は、タスクを選択して詳細パネルを開く
-      if (this.pendingCommentId || openDetail) {
+      // コメントIDまたは添付ファイルIDが指定されている場合、またはopenDetailフラグがtrueの場合は、タスクを選択して詳細パネルを開く
+      if (this.pendingCommentId || this.pendingAttachmentId || openDetail) {
         this.selectTask(target);
         this.pendingFocusTaskId = null;
         this.pendingOpenDetail = false;

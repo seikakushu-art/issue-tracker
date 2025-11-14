@@ -78,6 +78,7 @@
                 *ngIf="getTaskLink(attachment) as link"
                 class="task-link"
                 [routerLink]="link"
+                [queryParams]="getTaskQueryParams(attachment)"
               >
                 タスクを開く
               </a>

@@ -534,6 +534,7 @@
       >
         <li
           class="attachment-item"
+          [id]="'attachment-' + attachment.id"
           *ngFor="let attachment of attachments; trackBy: trackAttachmentById"
         >
           <div class="attachment-main">

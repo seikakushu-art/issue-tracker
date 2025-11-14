@@ -1,5 +1,5 @@
-import { CommonModule,DOCUMENT } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { CommonModule, DOCUMENT, isPlatformBrowser } from '@angular/common';
+import { Component, OnInit, computed, inject, PLATFORM_ID, signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import {
   ActionableTaskCard,
@@ -55,6 +55,7 @@ export class DashboardComponent implements OnInit {
   private readonly boardService = inject(BoardService);
   private readonly document = inject(DOCUMENT);
   private readonly userDirectoryService = inject(UserDirectoryService);
+  private readonly platformId = inject(PLATFORM_ID);
 
   /** Mathオブジェクトをテンプレートで使用するため */
   readonly Math = Math;
@@ -368,6 +369,9 @@ export class DashboardComponent implements OnInit {
 
   /** ローカルストレージから既読通知キーを読み込む */
   private loadReadNotificationKeys(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
     try {
       const stored = localStorage.getItem('readNotificationKeys');
       if (stored) {
@@ -382,6 +386,9 @@ export class DashboardComponent implements OnInit {
 
   /** 既読通知キーをローカルストレージに保存する */
   private saveReadNotificationKeys(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
     try {
       const keys = Array.from(this.readNotificationKeys());
       localStorage.setItem('readNotificationKeys', JSON.stringify(keys));

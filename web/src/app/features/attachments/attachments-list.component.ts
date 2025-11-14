@@ -129,19 +129,30 @@ export class AttachmentsListComponent implements OnInit {
       }
 
       // アーカイブされたタスクの添付ファイルを除外するため、タスクのアーカイブ状態を取得
+      // 添付ファイルから必要なタスクIDを抽出
+      const requiredTaskIds = new Set<string>();
+      for (const attachment of attachments) {
+        if (attachment.taskId) {
+          requiredTaskIds.add(attachment.taskId);
+        }
+      }
+
+      // 各プロジェクトのタスクを並列で取得
       const taskArchivedMap = new Map<string, boolean>();
-      for (const projectId of projectIds) {
+      const taskPromises = projectIds.map(async (projectId) => {
         try {
           const tasks = await this.tasksService.listTasksByProject(projectId, true);
           for (const task of tasks) {
-            if (task.id) {
+            // 必要なタスクIDのみをマップに追加（パフォーマンス向上）
+            if (task.id && requiredTaskIds.has(task.id)) {
               taskArchivedMap.set(task.id, task.archived ?? false);
             }
           }
         } catch (error) {
           console.error(`プロジェクト ${projectId} のタスク取得に失敗しました:`, error);
         }
-      }
+      });
+      await Promise.all(taskPromises);
 
       // アーカイブされたタスクの添付ファイルを除外
       const filteredAttachments = attachments.filter((attachment) => {
@@ -200,10 +211,22 @@ export class AttachmentsListComponent implements OnInit {
   }
 
   getTaskLink(row: AttachmentRow): string[] | null {
-    if (!row.projectId || !row.issueId) {
+    if (!row.projectId || !row.issueId || !row.taskId) {
       return null;
     }
     return ['/projects', row.projectId, 'issues', row.issueId];
+  }
+
+  getTaskQueryParams(row: AttachmentRow): Record<string, string> | null {
+    if (!row.taskId) {
+      return null;
+    }
+    const params: Record<string, string> = { focus: row.taskId, openDetail: 'true' };
+    // 添付ファイルIDもクエリパラメータに追加
+    if (row.id) {
+      params['attachmentId'] = row.id;
+    }
+    return params;
   }
 
   trackByAttachmentId(_: number, row: AttachmentRow): string {

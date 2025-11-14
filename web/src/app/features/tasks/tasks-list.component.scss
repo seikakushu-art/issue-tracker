@@ -1425,6 +1425,12 @@ h3 .checklist-hint {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: background-color 0.3s ease;
+
+  &.attachment-highlight {
+    background-color: #fff3cd;
+    animation: highlight-fade 2s ease-out;
+  }
 }
 
 .attachment-main {
