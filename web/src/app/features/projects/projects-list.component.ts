@@ -99,6 +99,10 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   memberRemovalMessage = '';
   memberRemovalError = '';
 
+  // アクセスエラーメッセージ
+  accessErrorMessage = '';
+  private accessErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
   // 並び替え設定
   sortBy: 'name' | 'startDate' | 'endDate' | 'progress' | 'createdAt' | 'period' | 'issueCount' | 'memberCount' = 'name';
   sortOrder: 'asc' | 'desc' = 'asc';
@@ -121,9 +125,58 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
     this.loadProjects();
     this.loadTemplates();
     this.observeCreateQuery();
+    this.checkAccessError();
+  }
+
+  /**
+   * クエリパラメータからアクセスエラーをチェックして表示
+   */
+  private checkAccessError(): void {
+    const errorParam = this.route.snapshot.queryParamMap.get('error');
+    if (errorParam) {
+      // 既存のタイマーをクリア
+      if (this.accessErrorTimer) {
+        clearTimeout(this.accessErrorTimer);
+        this.accessErrorTimer = null;
+      }
+
+      switch (errorParam) {
+        case 'access_denied':
+          this.accessErrorMessage = 'このプロジェクトにアクセスする権限がありません。プロジェクトのメンバーである必要があります。';
+          break;
+        case 'not_found':
+          this.accessErrorMessage = '指定されたプロジェクトが見つかりませんでした。';
+          break;
+        case 'unknown':
+          this.accessErrorMessage = 'プロジェクトへのアクセス中にエラーが発生しました。';
+          break;
+        default:
+          this.accessErrorMessage = '';
+      }
+      
+      // エラーメッセージを表示した後、クエリパラメータをクリア
+      if (this.accessErrorMessage) {
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { error: null },
+          queryParamsHandling: 'merge',
+        });
+
+        // 5秒後に自動でエラーメッセージを消す
+        this.accessErrorTimer = setTimeout(() => {
+          this.accessErrorMessage = '';
+          this.accessErrorTimer = null;
+        }, 5000);
+      }
+    }
   }
 
   ngOnDestroy() {
+    // タイマーをクリア
+    if (this.accessErrorTimer) {
+      clearTimeout(this.accessErrorTimer);
+      this.accessErrorTimer = null;
+    }
     this.destroy$.next();
     this.destroy$.complete();
   }

@@ -13,6 +13,15 @@
     </button>
   </div>
 
+  <!-- アクセスエラーメッセージ -->
+  <div class="error-message" *ngIf="accessErrorMessage">
+    <div class="error-message__content">
+      <span class="error-message__icon" aria-hidden="true">⚠️</span>
+      <span class="error-message__text">{{ accessErrorMessage }}</span>
+      <button class="error-message__close" type="button" (click)="accessErrorMessage = ''" aria-label="エラーメッセージを閉じる">×</button>
+    </div>
+  </div>
+
   <!-- フィルター・並び替え -->
   <div class="filters">
     <div class="filter-group filter-group--smart">

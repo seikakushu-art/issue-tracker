@@ -84,7 +84,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   selectedTask: Task | null = null;
   pendingFocusTaskId: string | null = null;
   pendingCommentId: string | null = null;
-  pendingOpenDetail: boolean = false;
+  pendingOpenDetail = false;
   newChecklistText = '';
   currentRole: Role | null = null;
   currentUid: string | null = null;
@@ -276,6 +276,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
       if (this.pendingFocusTaskId) {
         this.trySelectTaskById(this.pendingFocusTaskId, this.pendingOpenDetail);
       }
+      // プロジェクトが取得できない場合（権限エラーなど）はプロジェクト一覧へリダイレクト
+      if (!this.projectDetails) {
+        await this.router.navigate(['/projects'], {
+          queryParams: { error: 'access_denied' }
+        });
+        return;
+      }
+
       if (this.selectedTaskId) {
         const refreshed = tasks.find(task => task.id === this.selectedTaskId);
         if (refreshed && refreshed.id) {
@@ -290,6 +298,12 @@ export class TasksListComponent implements OnInit, OnDestroy {
       }
     } catch (error) {
       console.error('データの読み込みに失敗しました:', error);
+      // プロジェクトが取得できない場合（権限エラーなど）はプロジェクト一覧へリダイレクト
+      if (!this.projectDetails) {
+        await this.router.navigate(['/projects'], {
+          queryParams: { error: 'access_denied' }
+        });
+      }
     }
   }
 
@@ -1529,7 +1543,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   /** 指定IDのタスクを選択候補として適用する */
-  private trySelectTaskById(taskId: string | null, openDetail: boolean = false): void {
+  private trySelectTaskById(taskId: string | null, openDetail = false): void {
     if (!taskId) {
       return;
     }

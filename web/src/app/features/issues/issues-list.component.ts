@@ -171,6 +171,12 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       }
     } catch (error) {
       console.error('課題の読み込みに失敗しました:', error);
+      // プロジェクトが取得できない場合（権限エラーなど）はプロジェクト一覧へリダイレクト
+      if (!this.projectDetails) {
+        await this.router.navigate(['/projects'], {
+          queryParams: { error: 'access_denied' }
+        });
+      }
     }
   }
  /**

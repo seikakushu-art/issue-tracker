@@ -13,6 +13,7 @@ import { GlobalSearchComponent } from './features/search/global-search.component
 import { ProgressGanttComponent } from './features/progress/progress-gantt.component';
 import { ProgressTreeComponent } from './features/progress/progress-tree.component';
 import { authGuard } from './core/auth.guard';
+import { projectGuard } from './core/project.guard';
 /**
  * アプリケーションのルート設定
  * プロジェクト → 課題 → タスクの階層構造に対応
@@ -97,7 +98,7 @@ export const routes: Routes = [
     path: 'projects/:projectId',
     component: IssuesListComponent,
     title: '課題一覧',
-    canActivate: [authGuard]
+    canActivate: [authGuard, projectGuard]
   },
   
   // 課題詳細（タスク一覧）
@@ -105,7 +106,7 @@ export const routes: Routes = [
     path: 'projects/:projectId/issues/:issueId',
     component: TasksListComponent,
     title: 'タスク一覧',
-    canActivate: [authGuard]
+    canActivate: [authGuard, projectGuard]
   },
   
   // 404ページ

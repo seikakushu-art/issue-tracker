@@ -337,6 +337,8 @@ export class ProjectsService {
       return this.hydrateProject(snapshot.id, snapshot.data() as Project);
     } catch (error) {
       console.error('●●●Error fetching project detail:', error);
+      // 権限エラーの場合はnullを返す（ガードで既にチェック済み）
+      // その他のエラーもnullを返して呼び出し側で処理
       return null;
     }
   }
