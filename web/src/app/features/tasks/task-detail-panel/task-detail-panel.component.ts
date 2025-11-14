@@ -147,7 +147,7 @@ import {
         return;
       }
       void this.router.navigate(['/projects', this.projectId, 'issues', this.issueId], {
-        queryParams: { focus: this.taskId },
+        queryParams: { focus: this.taskId, openDetail: 'true' },
       });
     }
   
