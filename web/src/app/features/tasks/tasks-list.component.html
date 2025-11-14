@@ -727,7 +727,7 @@
 </div>
 
 <!-- タスク作成・編集モーダル -->
-<div *ngIf="showModal" class="modal-overlay" (click)="closeModal()" role="button" tabindex="-1">
+<div *ngIf="showModal" class="modal-overlay" (keydown.escape)="closeModal()" role="button" tabindex="-1">
   <div class="modal" (click)="$event.stopPropagation()" role="button" tabindex="-1">
     <div class="modal-header">
       <h2>{{ editingTask ? 'タスク編集' : '新規タスク' }}</h2>

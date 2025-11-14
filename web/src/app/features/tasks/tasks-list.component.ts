@@ -1724,6 +1724,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
       if (conflictCodes.includes(error.code) || error.message.includes('FAILED_PRECONDITION')) {
         return '最新の情報と競合したため保存できませんでした。画面を再読み込みしてからもう一度お試しください。';
       }
+      
+      // タイムアウトエラーを検出
+      if (error.code === 'deadline-exceeded' || error.message.toLowerCase().includes('timeout')) {
+        return 'リクエストがタイムアウトしました。時間をおいて再度お試しください。';
+      }
+      
+      // オフライン関連のエラーコードを検出
+      if (error.code === 'unavailable' || error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('offline')) {
+        return 'インターネット接続を確認してください。オフラインのため操作を完了できませんでした。';
+      }
+      
       if (error.message) {
         return error.message;
       }
@@ -1731,6 +1742,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     // 通常のErrorであればメッセージを返却し、その他は汎用文を表示
     if (error instanceof Error && error.message) {
+      // エラーメッセージをチェック
+      const errorMessage = error.message.toLowerCase();
+      if (errorMessage.includes('timeout')) {
+        return 'リクエストがタイムアウトしました。時間をおいて再度お試しください。';
+      }
+      if (errorMessage.includes('network') || errorMessage.includes('offline') || errorMessage.includes('fetch')) {
+        return 'インターネット接続を確認してください。オフラインのため操作を完了できませんでした。';
+      }
       return error.message;
     }
     return '予期しないエラーが発生しました。時間をおいて再度お試しください。';

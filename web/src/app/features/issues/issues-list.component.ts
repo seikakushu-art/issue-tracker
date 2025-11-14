@@ -812,8 +812,29 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
         (error.code === 'failed-precondition' || /version/i.test(error.message))
       ) {
         alert(`データのバージョンが古いため課題を${actionLabel}できませんでした。画面を再読み込みしてから再度お試しください。`);
+      } else if (error instanceof FirebaseError) {
+        // タイムアウトエラーを検出
+        if (error.code === 'deadline-exceeded' || error.message.toLowerCase().includes('timeout')) {
+          alert('リクエストがタイムアウトしました。時間をおいて再度お試しください。');
+        } else if (error.code === 'unavailable' || error.message.toLowerCase().includes('network') || error.message.toLowerCase().includes('offline')) {
+          // オフライン関連のエラーコードを検出
+          alert('インターネット接続を確認してください。オフラインのため操作を完了できませんでした。');
+        } else if (error.message) {
+          alert(error.message);
+        } else {
+          alert(`課題の${actionLabel}に失敗しました`);
+        }
       } else if(error instanceof Error && error.message) {
-        alert(error.message);
+        // エラーメッセージをチェック
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('timeout')) {
+          alert('リクエストがタイムアウトしました。時間をおいて再度お試しください。');
+        } else if (errorMessage.includes('network') || errorMessage.includes('offline') || errorMessage.includes('fetch')) {
+          alert('インターネット接続を確認してください。オフラインのため操作を完了できませんでした。');
+        } else {
+          alert(error.message);
+        }
+      } else {
         alert(`課題の${actionLabel}に失敗しました`);
       }
     } finally {

@@ -361,7 +361,7 @@
 </div>
 
 <!-- プロジェクト作成・編集モーダル -->
-<div *ngIf="showModal" class="modal-overlay" (click)="closeModal()" (keydown.enter)="closeModal()" (keydown.escape)="closeModal()" role="button" tabindex="-1">
+<div *ngIf="showModal" class="modal-overlay" (keydown.escape)="closeModal()" role="button" tabindex="-1">
   <div class="modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" role="button" tabindex="-1">
     <div class="modal-header">
       <h2>{{ editingProject ? 'プロジェクト編集' : '新規プロジェクト' }}</h2>
