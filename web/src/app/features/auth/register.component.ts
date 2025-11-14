@@ -92,6 +92,7 @@ import { UserProfileService } from '../../core/user-profile.service';
                 id="password"
                 [type]="showPassword ? 'text' : 'password'" 
                 [(ngModel)]="registerForm.password" 
+                (ngModelChange)="onPasswordChange($event)"
                 name="password"
                 required
                 placeholder="パスワードを入力（6文字以上）"
@@ -116,10 +117,12 @@ import { UserProfileService } from '../../core/user-profile.service';
                 id="confirmPassword"
                 [type]="showConfirmPassword ? 'text' : 'password'" 
                 [(ngModel)]="registerForm.confirmPassword" 
+                (ngModelChange)="onConfirmPasswordChange($event)"
                 name="confirmPassword"
                 required
                 placeholder="パスワードを再入力"
                 [disabled]="loading"
+                [class.input-warning]="passwordMismatchWarning"
               >
               <button
                 type="button"
@@ -130,6 +133,10 @@ import { UserProfileService } from '../../core/user-profile.service';
               >
                 <span class="password-toggle-icon">{{ showConfirmPassword ? '👁️' : '👁️‍🗨️' }}</span>
               </button>
+            </div>
+            <div *ngIf="passwordMismatchWarning" class="username-warning">
+              <i class="icon-warning"></i>
+              {{ passwordMismatchWarning }}
             </div>
           </div>
 
@@ -452,6 +459,7 @@ export class RegisterComponent implements OnDestroy {
   showPassword = false;
   showConfirmPassword = false;
   usernameWarning = '';
+  passwordMismatchWarning = '';
 
   /** 選択中のアイコン画像を一時的に保持 */
   selectedIconFile: File | null = null;
@@ -524,6 +532,38 @@ export class RegisterComponent implements OnDestroy {
 
   private isUsernameValid(value: string): boolean {
     return /^[a-z0-9_]{3,10}$/.test(value);
+  }
+
+  /**
+   * パスワード変更時の処理
+   */
+  onPasswordChange(value: string): void {
+    this.registerForm.password = value;
+    this.checkPasswordMatch();
+  }
+
+  /**
+   * パスワード確認変更時の処理
+   */
+  onConfirmPasswordChange(value: string): void {
+    this.registerForm.confirmPassword = value;
+    this.checkPasswordMatch();
+  }
+
+  /**
+   * パスワードの一致をチェック
+   */
+  private checkPasswordMatch(): void {
+    if (!this.registerForm.confirmPassword) {
+      this.passwordMismatchWarning = '';
+      return;
+    }
+
+    if (this.registerForm.password !== this.registerForm.confirmPassword) {
+      this.passwordMismatchWarning = 'パスワードが一致しません';
+    } else {
+      this.passwordMismatchWarning = '';
+    }
   }
 
   /**
