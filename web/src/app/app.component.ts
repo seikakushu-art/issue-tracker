@@ -251,8 +251,9 @@ export class AppComponent implements OnInit, OnDestroy {
     const url = this.router.url;
     this.breadcrumbs = [];
 
-     // URLからパラメータを抽出
-     const urlParts = url.split('/').filter(part => part);
+     // URLからクエリパラメータを除去してからパスを抽出
+     const urlWithoutQuery = url.split('?')[0];
+     const urlParts = urlWithoutQuery.split('/').filter(part => part);
 
      if (urlParts.length === 0) {
        return; // ホーム画面など
