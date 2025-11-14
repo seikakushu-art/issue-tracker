@@ -283,12 +283,22 @@ export class DashboardComponent implements OnInit {
       const isOverdue = task.dueDate ? this.notificationService.isOverdue(task.dueDate, now) : false;
       const type: NotificationListType = isOverdue ? 'overdue' : 'due_today';
       const key = this.getDueNotificationKey(task.taskId, task.dueDate);
+      // 期限超過の場合は表示日付を今日にするが、時刻は期限日の時刻を保持する
+      let displayTimestamp: Date | null = task.dueDate;
+      if (isOverdue && task.dueDate) {
+        const todayParts = this.getTokyoDateParts(now);
+        // 期限日の時刻を取得
+        const dueHours = task.dueDate.getHours();
+        const dueMinutes = task.dueDate.getMinutes();
+        // 今日の日付で、期限日の時刻を保持した新しいDateオブジェクトを作成
+        displayTimestamp = new Date(todayParts.year, todayParts.month, todayParts.day, dueHours, dueMinutes);
+      }
       return {
         key,
         type,
         title: task.title,
         description: this.composeProjectLabel(task.projectName, task.issueName),
-        timestamp: task.dueDate,
+        timestamp: displayTimestamp,
         projectId: task.projectId,
         issueId: task.issueId,
         taskId: task.taskId,

@@ -1270,6 +1270,21 @@ private async loadTagsForAllProjects(): Promise<void> {
     };
   }
 
+  /** 説明の現在の文字数を取得 */
+  getDescriptionCharCount(): number {
+    return this.projectForm.description?.length || 0;
+  }
+
+  /** 達成目標の現在の文字数を取得 */
+  getGoalCharCount(): number {
+    return this.projectForm.goal?.length || 0;
+  }
+
+  /** プロジェクト名の現在の文字数を取得 */
+  getNameCharCount(): number {
+    return this.projectForm.name?.length || 0;
+  }
+
   /**
    * プロジェクトIDから決定論的にカラフルな色を生成する
    */

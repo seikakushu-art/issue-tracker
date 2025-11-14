@@ -1762,6 +1762,21 @@ export class TasksListComponent implements OnInit, OnDestroy {
     this.saving = false;
   }
 
+  /** タイトルの現在の文字数を取得 */
+  getTitleCharCount(): number {
+    return this.taskForm.title?.length || 0;
+  }
+
+  /** 説明の現在の文字数を取得 */
+  getDescriptionCharCount(): number {
+    return this.taskForm.description?.length || 0;
+  }
+
+  /** 達成目標の現在の文字数を取得 */
+  getGoalCharCount(): number {
+    return this.taskForm.goal?.length || 0;
+  }
+
   /** タスク削除 */
   async deleteTask(task: Task, event?: Event) {
     if (event) {

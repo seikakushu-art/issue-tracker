@@ -314,6 +314,16 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
     return post.id ?? `${post.title}-${post.createdAt?.toISOString() ?? ''}`;
   }
 
+  /** タイトルの現在の文字数を取得 */
+  getTitleCharCount(): number {
+    return this.postForm.title?.length || 0;
+  }
+
+  /** 内容の現在の文字数を取得 */
+  getContentCharCount(): number {
+    return this.postForm.content?.length || 0;
+  }
+
   isPostExpanded(postId: string | undefined): boolean {
     if (!postId) {
       return false;

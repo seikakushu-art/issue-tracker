@@ -15,7 +15,7 @@
       <ng-container *ngIf="hasPostPermission(); else noPermission">
         <form (ngSubmit)="submit()" novalidate>
           <div class="form-field">
-            <label for="board-title-input">タイトル<span aria-hidden="true" class="form-field__required">*</span></label>
+            <label for="board-title-input">タイトル<span aria-hidden="true" class="form-field__required">*</span> <span class="char-count-label" [class.char-count-label--warning]="getTitleCharCount() > 110">{{ getTitleCharCount() }} / 120字</span></label>
             <input
               id="board-title-input"
               type="text"
@@ -29,7 +29,7 @@
           </div>
   
           <div class="form-field">
-            <label for="board-content-input">内容<span aria-hidden="true" class="form-field__required">*</span></label>
+            <label for="board-content-input">内容<span aria-hidden="true" class="form-field__required">*</span> <span class="char-count-label" [class.char-count-label--warning]="getContentCharCount() > 19000">{{ getContentCharCount() }} / 20000字</span></label>
             <textarea
               id="board-content-input"
               name="content"
@@ -38,13 +38,13 @@
               [disabled]="submitting()"
               required
               maxlength="20000"
-              placeholder="共有したい内容を記載してください"
+              placeholder="内容は2万文字以内で入力してください"
             ></textarea>
           </div>
   
           <div class="form-field">
-            <span class="form-field__label">対象プロジェクト<span aria-hidden="true" class="form-field__required">*</span></span>
-            <div class="form-field__checkboxes" role="group" aria-describedby="project-help">
+            <span class="form-field__label">対象プロジェクト<span aria-hidden="true" class="form-field__required">*</span> <span class="project-limit-hint">最大5件まで選択できます。</span></span>
+            <div class="form-field__checkboxes" role="group">
               <label *ngFor="let project of postableProjects()" class="checkbox-option">
                 <input
                   type="checkbox"
@@ -56,7 +56,6 @@
                 <span>{{ project.name }}</span>
               </label>
             </div>
-            <p id="project-help" class="form-field__help">最大5件まで選択できます。</p>
           </div>
   
           <p class="form-message form-message--error" *ngIf="formError()">{{ formError() }}</p>

@@ -383,7 +383,7 @@
     </section>
 
     <section class="detail-section">
-      <h3>チェックリスト</h3>
+      <h3>チェックリスト <span class="checklist-hint">チェックリスト項目は100文字以内で入力してください</span></h3>
       <div *ngIf="selectedTask.checklist.length > 0; else emptyChecklist">
         <div class="detail-checklist-item" *ngFor="let item of selectedTask.checklist">
           <label>
@@ -744,7 +744,7 @@
     
     <form class="modal-body" (ngSubmit)="saveTask()">
       <div class="form-group">
-        <label for="title">タイトル *</label>
+        <label for="title">タイトル * <span class="required-label">必須項目</span> <span class="char-count-label" [class.char-count-label--warning]="getTitleCharCount() > 70">{{ getTitleCharCount() }} / 80字</span></label>
         <input 
           id="title"
           type="text" 
@@ -757,7 +757,7 @@
       </div>
       
       <div class="form-group">
-        <label for="description">説明</label>
+        <label for="description">説明 <span class="char-count-label" [class.char-count-label--warning]="getDescriptionCharCount() > 450">{{ getDescriptionCharCount() }} / 500字</span></label>
         <textarea 
           id="description"
           [(ngModel)]="taskForm.description" 
@@ -813,7 +813,7 @@
       </div>
       
       <div class="form-group">
-        <label for="goal">達成目標</label>
+        <label for="goal">達成目標 <span class="char-count-label" [class.char-count-label--warning]="getGoalCharCount() > 450">{{ getGoalCharCount() }} / 500字</span></label>
         <textarea 
           id="goal"
           [(ngModel)]="taskForm.goal" 
@@ -825,7 +825,7 @@
       </div>
 
       <div class="form-group">
-        <span>タグ</span>
+        <span>タグ <span class="tag-hint">タグ名は最大10文字までです</span></span>
         <div class="tag-selector">
            <!-- 既存タグをグリッド状に表示し、クリックで選択する -->
            <div
@@ -882,13 +882,11 @@
             {{ creatingTag ? '作成中...' : 'タグを追加' }}
           </button>
         </div>
-        <small class="hint">
-          カスタムタグは保存され、ほかのタスクでも選択できます。
-        </small>
+        <span class="tag-info-hint">プロジェクト内のタグは最大20個まで保存できる <span class="tag-count-label" [class.tag-count-label--warning]="availableTags.length >= 18">{{ availableTags.length }} / 20</span></span>
       </div>
 
       <div class="form-group">
-        <span>チェックリスト</span>
+        <span>チェックリスト <span class="checklist-hint">チェックリスト項目は100文字以内で入力してください</span></span>
         <div class="checklist-editor">
           <div 
             *ngFor="let item of taskForm.checklist; let i = index" 

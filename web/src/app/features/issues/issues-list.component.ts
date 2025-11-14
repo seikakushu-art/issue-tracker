@@ -851,6 +851,21 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     this.saving = false;
   }
 
+  /** 課題名の現在の文字数を取得 */
+  getNameCharCount(): number {
+    return this.issueForm.name?.length || 0;
+  }
+
+  /** 説明の現在の文字数を取得 */
+  getDescriptionCharCount(): number {
+    return this.issueForm.description?.length || 0;
+  }
+
+  /** 達成目標の現在の文字数を取得 */
+  getGoalCharCount(): number {
+    return this.issueForm.goal?.length || 0;
+  }
+
   /** 課題期間（日数）を算出する（開始・終了がそろっていない場合は0） */
   private getIssueDuration(issue: Issue): number {
     const startDate = this.normalizeToDate(issue.startDate);

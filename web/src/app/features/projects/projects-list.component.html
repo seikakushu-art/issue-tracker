@@ -406,7 +406,7 @@
         <p class="template-notice" *ngIf="templateNotice">{{ templateNotice }}</p>
       </div>
       <div class="form-group">
-        <label for="name">プロジェクト名 *</label>
+        <label for="name">プロジェクト名 * <span class="required-label">必須項目</span> <span class="char-count-label" [class.char-count-label--warning]="getNameCharCount() > 70">{{ getNameCharCount() }} / 80字</span></label>
         <input
           id="name"
           type="text"
@@ -419,7 +419,7 @@
       </div>
       
       <div class="form-group">
-        <label for="description">説明</label>
+        <label for="description">説明 <span class="char-count-label" [class.char-count-label--warning]="getDescriptionCharCount() > 450">{{ getDescriptionCharCount() }} / 500字</span></label>
         <textarea 
           id="description"
           [(ngModel)]="projectForm.description" 
@@ -452,7 +452,7 @@
       </div>
       
       <div class="form-group">
-        <label for="goal">達成目標</label>
+        <label for="goal">達成目標 <span class="char-count-label" [class.char-count-label--warning]="getGoalCharCount() > 450">{{ getGoalCharCount() }} / 500字</span></label>
           <textarea 
             id="goal"
             [(ngModel)]="projectForm.goal" 

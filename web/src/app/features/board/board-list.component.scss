@@ -64,6 +64,25 @@
     color: #ef4444;
     margin-left: 4px;
   }
+
+  .form-field label .char-count-label {
+    font-size: 11px;
+    font-weight: 400;
+    color: #6b7280;
+    margin-left: 4px;
+  }
+
+  .form-field label .char-count-label--warning {
+    color: #dc2626;
+    font-weight: 600;
+  }
+
+  .form-field__label .project-limit-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: #6b7280;
+    margin-left: 4px;
+  }
   
   .form-field input,
   .form-field textarea {

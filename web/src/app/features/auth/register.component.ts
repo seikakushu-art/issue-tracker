@@ -39,8 +39,13 @@ import { UserProfileService } from '../../core/user-profile.service';
               placeholder="半角英数字と_で3〜10文字"
               autocomplete="username"
               [disabled]="loading"
+              [class.input-warning]="usernameWarning"
             >
             <small class="form-group__hint">※小文字のみ使用できます。同じユーザー名は登録できません。</small>
+            <div *ngIf="usernameWarning" class="username-warning">
+              <i class="icon-warning"></i>
+              {{ usernameWarning }}
+            </div>
           </div>
           <div class="form-group form-group--file">
             <label for="icon">プロフィールアイコン</label>
@@ -82,28 +87,50 @@ import { UserProfileService } from '../../core/user-profile.service';
           
           <div class="form-group">
             <label for="password">パスワード</label>
-            <input 
-              id="password"
-              type="password" 
-              [(ngModel)]="registerForm.password" 
-              name="password"
-              required
-              placeholder="パスワードを入力（6文字以上）"
-              [disabled]="loading"
-            >
+            <div class="password-input-wrapper">
+              <input 
+                id="password"
+                [type]="showPassword ? 'text' : 'password'" 
+                [(ngModel)]="registerForm.password" 
+                name="password"
+                required
+                placeholder="パスワードを入力（6文字以上）"
+                [disabled]="loading"
+              >
+              <button
+                type="button"
+                class="password-toggle-btn"
+                (click)="showPassword = !showPassword"
+                [disabled]="loading"
+                [attr.aria-label]="showPassword ? 'パスワードを非表示' : 'パスワードを表示'"
+              >
+                <span class="password-toggle-icon">{{ showPassword ? '👁️' : '👁️‍🗨️' }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="form-group">
             <label for="confirmPassword">パスワード確認</label>
-            <input 
-              id="confirmPassword"
-              type="password" 
-              [(ngModel)]="registerForm.confirmPassword" 
-              name="confirmPassword"
-              required
-              placeholder="パスワードを再入力"
-              [disabled]="loading"
-            >
+            <div class="password-input-wrapper">
+              <input 
+                id="confirmPassword"
+                [type]="showConfirmPassword ? 'text' : 'password'" 
+                [(ngModel)]="registerForm.confirmPassword" 
+                name="confirmPassword"
+                required
+                placeholder="パスワードを再入力"
+                [disabled]="loading"
+              >
+              <button
+                type="button"
+                class="password-toggle-btn"
+                (click)="showConfirmPassword = !showConfirmPassword"
+                [disabled]="loading"
+                [attr.aria-label]="showConfirmPassword ? 'パスワード確認を非表示' : 'パスワード確認を表示'"
+              >
+                <span class="password-toggle-icon">{{ showConfirmPassword ? '👁️' : '👁️‍🗨️' }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="form-actions">
@@ -241,6 +268,44 @@ import { UserProfileService } from '../../core/user-profile.service';
       box-sizing: border-box;
     }
 
+    .password-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .password-input-wrapper input {
+      padding-right: 48px;
+    }
+
+    .password-toggle-btn {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background-color 0.2s ease;
+    }
+
+    .password-toggle-btn:hover:not(:disabled) {
+      background-color: #f1f5f9;
+    }
+
+    .password-toggle-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .password-toggle-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
     .form-group input:focus {
       outline: none;
       border-color: #667eea;
@@ -251,6 +316,19 @@ import { UserProfileService } from '../../core/user-profile.service';
       margin-top: 6px;
       color: #64748b;
       font-size: 12px;
+    }
+
+    .input-warning {
+      border-color: #f59e0b !important;
+    }
+
+    .username-warning {
+      margin-top: 6px;
+      color: #f59e0b;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
 
@@ -360,6 +438,7 @@ import { UserProfileService } from '../../core/user-profile.service';
     .icon-folder::before { content: '📁'; }
     .icon-error::before { content: '⚠️'; }
     .icon-success::before { content: '✅'; }
+    .icon-warning::before { content: '⚠️'; }
   `]
 })
 export class RegisterComponent implements OnDestroy {
@@ -370,6 +449,9 @@ export class RegisterComponent implements OnDestroy {
   loading = false;
   errorMessage = '';
   successMessage = '';
+  showPassword = false;
+  showConfirmPassword = false;
+  usernameWarning = '';
 
   /** 選択中のアイコン画像を一時的に保持 */
   selectedIconFile: File | null = null;
@@ -395,10 +477,45 @@ export class RegisterComponent implements OnDestroy {
    * ユーザー名入力の変換・制限を行う
    */
   onUsernameChange(value: string): void {
-    const sanitized = (value ?? '')
+    const originalValue = value ?? '';
+    const sanitized = originalValue
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, '')
       .slice(0, 10);
+    
+    // 警告メッセージをリセット
+    this.usernameWarning = '';
+    
+    // ルール違反をチェック
+    if (originalValue !== sanitized) {
+      const issues: string[] = [];
+      
+      // 大文字が含まれていた場合
+      if (originalValue !== originalValue.toLowerCase()) {
+        issues.push('大文字は小文字に変換されます');
+      }
+      
+      // 無効な文字が含まれていた場合
+      if (/[^a-z0-9_]/i.test(originalValue)) {
+        issues.push('半角英数字とアンダースコア(_)以外の文字は使用できません');
+      }
+      
+      // 10文字を超えていた場合
+      const validChars = originalValue.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (validChars.length > 10) {
+        issues.push('10文字を超える部分は削除されます');
+      }
+      
+      if (issues.length > 0) {
+        this.usernameWarning = issues.join('。');
+      }
+    }
+    
+    // 文字数が少ない場合の警告
+    if (sanitized.length > 0 && sanitized.length < 3) {
+      this.usernameWarning = `3文字以上必要です（現在: ${sanitized.length}文字）`;
+    }
+    
     this.registerForm.username = sanitized;
     if (this.errorMessage) {
       this.errorMessage = '';

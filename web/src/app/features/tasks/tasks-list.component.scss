@@ -985,6 +985,64 @@
   color: #333;
 }
 
+.form-group label .required-label {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.form-group label .char-count-label {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.form-group label .char-count-label--warning {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.checklist-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+h3 .checklist-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.tag-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.tag-info-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+  margin-top: 4px;
+  display: block;
+}
+
+.tag-info-hint .tag-count-label {
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.tag-info-hint .tag-count-label--warning {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 .form-group input,
 .form-group textarea,
 .form-group select {

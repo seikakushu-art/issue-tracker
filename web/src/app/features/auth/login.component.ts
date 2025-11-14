@@ -46,15 +46,26 @@ import { AuthService } from '../../core/auth.service';
           
           <div class="form-group">
             <label for="password">パスワード</label>
-            <input 
-              id="password"
-              type="password" 
-              [(ngModel)]="loginForm.password" 
-              name="password"
-              required
-              placeholder="パスワードを入力"
-              [disabled]="loading"
-            >
+            <div class="password-input-wrapper">
+              <input 
+                id="password"
+                [type]="showPassword ? 'text' : 'password'" 
+                [(ngModel)]="loginForm.password" 
+                name="password"
+                required
+                placeholder="パスワードを入力"
+                [disabled]="loading"
+              >
+              <button
+                type="button"
+                class="password-toggle-btn"
+                (click)="showPassword = !showPassword"
+                [disabled]="loading"
+                [attr.aria-label]="showPassword ? 'パスワードを非表示' : 'パスワードを表示'"
+              >
+                <span class="password-toggle-icon">{{ showPassword ? '👁️' : '👁️‍🗨️' }}</span>
+              </button>
+            </div>
           </div>
 
           <div class="form-group remember-group">
@@ -214,6 +225,44 @@ import { AuthService } from '../../core/auth.service';
       box-sizing: border-box;
     }
 
+    .password-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .password-input-wrapper input {
+      padding-right: 48px;
+    }
+
+    .password-toggle-btn {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background-color 0.2s ease;
+    }
+
+    .password-toggle-btn:hover:not(:disabled) {
+      background-color: #f1f5f9;
+    }
+
+    .password-toggle-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .password-toggle-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
     .form-group input:focus {
       outline: none;
       border-color: #667eea;
@@ -355,6 +404,7 @@ export class LoginComponent implements OnInit {
   successMessage = '';
   private redirectUrl: string | null = null;
   sendingReset = false;
+  showPassword = false;
 
   loginForm = {
     email: '',
