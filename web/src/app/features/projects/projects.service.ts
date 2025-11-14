@@ -172,6 +172,16 @@ export class ProjectsService {
     console.log('●●●createProject called with:', input);
     const uid = (await this.requireUser()).uid;
     
+    // プロジェクト名のバリデーション
+    const trimmedName = input.name?.trim() ?? '';
+    if (!trimmedName) {
+      throw new Error('プロジェクト名を入力してください');
+    }
+    const MAX_PROJECT_NAME_LENGTH = 80;
+    if (trimmedName.length > MAX_PROJECT_NAME_LENGTH) {
+      throw new Error(`プロジェクト名は最大${MAX_PROJECT_NAME_LENGTH}文字までです`);
+    }
+    
     // アクティブなプロジェクト数の上限チェック（30件）
     const activeProjectCount = await this.countActiveProjects();
     const MAX_ACTIVE_PROJECTS = 30;
@@ -180,7 +190,7 @@ export class ProjectsService {
     }
     
     // プロジェクト名重複チェック（アクティブ内で一意）
-    await this.checkNameUniqueness(input.name);
+    await this.checkNameUniqueness(trimmedName);
     
     // バリデーション: 開始日は終了日以前
     if (input.startDate && input.endDate && input.startDate > input.endDate) {
@@ -188,7 +198,7 @@ export class ProjectsService {
     }
     
     const payload: Record<string, unknown> = {
-      name: input.name,
+      name: trimmedName,
       memberIds: [uid],
       roles: { [uid]: 'admin' },
       archived: false,
@@ -345,7 +355,18 @@ export class ProjectsService {
 
 
   async archive(id: string, archived: boolean) {
-    await this.ensureProjectRole(id, ['admin']);
+    const { project } = await this.ensureProjectRole(id, ['admin']);
+    
+    // プロジェクトを復元する際は、アクティブプロジェクト数の上限と名前の一意性をチェック
+    if (!archived) {
+      const activeProjectCount = await this.countActiveProjects();
+      const MAX_ACTIVE_PROJECTS = 30;
+      if (activeProjectCount >= MAX_ACTIVE_PROJECTS) {
+        throw new Error(`アクティブなプロジェクトの上限（${MAX_ACTIVE_PROJECTS}件）に達しています。プロジェクトを復元するには、既存のプロジェクトをアーカイブするか削除してください。`);
+      }
+      // 名前の一意性チェック（自分自身を除外）
+      await this.checkNameUniqueness(project.name, id);
+    }
     
     // プロジェクトをアーカイブする際は、配下の課題とタスクも自動的にアーカイブする
     if (archived) {
@@ -473,7 +494,18 @@ export class ProjectsService {
     const { project: current } = await this.ensureProjectRole(id, ['admin']);
 
     if (updates.name !== undefined) {
-      await this.checkNameUniqueness(updates.name, id);
+      // プロジェクト名のバリデーション
+      const trimmedName = updates.name?.trim() ?? '';
+      if (!trimmedName) {
+        throw new Error('プロジェクト名を入力してください');
+      }
+      const MAX_PROJECT_NAME_LENGTH = 80;
+      if (trimmedName.length > MAX_PROJECT_NAME_LENGTH) {
+        throw new Error(`プロジェクト名は最大${MAX_PROJECT_NAME_LENGTH}文字までです`);
+      }
+      await this.checkNameUniqueness(trimmedName, id);
+      // 正規化された名前で更新
+      updates.name = trimmedName;
     }
 
     // --- FirestoreのTimestampが渡される場合に備えてDateへ正規化 ---
@@ -506,7 +538,7 @@ export class ProjectsService {
    * アクティブなプロジェクト数をカウントする
    * @returns アクティブなプロジェクト数（アーカイブされていないもの）
    */
-  private async countActiveProjects(): Promise<number> {
+  async countActiveProjects(): Promise<number> {
     // 認証済みコンテキストから呼ばれるため、認証を確認
     const uid = await this.getSignedInUid();
     const q = query(

@@ -154,14 +154,17 @@ import { Project, Issue, Task } from './models/schema';
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
+      max-width: 100%;
     }
     
     .breadcrumb-item:last-child {
-      flex-shrink: 0;
+      flex-shrink: 1;
+      min-width: 0;
     }
     
     .breadcrumb-item:last-child .breadcrumb-item__label {
-      flex-shrink: 0;
+      flex-shrink: 1;
+      min-width: 0;
     }
 
     .breadcrumb-item:hover {

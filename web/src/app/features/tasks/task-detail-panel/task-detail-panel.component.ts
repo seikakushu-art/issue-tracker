@@ -569,6 +569,8 @@ import {
         await this.refreshTask();
       } catch (error) {
         console.error('タスクのアーカイブ切り替えに失敗しました:', error);
+        const errorMessage = error instanceof Error ? error.message : 'タスクのアーカイブ切り替えに失敗しました';
+        alert(errorMessage);
       }
     }
   

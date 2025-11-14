@@ -39,6 +39,15 @@
 .header h2 {
   margin: 0;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
 }
 // 課題サマリーをテーマカラーで強調
 .issue-summary {
@@ -1335,6 +1344,33 @@ h3 .checklist-hint {
   margin: 0 0 8px 0;
   font-size: 14px;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignee-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
+}
+
+.checklist-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
+}
+
+.tag-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
+}
+
+.attachment-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
 }
 
 .attachments-section .section-header {

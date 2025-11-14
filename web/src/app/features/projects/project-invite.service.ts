@@ -188,6 +188,13 @@ export class ProjectInviteService {
   async acceptInvite(token: string): Promise<{ projectId: string; role: Role }> {
     const uid = await this.projectsService.getSignedInUid();
 
+    // アクティブプロジェクト数の上限チェック（トランザクション外で実行）
+    const activeProjectCount = await this.projectsService.countActiveProjects();
+    const MAX_ACTIVE_PROJECTS = 30;
+    if (activeProjectCount >= MAX_ACTIVE_PROJECTS) {
+      throw new Error(`アクティブなプロジェクトの上限（${MAX_ACTIVE_PROJECTS}件）に達しています。プロジェクトに参加するには、既存のプロジェクトをアーカイブするか削除してください。`);
+    }
+
     return runTransaction(this.db, async (tx) => {
       const inviteRef = doc(this.invitesCol, token);
       const inviteSnap = await tx.get(inviteRef);

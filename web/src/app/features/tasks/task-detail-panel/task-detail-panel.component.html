@@ -83,7 +83,7 @@
     </section>
 
     <section class="detail-section">
-      <h3>チェックリスト</h3>
+      <h3>チェックリスト <span class="checklist-count">({{ task.checklist.length }}/200)</span></h3>
       <div *ngIf="task.checklist.length > 0; else emptyChecklist">
         <div class="detail-checklist-item" *ngFor="let item of task.checklist">
           <label>
@@ -125,7 +125,7 @@
     </section>
 
     <section class="detail-section" *ngIf="getVisibleTagIds(task).length > 0">
-      <h3>タグ</h3>
+      <h3>タグ <span class="tag-count">({{ task.tagIds.length }}/10)</span></h3>
       <div class="detail-tags">
         <span
         *ngFor="let tagId of getVisibleTagIds(task)"
@@ -138,7 +138,7 @@
     </section>
 
     <section class="detail-section">
-      <h3>担当者</h3>
+      <h3>担当者 <span class="assignee-count">({{ task.assigneeIds.length }}/10)</span></h3>
       <p *ngIf="task.assigneeIds.length === 0" class="placeholder-text">担当者はまだ割り当てられていません。</p>
       <ul *ngIf="task.assigneeIds.length > 0" class="assignee-list">
         <li *ngFor="let assigneeId of task.assigneeIds" class="assignee-item">
@@ -174,7 +174,7 @@
 
     <section class="detail-section attachments-section">
       <div class="section-header">
-        <h3>添付</h3>
+        <h3>添付 <span class="attachment-count">({{ attachments.length }}/20)</span></h3>
       </div>
 
       <p *ngIf="attachmentsLoading" class="placeholder-text">添付ファイルを読み込み中です...</p>

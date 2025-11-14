@@ -39,6 +39,15 @@
 .header h2 {
   margin: 0;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.issue-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
 }
 
 .project-summary {

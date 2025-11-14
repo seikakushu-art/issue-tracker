@@ -73,7 +73,7 @@
         <span class="back-button__icon" aria-hidden="true">←</span>
         プロジェクト一覧
       </button>
-      <h2>課題一覧</h2>
+      <h2>課題一覧 <span class="issue-count">({{ filteredIssues.length }})</span></h2>
     </div>
     <button class="btn btn-primary" *ngIf="canCreateIssue()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規課題
@@ -124,7 +124,7 @@
     </div>
     <div class="filter-group">
       <label>
-        <input type="checkbox" [(ngModel)]="showArchived" (change)="loadIssues()">
+        <input type="checkbox" [(ngModel)]="showArchived" (change)="loadIssues(true)">
         アーカイブ済みも表示
       </label>
     </div>

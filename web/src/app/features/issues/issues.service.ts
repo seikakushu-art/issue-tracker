@@ -440,6 +440,17 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
       throw new Error('課題をアーカイブする権限がありません');
     }
     
+    // 課題を復元する際は、アクティブ課題数の上限と名前の一意性をチェック
+    if (!archived) {
+      const activeIssueCount = await this.countActiveIssues(projectId);
+      const MAX_ACTIVE_ISSUES = 50;
+      if (activeIssueCount >= MAX_ACTIVE_ISSUES) {
+        throw new Error(`アクティブな課題の上限（${MAX_ACTIVE_ISSUES}件）に達しています。課題を復元するには、既存の課題をアーカイブするか削除してください。`);
+      }
+      // 名前の一意性チェック（自分自身を除外）
+      await this.checkNameUniqueness(projectId, issue.name, issueId);
+    }
+    
     // 課題をアーカイブする際は、配下のタスクも自動的にアーカイブする
     if (archived) {
       await this.archiveIssueDescendants(projectId, issueId, true);
@@ -568,7 +579,11 @@ async togglePin(projectId: string, issueId: string, pinned: boolean): Promise<vo
    */
   private async checkNameUniqueness(projectId: string, name: string, excludeIssueId?: string): Promise<void> {
     const issues = await this.listIssues(projectId, true);
-    const duplicate = issues.find(issue => issue.name === name && issue.id !== excludeIssueId);
+    const duplicate = issues.find(issue => 
+      issue.name === name && 
+      issue.id !== excludeIssueId && 
+      !issue.archived
+    );
     if (duplicate) {
       throw new Error(`課題名 "${name}" は既にこのプロジェクト内で使用されています`);
     }

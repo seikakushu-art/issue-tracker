@@ -568,6 +568,17 @@ export class TasksService {
       throw new Error('タスクが見つかりません');
     }
 
+    // タスクを復元する際は、アクティブタスク数の上限と名前の一意性をチェック
+    if (updates.archived !== undefined && task.archived && !updates.archived) {
+      const activeTaskCount = await this.countActiveTasks(projectId, issueId);
+      const MAX_ACTIVE_TASKS = 300;
+      if (activeTaskCount >= MAX_ACTIVE_TASKS) {
+        throw new Error(`アクティブなタスクの上限（${MAX_ACTIVE_TASKS}件）に達しています。タスクを復元するには、既存のタスクをアーカイブするか削除してください。`);
+      }
+      // 名前の一意性チェック（自分自身を除外）
+      await this.checkTitleUniqueness(projectId, issueId, task.title, taskId);
+    }
+
     if (role === 'member') {
       const canEdit = task.createdBy === uid || (task.assigneeIds ?? []).includes(uid);
       if (!canEdit) {
@@ -703,6 +714,20 @@ export class TasksService {
     taskId: string,
     archived: boolean
   ): Promise<void> {
+    // タスクを復元する際は、アクティブタスク数の上限と名前の一意性をチェック
+    if (!archived) {
+      const activeTaskCount = await this.countActiveTasks(projectId, issueId);
+      const MAX_ACTIVE_TASKS = 300;
+      if (activeTaskCount >= MAX_ACTIVE_TASKS) {
+        throw new Error(`アクティブなタスクの上限（${MAX_ACTIVE_TASKS}件）に達しています。タスクを復元するには、既存のタスクをアーカイブするか削除してください。`);
+      }
+      // タスクを取得して名前の一意性チェック（自分自身を除外）
+      const task = await this.getTask(projectId, issueId, taskId);
+      if (task) {
+        await this.checkTitleUniqueness(projectId, issueId, task.title, taskId);
+      }
+    }
+    
     await this.updateTask(projectId, issueId, taskId, { archived });
   }
 
@@ -1126,8 +1151,12 @@ export class TasksService {
     title: string,
     excludeTaskId?: string
   ): Promise<void> {
-    const tasks = await this.listTasks(projectId, issueId);
-    const duplicate = tasks.find(task => task.title === title && task.id !== excludeTaskId);
+    // アクティブなタスクのみを取得してチェック（アーカイブ済みは除外）
+    const tasks = await this.listTasks(projectId, issueId, false);
+    const duplicate = tasks.find(task => 
+      task.title === title && 
+      task.id !== excludeTaskId
+    );
     if (duplicate) {
       throw new Error(`タスク名 "${title}" は既にこの課題内で使用されています`);
     }

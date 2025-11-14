@@ -91,6 +91,33 @@
   margin: 0 0 8px 0;
   font-size: 14px;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignee-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
+}
+
+.checklist-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
+}
+
+.tag-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
+}
+
+.attachment-count {
+  font-size: 0.65em;
+  font-weight: normal;
+  color: #666;
 }
 
 .attachments-section .section-header {

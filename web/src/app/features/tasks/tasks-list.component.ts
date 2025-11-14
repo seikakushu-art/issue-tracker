@@ -1844,7 +1844,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.refreshSelectedTask();
     } catch (error) {
       console.error('アーカイブの切替に失敗しました:', error);
-      alert('アーカイブの切替に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : 'アーカイブの切替に失敗しました';
+      alert(errorMessage);
     }
   }
 

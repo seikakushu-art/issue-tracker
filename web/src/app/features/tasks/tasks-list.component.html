@@ -56,7 +56,7 @@
         <span class="back-button__icon" aria-hidden="true">←</span>
         課題一覧
       </button>
-      <h2>タスク一覧</h2>
+      <h2>タスク一覧 <span class="task-count">({{ filteredTasks.length }})</span></h2>
     </div>
     <button class="btn btn-primary" *ngIf="canCreateTask()" (click)="openCreateModal()">
       <i class="icon-plus"></i> 新規タスク
@@ -383,7 +383,7 @@
     </section>
 
     <section class="detail-section">
-      <h3>チェックリスト <span class="checklist-hint">チェックリスト項目は100文字以内で入力してください</span></h3>
+      <h3>チェックリスト <span class="checklist-count">({{ selectedTask.checklist.length }}/200)</span> <span class="checklist-hint">チェックリスト項目は100文字以内で入力してください</span></h3>
       <div *ngIf="selectedTask.checklist.length > 0; else emptyChecklist">
         <div class="detail-checklist-item" *ngFor="let item of selectedTask.checklist">
           <label>
@@ -425,7 +425,7 @@
     </section>
 
     <section class="detail-section" *ngIf="getVisibleTagIds(selectedTask).length > 0">
-      <h3>タグ</h3>
+      <h3>タグ <span class="tag-count">({{ selectedTask.tagIds.length }}/10)</span></h3>
       <div class="detail-tags">
         <span
         *ngFor="let tagId of getVisibleTagIds(selectedTask)"
@@ -438,7 +438,7 @@
     </section>
 
     <section class="detail-section">
-      <h3>担当者</h3>
+      <h3>担当者 <span class="assignee-count">({{ selectedTask.assigneeIds.length }}/10)</span></h3>
       <p *ngIf="selectedTask.assigneeIds.length === 0" class="placeholder-text">担当者はまだ割り当てられていません。</p>
       <ul *ngIf="selectedTask.assigneeIds.length > 0" class="assignee-list">
         <li *ngFor="let assigneeId of selectedTask.assigneeIds" class="assignee-item">
@@ -494,7 +494,7 @@
 
     <section class="detail-section attachments-section">
       <div class="section-header">
-        <h3>添付</h3>
+        <h3>添付 <span class="attachment-count">({{ attachments.length }}/20)</span></h3>
         <div class="attachment-actions" *ngIf="canUploadAttachment(selectedTask)">
           <label class="btn btn-secondary btn-sm attachment-upload-button">
             <input

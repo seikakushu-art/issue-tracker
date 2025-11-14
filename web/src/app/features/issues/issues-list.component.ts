@@ -138,8 +138,9 @@ export class IssuesListComponent implements OnInit, OnDestroy {
 
   /**
    * 課題一覧を読み込む
+   * @param skipScroll スクロール処理をスキップするかどうか（デフォルト: false）
    */
-  async loadIssues() {
+  async loadIssues(skipScroll = false) {
     if (!this.projectId) return;
     
     try {
@@ -162,12 +163,14 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       await this.refreshTaskSummaries();
       await this.loadTagsForProject(this.projectId); // 直近で作成されたタグも反映
 
-      // クエリパラメータからfocus（課題ID）を取得してスクロール
-      const focusIssueId = this.route.snapshot.queryParamMap.get('focus');
-      if (focusIssueId) {
-        setTimeout(() => {
-          this.scrollToIssue(focusIssueId);
-        }, 100);
+      // クエリパラメータからfocus（課題ID）を取得してスクロール（スキップフラグがfalseの場合のみ）
+      if (!skipScroll) {
+        const focusIssueId = this.route.snapshot.queryParamMap.get('focus');
+        if (focusIssueId) {
+          setTimeout(() => {
+            this.scrollToIssue(focusIssueId);
+          }, 100);
+        }
       }
     } catch (error) {
       console.error('課題の読み込みに失敗しました:', error);
@@ -671,7 +674,8 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
         await this.loadIssues();
       } catch (error) {
         console.error(`${actionLabel}に失敗しました:`, error);
-        alert(`${actionLabel}に失敗しました`);
+        const errorMessage = error instanceof Error ? error.message : `${actionLabel}に失敗しました`;
+        alert(errorMessage);
       }
     }
   }

@@ -202,14 +202,21 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
 
   /**
    * プロジェクト一覧を読み込む
+   * @param skipScroll スクロール処理をスキップするかどうか（デフォルト: false）
    */
-  async loadProjects() {
+  async loadProjects(skipScroll = false) {
     try {
       this.currentUid = await this.projectsService.getSignedInUid();
       this.projects = await this.projectsService.listMyProjects();
       await this.loadIssueCounts();
       await this.loadMemberProfiles(this.projects);
-      await this.loadProjectTasks();
+      // スマートフィルターが空でない場合のみタスクを取得（パフォーマンス最適化）
+      if (!isSmartFilterEmpty(this.smartFilterCriteria)) {
+        await this.loadProjectTasks();
+      } else {
+        // スマートフィルターが空の場合はタスクマップをクリア
+        this.projectTasksMap = {};
+      }
       await this.loadTagsForAllProjects(); // プロジェクト一覧に応じたタグ候補を再構築
       this.filterProjects();
       if (this.showInviteModal && this.inviteProject?.id) {
@@ -225,12 +232,14 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
         }
       }
 
-      // クエリパラメータからfocus（プロジェクトID）を取得してスクロール
-      const focusProjectId = this.route.snapshot.queryParamMap.get('focus');
-      if (focusProjectId) {
-        setTimeout(() => {
-          this.scrollToProject(focusProjectId);
-        }, 100);
+      // クエリパラメータからfocus（プロジェクトID）を取得してスクロール（スキップフラグがfalseの場合のみ）
+      if (!skipScroll) {
+        const focusProjectId = this.route.snapshot.queryParamMap.get('focus');
+        if (focusProjectId) {
+          setTimeout(() => {
+            this.scrollToProject(focusProjectId);
+          }, 100);
+        }
       }
     } catch (error) {
       console.error('プロジェクトの読み込みに失敗しました:', error);
@@ -304,9 +313,16 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /** スマートフィルター適用時 */
-  onSmartFilterApply(criteria: SmartFilterCriteria): void {
+  async onSmartFilterApply(criteria: SmartFilterCriteria): Promise<void> {
     this.smartFilterCriteria = criteria;
     this.smartFilterVisible = false;
+    // スマートフィルターが空でない場合のみタスクを取得（パフォーマンス最適化）
+    if (!isSmartFilterEmpty(this.smartFilterCriteria)) {
+      await this.loadProjectTasks();
+    } else {
+      // スマートフィルターが空の場合はタスクマップをクリア
+      this.projectTasksMap = {};
+    }
     this.filterProjects();
   }
 
@@ -622,7 +638,8 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
         await this.loadProjects();
     } catch (error) {
         console.error('アーカイブに失敗しました:', error);
-        alert(`${actionLabel}に失敗しました`);
+        const errorMessage = error instanceof Error ? error.message : `${actionLabel}に失敗しました`;
+        alert(errorMessage);
       }
     }
   }
