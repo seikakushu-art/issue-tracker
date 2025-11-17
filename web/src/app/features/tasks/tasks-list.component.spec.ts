@@ -12,7 +12,12 @@ import { createEmptySmartFilterCriteria } from '../../shared/smart-filter/smart-
 import { Task } from '../../models/schema';
 
 // 依存サービスは全てテストダブルで置き換えておく（AngularFire を実動させないため）
-const tasksServiceStub = {
+const tasksServiceStub: {
+    calculateProgressFromChecklist: jasmine.Spy;
+    updateTask?: jasmine.Spy;
+    updateChecklist?: jasmine.Spy;
+    togglePin?: jasmine.Spy;
+  } = {
   calculateProgressFromChecklist: jasmine.createSpy('calculateProgressFromChecklist')
 };
 
@@ -48,6 +53,12 @@ describe('TasksListComponent の軽量ロジック', () => {
   let component: TasksListComponent;
 
   beforeEach(() => {
+    tasksServiceStub.calculateProgressFromChecklist.calls.reset();
+    tasksServiceStub.calculateProgressFromChecklist.and.returnValue(0);
+    tasksServiceStub.updateTask = jasmine.createSpy('updateTask').and.returnValue(Promise.resolve());
+    tasksServiceStub.updateChecklist = jasmine.createSpy('updateChecklist').and.returnValue(Promise.resolve());
+    tasksServiceStub.togglePin = jasmine.createSpy('togglePin').and.returnValue(Promise.resolve());
+
     TestBed.configureTestingModule({
       providers: [
         { provide: TasksService, useValue: tasksServiceStub },
@@ -111,5 +122,139 @@ describe('TasksListComponent の軽量ロジック', () => {
     // 未設定の場合だけサービスに委譲される
     expect(component.getTaskProgress(withoutProgress)).toBe(40);
     expect(tasksServiceStub.calculateProgressFromChecklist).toHaveBeenCalledWith(withoutProgress.checklist, withoutProgress.status);
+  });
+  it('アーカイブ表示設定を切り替えると該当タスクの表示が変わる', () => {
+    component.tasks = [
+      createTask({ id: 'visible-active', archived: false, title: 'Alpha' }),
+      createTask({ id: 'visible-archived', archived: true, title: 'Beta' }),
+    ];
+    component.smartFilterCriteria = createEmptySmartFilterCriteria();
+    component.statusFilter = '';
+    component.importanceFilter = '';
+
+    component.showArchived = false;
+    component.filterTasks();
+    expect(component.filteredTasks.map(task => task.id)).toEqual(['visible-active']);
+
+    component.showArchived = true;
+    component.filterTasks();
+    expect(component.filteredTasks.map(task => task.id)).toEqual(['visible-active', 'visible-archived']);
+  });
+
+  it('ピン止め操作で stopPropagation しつつサービスに委譲する', async () => {
+    component.projectId = 'p1';
+    component.issueId = 'i1';
+    component.currentUid = 'u1';
+    const task = createTask({ id: 'pin-target', pinnedBy: [] });
+    const mockEvent = { stopPropagation: jasmine.createSpy('stopPropagation') } as unknown as Event;
+    const componentWithPrivates = component as unknown as { loadData: () => Promise<void> };
+    spyOn(componentWithPrivates, 'loadData').and.returnValue(Promise.resolve());
+
+    await component.toggleTaskPin(task, mockEvent);
+
+    expect(mockEvent.stopPropagation).toHaveBeenCalled();
+    expect(tasksServiceStub.togglePin).toHaveBeenCalledWith('p1', 'i1', 'pin-target', true);
+    expect(componentWithPrivates.loadData).toHaveBeenCalled();
+  });
+
+  it('ステータス変更時にチェックリスト進捗を計算して保存する', async () => {
+    component.projectId = 'p1';
+    component.issueId = 'i1';
+    component.currentUid = 'u1';
+    component.currentRole = 'admin';
+    const task = createTask({
+      id: 'progress-task',
+      checklist: [
+        { id: 'c1', text: 'one', completed: true },
+        { id: 'c2', text: 'two', completed: false },
+      ],
+      createdBy: 'u1',
+    });
+    tasksServiceStub.calculateProgressFromChecklist.and.returnValue(50);
+    const componentWithPrivates = component as unknown as {
+      loadData: () => Promise<void>;
+      refreshSelectedTask: () => void;
+      updateIssueProgress: () => Promise<void>;
+    };
+    spyOn(componentWithPrivates, 'loadData').and.returnValue(Promise.resolve());
+    spyOn(componentWithPrivates, 'refreshSelectedTask');
+    spyOn(componentWithPrivates, 'updateIssueProgress').and.returnValue(Promise.resolve());
+
+    await component.updateTaskStatus(task, 'in_progress');
+
+    expect(tasksServiceStub.updateTask).toHaveBeenCalledWith('p1', 'i1', 'progress-task', {
+      status: 'in_progress',
+      progress: 50,
+    });
+    expect(component.statusMenuTaskId).toBeNull();
+  });
+
+  it('チェックリスト完了時に完了確認で「いいえ」を選ぶとステータスを維持したまま進捗100%で保存する', async () => {
+    component.projectId = 'p1';
+    component.issueId = 'i1';
+    component.currentUid = 'u1';
+    component.currentRole = 'admin';
+    const checklist = [
+      { id: 'c1', text: 'step 1', completed: true },
+      { id: 'c2', text: 'step 2', completed: true },
+    ];
+    const task = createTask({ id: 'checklist-task', checklist, status: 'in_progress', createdBy: 'u1' });
+    const componentWithPrivates = component as unknown as {
+      confirmChecklistCompletion: () => boolean;
+      loadData: () => Promise<void>;
+      refreshSelectedTask: () => void;
+      updateIssueProgress: () => Promise<void>;
+      persistChecklist(task: Task, checklist: Task['checklist']): Promise<void>;
+    };
+    spyOn(componentWithPrivates, 'confirmChecklistCompletion').and.returnValue(false);
+    spyOn(componentWithPrivates, 'loadData').and.returnValue(Promise.resolve());
+    spyOn(componentWithPrivates, 'refreshSelectedTask');
+    spyOn(componentWithPrivates, 'updateIssueProgress').and.returnValue(Promise.resolve());
+
+    await componentWithPrivates.persistChecklist(task, checklist);
+
+    expect(tasksServiceStub.updateTask).toHaveBeenCalledWith('p1', 'i1', 'checklist-task', {
+      checklist,
+      progress: 100,
+      status: 'in_progress',
+    });
+    expect(tasksServiceStub.updateChecklist).not.toHaveBeenCalled();
+  });
+
+  it('並び替え順を降順に変えると結果も反転する', () => {
+    component.filteredTasks = [
+      createTask({ id: 'a-title', title: 'Alpha' }),
+      createTask({ id: 'b-title', title: 'Beta' }),
+      createTask({ id: 'c-title', title: 'Charlie' }),
+    ];
+    component.sortBy = 'title';
+
+    component.sortOrder = 'asc';
+    component.sortTasks();
+    const ascOrder = component.filteredTasks.map(task => task.id);
+
+    component.sortOrder = 'desc';
+    component.sortTasks();
+    const descOrder = component.filteredTasks.map(task => task.id);
+
+    expect(ascOrder).toEqual(['a-title', 'b-title', 'c-title']);
+    expect(descOrder).toEqual(['c-title', 'b-title', 'a-title']);
+  });
+
+  it('スマートフィルター適用でタグ指定のタスクだけを表示しパネルを閉じる', () => {
+    component.tasks = [
+      createTask({ id: 'has-tag', tagIds: ['t1'], title: 'Alpha' }),
+      createTask({ id: 'no-tag', tagIds: ['t2'], title: 'Beta' }),
+    ];
+    component.showArchived = true;
+    component.statusFilter = '';
+    component.importanceFilter = '';
+    component.smartFilterVisible = true;
+    const criteria = { ...createEmptySmartFilterCriteria(), tagIds: ['t1'] };
+
+    component.onSmartFilterApply(criteria);
+
+    expect(component.smartFilterVisible).toBeFalse();
+    expect(component.filteredTasks.map(task => task.id)).toEqual(['has-tag']);
   });
 });
