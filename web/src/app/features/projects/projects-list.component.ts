@@ -22,7 +22,6 @@ import {
   SMART_FILTER_STATUS_OPTIONS,
   SMART_FILTER_IMPORTANCE_OPTIONS,
   createEmptySmartFilterCriteria,
-  matchesSmartFilterTask,
   isSmartFilterEmpty,
   doesDateMatchDue,
 } from '../../shared/smart-filter/smart-filter.model';
@@ -210,14 +209,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       this.projects = await this.projectsService.listMyProjects();
       await this.loadIssueCounts();
       await this.loadMemberProfiles(this.projects);
-      // スマートフィルターが空でない場合のみタスクを取得（パフォーマンス最適化）
-      if (!isSmartFilterEmpty(this.smartFilterCriteria)) {
-        await this.loadProjectTasks();
-      } else {
-        // スマートフィルターが空の場合はタスクマップをクリア
-        this.projectTasksMap = {};
-      }
-      await this.loadTagsForAllProjects(); // プロジェクト一覧に応じたタグ候補を再構築
+      // プロジェクト一覧画面では参加メンバーと期限のみでフィルターするため、タスクとタグの読み込みは不要
       this.filterProjects();
       if (this.showInviteModal && this.inviteProject?.id) {
         const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
@@ -316,13 +308,7 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   async onSmartFilterApply(criteria: SmartFilterCriteria): Promise<void> {
     this.smartFilterCriteria = criteria;
     this.smartFilterVisible = false;
-    // スマートフィルターが空でない場合のみタスクを取得（パフォーマンス最適化）
-    if (!isSmartFilterEmpty(this.smartFilterCriteria)) {
-      await this.loadProjectTasks();
-    } else {
-      // スマートフィルターが空の場合はタスクマップをクリア
-      this.projectTasksMap = {};
-    }
+    // プロジェクト一覧画面では参加メンバーと期限のみでフィルターするため、タスクの読み込みは不要
     this.filterProjects();
   }
 
@@ -335,20 +321,26 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    const tasks = this.projectTasksMap[project.id] ?? [];
-    const relevantTasks = this.showArchived ? tasks : tasks.filter(task => !task.archived);
-    const hasMatchingTask = relevantTasks.some(task => matchesSmartFilterTask(task, this.smartFilterCriteria));
+    // 参加メンバーでのフィルタリング（プロジェクト一覧画面では参加メンバーでフィルター）
+    if (this.smartFilterCriteria.assigneeIds.length > 0) {
+      const projectMemberIds = project.memberIds ?? [];
+      const hasMatchingMember = this.smartFilterCriteria.assigneeIds.some(assigneeId =>
+        projectMemberIds.includes(assigneeId)
+      );
+      if (!hasMatchingMember) {
+        return false;
+      }
+    }
 
-    const onlyDueFilter =
-      this.smartFilterCriteria.due !== '' &&
-      this.smartFilterCriteria.tagIds.length === 0 &&
-      this.smartFilterCriteria.assigneeIds.length === 0 &&
-      this.smartFilterCriteria.importanceLevels.length === 0 &&
-      this.smartFilterCriteria.statuses.length === 0;
+    // 期限でのフィルタリング（常にプロジェクトの期限でフィルター）
+    if (this.smartFilterCriteria.due !== '') {
+      const matchesDue = doesDateMatchDue(project.endDate ?? null, this.smartFilterCriteria.due);
+      if (!matchesDue) {
+        return false;
+      }
+    }
 
-    const dueMatchesProject = onlyDueFilter && doesDateMatchDue(project.endDate ?? null, this.smartFilterCriteria.due);
-
-    return hasMatchingTask || dueMatchesProject;
+    return true;
   }
 
   /** スマートフィルター用に担当者一覧を生成 */

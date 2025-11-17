@@ -37,6 +37,12 @@ export class SmartFilterPanelComponent implements OnInit, OnChanges {
   @Input() hideTags = false;
   /** 担当者の選択肢 */
   @Input() assignees: SmartFilterAssigneeOption[] = [];
+  /** 担当者セクションのラベル（デフォルト: "担当者"） */
+  @Input() assigneeLabel = '担当者';
+  /** 重要度セクションを非表示にするかどうか */
+  @Input() hideImportance = false;
+  /** ステータスセクションを非表示にするかどうか */
+  @Input() hideStatus = false;
   /** ステータスの選択肢（タスクに準拠） */
   @Input() statusOptions: SmartFilterOption<TaskStatus>[] = SMART_FILTER_STATUS_OPTIONS;
   /** 重要度の選択肢 */

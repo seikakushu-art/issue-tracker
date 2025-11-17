@@ -32,7 +32,7 @@
       </section>
   
       <section class="filter-section" *ngIf="assignees.length > 0">
-        <h4>担当者</h4>
+        <h4>{{ assigneeLabel }}</h4>
         <div class="option-grid">
           <label *ngFor="let member of assignees" class="option-item">
             <input
@@ -46,7 +46,7 @@
         </div>
       </section>
   
-      <section class="filter-section">
+      <section class="filter-section" *ngIf="!hideImportance">
         <h4>重要度</h4>
         <div class="option-grid">
           <label *ngFor="let option of importanceOptions" class="option-item">
@@ -61,7 +61,7 @@
         </div>
       </section>
   
-      <section class="filter-section">
+      <section class="filter-section" *ngIf="!hideStatus">
         <h4>ステータス</h4>
         <div class="option-grid">
           <label *ngFor="let option of statusOptions" class="option-item">
