@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
-import { Subject } from 'rxjs';
+import { ActivatedRoute, provideRouter } from '@angular/router';
+import { Subject, of } from 'rxjs';
 import { IssuesListComponent } from './issues-list.component';
 import { createEmptySmartFilterCriteria } from '../../shared/smart-filter/smart-filter.model';
 import { IssuesService } from './issues.service';
@@ -8,29 +8,52 @@ import { ProjectsService } from '../projects/projects.service';
 import { TasksService } from '../tasks/tasks.service';
 import { TagsService } from '../tags/tags.service';
 import { UserDirectoryService } from '../../core/user-directory.service';
-import { Issue, Task } from '../../models/schema';
+import { Issue, Tag, Task } from '../../models/schema';
 
 // 依存サービスはすべてスタブに置き換え、AngularFire へ実アクセスしないようにする
 class IssuesServiceStub {
+  listIssues = jasmine
+    .createSpy('listIssues')
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    .and.callFake((_projectId: string, _showArchived: boolean): Promise<Issue[]> => Promise.resolve([]));
   togglePin = jasmine.createSpy('togglePin');
 }
-class ProjectsServiceStub {}
+class ProjectsServiceStub {
+  listMyProjects = jasmine
+    .createSpy('listMyProjects')
+    .and.callFake((): Promise<unknown[]> => Promise.resolve([]));
+
+  getProject = jasmine
+    .createSpy('getProject')
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    .and.callFake((_projectId: string): Promise<null> => Promise.resolve(null));
+
+  getSignedInUid = jasmine
+    .createSpy('getSignedInUid')
+    .and.callFake((): Promise<string> => Promise.resolve('test-user'));
+}
 class TasksServiceStub {
   // スマートフィルターのためにタスク一覧を返すが、ここでは空配列を返して最小限に抑える
   listTasks = jasmine.createSpy('listTasks').and.resolveTo([] as Task[]);
 }
-class TagsServiceStub {}
+class TagsServiceStub {
+  listTags = jasmine
+    .createSpy('listTags')
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    .and.callFake((_projectId: string): Promise<Tag[]> => Promise.resolve([]));
+}
 class UserDirectoryServiceStub {
   getProfiles = jasmine.createSpy('getProfiles').and.resolveTo([]);
 }
-class RouterStub {
-  navigate = jasmine.createSpy('navigate').and.resolveTo(true);
-}
 
-// ActivatedRoute はパラメータを流せるよう、Subject ベースで用意する
+// ActivatedRoute はパラメータを流せるよう、Subject ベースで用意する（Observable を返す）
 const params$ = new Subject<Record<string, string>>();
 const activatedRouteStub = {
   params: params$.asObservable(),
+  queryParams: of({}),
+  data: of({}),
+  fragment: of(null),
+  url: of([]),
   snapshot: {
     queryParamMap: {
       get: () => null,
@@ -51,13 +74,16 @@ describe('IssuesListComponent', () => {
         { provide: TasksService, useClass: TasksServiceStub },
         { provide: TagsService, useClass: TagsServiceStub },
         { provide: UserDirectoryService, useClass: UserDirectoryServiceStub },
-        { provide: Router, useClass: RouterStub },
         { provide: ActivatedRoute, useValue: activatedRouteStub },
+        provideRouter([]),
       ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(IssuesListComponent);
     component = fixture.componentInstance;
+    // filterIssuesテストではngOnInitをスキップする（route.paramsのsubscribeを避けるため）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spyOn<any>(component, 'ngOnInit');
   });
 
   describe('filterIssues', () => {
