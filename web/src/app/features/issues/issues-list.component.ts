@@ -167,8 +167,12 @@ export class IssuesListComponent implements OnInit, OnDestroy {
       if (!skipScroll) {
         const focusIssueId = this.route.snapshot.queryParamMap.get('focus');
         if (focusIssueId) {
+          // focusIssueIdを保存してから、クエリパラメータを削除（URL変更の影響を受けないようにする）
+          const savedFocusIssueId = focusIssueId;
+          // スクロール実行前にクエリパラメータを削除（再読み込み時の重複スクロールを防ぐ）
+          this.removeFocusQueryParams();
           setTimeout(() => {
-            this.scrollToIssue(focusIssueId);
+            this.scrollToIssue(savedFocusIssueId);
           }, 100);
         }
       }
@@ -600,6 +604,20 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
         element.classList.remove('issue-highlight');
       }, 4000);
     }
+  }
+
+  /** フォーカス関連のクエリパラメータをURLから削除 */
+  private removeFocusQueryParams(): void {
+    const currentParams = { ...this.route.snapshot.queryParams };
+    // focusを削除
+    delete currentParams['focus'];
+    
+    // 現在のルートを維持しつつ、クエリパラメータを更新
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: currentParams,
+      replaceUrl: true, // ブラウザ履歴に残さない
+    });
   }
 
   /**

@@ -71,8 +71,12 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
     // fragmentが指定されている場合は該当投稿までスクロール
     this.route.fragment.subscribe((fragment) => {
       if (fragment) {
+        // fragmentを保存してからスクロール（URL変更の影響を受けないようにする）
+        const savedFragment = fragment;
+        // スクロール実行前にfragmentを削除（再読み込み時の重複スクロールを防ぐ）
+        this.removeFragment();
         setTimeout(() => {
-          this.scrollToPost(fragment);
+          this.scrollToPost(savedFragment);
         }, 300); // 投稿読み込みを待つ
       }
     });
@@ -113,6 +117,16 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
         }
       }
     }
+  }
+
+  /** fragmentをURLから削除 */
+  private removeFragment(): void {
+    // 現在のルートを維持しつつ、fragmentを削除
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      fragment: undefined,
+      replaceUrl: true, // ブラウザ履歴に残さない
+    });
   }
 
   async initializeBoard(): Promise<void> {

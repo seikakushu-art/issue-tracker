@@ -1042,6 +1042,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
         setTimeout(() => {
           this.scrollToComment(this.pendingCommentId);
           this.pendingCommentId = null;
+          // スクロール実行後にクエリパラメータを削除（再読み込み時の重複スクロールを防ぐ）
+          this.removeFocusQueryParams();
         }, 300); // 詳細パネルのアニメーション完了を待つ
       }
     } catch (error) {
@@ -1167,6 +1169,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
         setTimeout(() => {
           this.scrollToAttachment(this.pendingAttachmentId);
           this.pendingAttachmentId = null;
+          // スクロール実行後にクエリパラメータを削除（再読み込み時の重複スクロールを防ぐ）
+          this.removeFocusQueryParams();
         }, 300); // 詳細パネルのアニメーション完了を待つ
       }
     } catch (error) {
@@ -1555,6 +1559,13 @@ export class TasksListComponent implements OnInit, OnDestroy {
       setTimeout(() => {
         this.scrollToTask(task.id!);
       }, 100);
+      // コメントIDや添付ファイルIDが指定されていない場合のみ、詳細パネルが開いた後にクエリパラメータを削除
+      // （コメントIDや添付ファイルIDが指定されている場合は、loadTaskComments/loadTaskAttachmentsで削除される）
+      if (!this.pendingCommentId && !this.pendingAttachmentId) {
+        setTimeout(() => {
+          this.removeFocusQueryParams();
+        }, 500);
+      }
     }
   }
 
@@ -1592,15 +1603,38 @@ export class TasksListComponent implements OnInit, OnDestroy {
         this.selectTask(target);
         this.pendingFocusTaskId = null;
         this.pendingOpenDetail = false;
+        // コメントや添付ファイルのスクロールは非同期で実行されるため、
+        // クエリパラメータの削除はscrollToComment/scrollToAttachment内で行う
       } else {
         // 検索結果からの遷移時は詳細パネルを開かずにスクロールのみ
+        // taskIdを保存してから、クエリパラメータを削除（URL変更の影響を受けないようにする）
+        const savedTaskId = taskId;
+        // スクロール実行前にクエリパラメータを削除（再読み込み時の重複スクロールを防ぐ）
+        this.removeFocusQueryParams();
         setTimeout(() => {
-          this.scrollToTask(taskId);
+          this.scrollToTask(savedTaskId);
         }, 100);
         this.pendingFocusTaskId = null;
         this.pendingOpenDetail = false;
       }
     }
+  }
+
+  /** フォーカス関連のクエリパラメータをURLから削除 */
+  private removeFocusQueryParams(): void {
+    const currentParams = { ...this.route.snapshot.queryParams };
+    // focus、commentId、attachmentId、openDetailを削除
+    delete currentParams['focus'];
+    delete currentParams['commentId'];
+    delete currentParams['attachmentId'];
+    delete currentParams['openDetail'];
+    
+    // 現在のルートを維持しつつ、クエリパラメータを更新
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: currentParams,
+      replaceUrl: true, // ブラウザ履歴に残さない
+    });
   }
 
   /** 新規作成モーダルを開く */
