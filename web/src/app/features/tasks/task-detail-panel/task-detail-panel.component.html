@@ -138,7 +138,11 @@
     </section>
 
     <section class="detail-section">
-      <h3>担当者 <span class="assignee-count">({{ task.assigneeIds.length }}/10)</span></h3>
+      <h3>
+        担当者
+        <span class="assignee-count">({{ task.assigneeIds.length }}/10)</span>
+        <span class="assignee-note">タスクを退出しても投稿（添付・コメント・チェックリスト）は残ります。</span>
+      </h3>
       <p *ngIf="task.assigneeIds.length === 0" class="placeholder-text">担当者はまだ割り当てられていません。</p>
       <ul *ngIf="task.assigneeIds.length > 0" class="assignee-list">
         <li *ngFor="let assigneeId of task.assigneeIds" class="assignee-item">
