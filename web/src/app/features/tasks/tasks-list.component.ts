@@ -1598,6 +1598,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
     const target = this.tasks.find((task) => task.id === taskId);
     if (target) {
+      // アーカイブされたタスクが選択された場合、showArchivedをtrueに設定して表示する
+      if (target.archived && !this.showArchived) {
+        this.showArchived = true;
+        this.filterTasks();
+      }
       // コメントIDまたは添付ファイルIDが指定されている場合、またはopenDetailフラグがtrueの場合は、タスクを選択して詳細パネルを開く
       if (this.pendingCommentId || this.pendingAttachmentId || openDetail) {
         this.selectTask(target);
