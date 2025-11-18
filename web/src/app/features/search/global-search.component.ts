@@ -317,9 +317,9 @@ export class GlobalSearchComponent implements OnInit {
     this.query.set(value);
   }
 
-  onIncludeArchivedChange(checked: boolean): void {
+  async onIncludeArchivedChange(checked: boolean): Promise<void> {
     this.includeArchived.set(checked);
-    void this.loadAllData();
+    await this.loadAllData();
   }
 
   onTypeFilterChange(type: SearchResultType, checked: boolean): void {
