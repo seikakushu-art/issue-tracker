@@ -20,7 +20,7 @@ describe('GlobalSearchComponent', () => {
   const activeProject: Project & { id: string } = {
     id: 'p-active',
     name: '開発プロジェクト',
-    description: '開発用プロジェクト',
+    description: '開発用プロジェクトの調査',
     goal: '品質向上',
     archived: false,
     roles: {},
@@ -61,7 +61,7 @@ describe('GlobalSearchComponent', () => {
   const createPost = (overrides: Partial<BulletinPost> = {}): BulletinPost & { id: string } => ({
     id: 'b-1',
     title: '掲示板トピック',
-    content: '共有内容',
+    content: '共有内容の調査',
     projectIds: [activeProject.id],
     authorId: 'author',
     authorUsername: 'author',

@@ -270,14 +270,18 @@ export class GlobalSearchComponent implements OnInit {
           const context = projectNames.length > 0
             ? `関連プロジェクト: ${projectNames.join(', ')}`
             : undefined;
-          return this.createItem({
+          const item = this.createItem({
             id: post.id!,
             type: 'board',
             title: post.title,
             context,
+            description: post.content,
             routerLink: ['/board'],
             fragment: `post-${post.id!}`,
           });
+          // 掲示板のcontext（関連プロジェクト名）は検索対象から除外
+          item.contextLower = null;
+          return item;
         });
     } catch (error) {
       console.error('Failed to load board posts for search', error);
