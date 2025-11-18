@@ -63,7 +63,7 @@ import { AuthService } from '../../core/auth.service';
               {{ loading ? '保存中...' : '変更を保存' }}
             </button>
             <button type="button" class="btn btn-secondary" (click)="resetForm()" [disabled]="loading">
-              変更を取り消す
+              保存前の変更を取り消す
             </button>
           </div>
         </form>
@@ -422,6 +422,7 @@ export class UserSettingsComponent implements OnDestroy {
     } catch (error) {
       console.error('ログアウトに失敗しました', error);
       this.errorMessage = 'ログアウトに失敗しました。時間をおいて再度お試しください。';
+    } finally {
       this.loading = false;
     }
   }
