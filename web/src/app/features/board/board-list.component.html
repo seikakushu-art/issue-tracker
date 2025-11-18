@@ -125,11 +125,13 @@
         <li class="board-post" *ngFor="let post of posts(); trackBy: trackByPostId" [id]="post.id">
           <header class="board-post__header">
             <div class="board-post__author">
-              <ng-container *ngIf="post.authorPhotoUrl; else authorFallback">
+              <ng-container *ngIf="post.authorPhotoUrl && post.authorPhotoUrl.trim().length > 0; else authorFallback">
                 <img
                   [src]="post.authorPhotoUrl"
                   class="board-post__avatar"
                   [alt]="post.authorUsername + 'のアイコン'"
+                  (error)="onAvatarError(post)"
+                  #avatarImg
                 />
               </ng-container>
               <ng-template #authorFallback>

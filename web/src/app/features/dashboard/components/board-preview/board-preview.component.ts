@@ -19,12 +19,32 @@ export class BoardPreviewComponent {
   /** 埋め込み表示かどうか */
   @Input() embedded = false;
 
+  /** 画像読み込みエラーが発生した投稿IDのセット */
+  private readonly avatarErrors = new Set<string>();
+
   getAvatarInitial(author: BulletinPreviewItem): string {
     return getAvatarInitial(author.authorUsername || author.authorId, '?');
   }
 
   getAvatarColor(author: BulletinPreviewItem): string {
     return getAvatarColor(author.authorId || author.authorUsername);
+  }
+
+  /**
+   * 投稿のアイコンが表示可能かどうかを判定
+   */
+  hasValidAvatar(post: BulletinPreviewItem): boolean {
+    if (this.avatarErrors.has(post.id)) {
+      return false;
+    }
+    return post.authorPhotoUrl != null && post.authorPhotoUrl.trim().length > 0;
+  }
+
+  /**
+   * アイコン画像の読み込みエラー時にフォールバック表示に切り替える
+   */
+  onAvatarError(post: BulletinPreviewItem): void {
+    this.avatarErrors.add(post.id);
   }
 
   /** 表示対象に制限した投稿配列を返す */
