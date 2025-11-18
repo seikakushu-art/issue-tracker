@@ -296,7 +296,10 @@
 
       <section class="member-management" *ngIf="inviteProject">
         <div class="member-management__header">
-          <h3>参加メンバー</h3>
+          <h3>
+            参加メンバー
+            <span class="member-note">削除した参加メンバーの投稿（添付・コメント・チェックリスト）は残ります。</span>
+          </h3>
           <span class="member-management__count">{{ inviteProject.memberIds.length }}人</span>
         </div>
         <p class="info-text" *ngIf="inviteProject.memberIds.length === 0">
