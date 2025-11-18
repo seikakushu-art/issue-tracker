@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { FirebaseError } from 'firebase/app';
 import { ProjectsListComponent } from './projects-list.component';
 import { ProjectsService } from './projects.service';
 import { IssuesService } from '../issues/issues.service';
@@ -168,5 +169,80 @@ describe('ProjectsListComponent（一覧の基本挙動）', () => {
 
     expect(component.filteredProjects[0]).toBe(late);
     expect(component.filteredProjects[1]).toBe(early);
+  });
+});
+
+describe('ProjectsListComponent（エラーハンドリング）', () => {
+  let component: ProjectsListComponent;
+
+  beforeEach(() => {
+    component = createComponent();
+    component.currentUid = 'user-1';
+  });
+
+  it('オフライン時の保存エラーを人間向けメッセージに変換する', () => {
+    const firebaseError = new FirebaseError('unavailable', 'Network connection lost');
+
+    const message = (component as unknown as { buildProjectSaveErrorMessage(error: unknown): string }).buildProjectSaveErrorMessage(firebaseError);
+
+    expect(message).toBe('インターネット接続を確認してください。オフラインのため操作を完了できませんでした。');
+  });
+
+  it('タイムアウト時の保存エラーを人間向けメッセージに変換する', () => {
+    const firebaseError = new FirebaseError('deadline-exceeded', 'Operation timeout');
+
+    const message = (component as unknown as { buildProjectSaveErrorMessage(error: unknown): string }).buildProjectSaveErrorMessage(firebaseError);
+
+    expect(message).toBe('リクエストがタイムアウトしました。時間をおいて再度お試しください。');
+  });
+
+  it('必須項目未入力の場合は保存せずエラーメッセージを表示する', async () => {
+    const alertSpy = spyOn(window, 'alert');
+    component.projectForm = { ...component.projectForm, name: '   ' };
+
+    await component.saveProject();
+
+    expect(alertSpy).toHaveBeenCalledWith('プロジェクト名を入力してください');
+  });
+
+  it('文字数制限超過の場合は保存せずエラーメッセージを表示する', async () => {
+    const alertSpy = spyOn(window, 'alert');
+    component.projectForm = { ...component.projectForm, name: 'x'.repeat(81) };
+
+    await component.saveProject();
+
+    expect(alertSpy).toHaveBeenCalledWith('プロジェクト名は80文字以内で入力してください');
+  });
+
+  it('日付形式エラーが発生した場合はエラーメッセージをそのまま表示する', () => {
+    const message = (component as unknown as { buildProjectSaveErrorMessage(error: unknown): string }).buildProjectSaveErrorMessage(new Error('日付形式が不正です'));
+
+    expect(message).toBe('日付形式が不正です');
+  });
+
+  it('権限がない操作にはエラーメッセージを表示する', () => {
+    const alertSpy = spyOn(window, 'alert');
+    const project: Project = { id: 'p9', name: 'Restricted', archived: false, memberIds: ['other'], roles: { other: 'member' }, pinnedBy: [] } as unknown as Project;
+    const event = { stopPropagation: jasmine.createSpy('stopPropagation') } as unknown as Event;
+
+    component.editProject(project, event);
+
+    expect(alertSpy).toHaveBeenCalledWith('この操作を行う権限がありません');
+    expect(event.stopPropagation).toHaveBeenCalled();
+    expect(component.showModal).toBeFalse();
+    expect(component.editingProject).toBeNull();
+  });
+
+  it('アクセスできないリソースへのアクセス時はエラーメッセージを表示する', async () => {
+    const alertSpy = spyOn(window, 'alert');
+    const project: Project = { id: 'p10', name: 'Invite Restricted', archived: false, memberIds: ['another'], roles: { another: 'member' }, pinnedBy: [] } as unknown as Project;
+    const event = { stopPropagation: jasmine.createSpy('stopPropagation') } as unknown as Event;
+
+    await component.openInviteModal(project, event);
+
+    expect(alertSpy).toHaveBeenCalledWith('招待リンクの管理権限がありません');
+    expect(event.stopPropagation).toHaveBeenCalled();
+    expect(component.showInviteModal).toBeFalse();
+    expect(component.inviteProject).toBeNull();
   });
 });
