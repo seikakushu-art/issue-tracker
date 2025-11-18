@@ -13,11 +13,12 @@
       <li class="board-preview__item" *ngFor="let post of visiblePosts">
         <div class="board-preview__meta">
           <div class="board-preview__author">
-            <ng-container *ngIf="post.authorPhotoUrl; else previewFallback">
+            <ng-container *ngIf="hasValidAvatar(post); else previewFallback">
               <img
                 [src]="post.authorPhotoUrl"
                 class="board-preview__avatar"
                 [alt]="post.authorUsername + 'のアイコン'"
+                (error)="onAvatarError(post)"
               />
             </ng-container>
             <ng-template #previewFallback>

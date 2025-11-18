@@ -10,10 +10,12 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from '@angular/fire/firestore';
 import {
   Storage,
+  deleteObject,
   getDownloadURL,
   ref,
   uploadBytes,
@@ -116,17 +118,50 @@ export class UserProfileService {
       throw new Error('ユーザー名が登録されていません');
     }
 
+    // 既存のアイコンURLを取得（削除時にStorageからも削除するため）
+    const directoryProfile = this.directoryProfile();
+    const currentPhotoUrl = directoryProfile?.photoURL ?? currentUser.photoURL ?? null;
+
     let nextPhotoUrl: string | null | undefined;
     if (options.photoFile instanceof File) {
       nextPhotoUrl = await this.uploadAvatar(currentUsername, options.photoFile);
+      // 新しいアイコンをアップロードした場合、古いアイコンをStorageから削除
+      if (currentPhotoUrl && currentPhotoUrl !== nextPhotoUrl) {
+        try {
+          // Storageのパスを抽出して削除
+          const storageRef = ref(this.storage, `avatars/${currentUsername}/avatar.png`);
+          await deleteObject(storageRef);
+        } catch (error) {
+          console.warn('古いアイコンファイルの削除に失敗しました:', error);
+          // エラーが発生しても続行（ファイルが既に存在しない場合など）
+        }
+      }
     } else if (options.photoFile === null) {
       nextPhotoUrl = null;
+      // アイコンを削除する場合、Storageからも削除
+      if (currentPhotoUrl) {
+        try {
+          const storageRef = ref(this.storage, `avatars/${currentUsername}/avatar.png`);
+          await deleteObject(storageRef);
+        } catch (error) {
+          console.warn('アイコンファイルの削除に失敗しました:', error);
+          // エラーが発生しても続行（ファイルが既に存在しない場合など）
+        }
+      }
+      // 掲示板投稿のauthorPhotoUrlもnullに更新
+      try {
+        await this.updateBulletinPostsPhotoUrl(currentUser.uid, null);
+      } catch (error) {
+        console.warn('掲示板投稿のアイコン更新に失敗しました:', error);
+        // エラーが発生しても続行
+      }
     }
 
     const profileUpdates: Partial<UserProfile> = {};
 
     if (nextPhotoUrl !== undefined) {
-      profileUpdates['photoURL'] = nextPhotoUrl;
+      // Firebase Authでは、nullの代わりに空文字列を使用してアイコンを削除
+      profileUpdates['photoURL'] = nextPhotoUrl ?? '';
     }
 
     if (Object.keys(profileUpdates).length > 0) {
@@ -206,5 +241,23 @@ export class UserProfileService {
       contentType: file.type,
     });
     return getDownloadURL(storageRef);
+  }
+
+  /**
+   * 掲示板投稿のauthorPhotoUrlを更新する
+   */
+  private async updateBulletinPostsPhotoUrl(authorId: string, photoUrl: string | null): Promise<void> {
+    const postsRef = collection(this.db, 'bulletinPosts');
+    const postsQuery = query(postsRef, where('authorId', '==', authorId));
+    const snapshot = await getDocs(postsQuery);
+
+    const updatePromises = snapshot.docs.map((postDoc) =>
+      updateDoc(postDoc.ref, {
+        authorPhotoUrl: photoUrl,
+        updatedAt: serverTimestamp(),
+      }),
+    );
+
+    await Promise.all(updatePromises);
   }
 }
