@@ -998,8 +998,27 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
     return filtered
       .slice()
       .sort((a, b) => {
+        // 1. ピン止めされているタスクを先頭に
         const pinnedDiff = Number(this.isTaskPinned(b)) - Number(this.isTaskPinned(a));
-        return pinnedDiff;
+        if (pinnedDiff !== 0) {
+          return pinnedDiff;
+        }
+        
+        // 2. ピン止めされていないタスクの場合、完了・保留・廃棄を後ろに
+        const isCompletedOrOnHoldOrDiscarded = (task: Task) => {
+          return task.status === 'completed' || task.status === 'on_hold' || task.status === 'discarded';
+        };
+        
+        const aIsCompleted = isCompletedOrOnHoldOrDiscarded(a);
+        const bIsCompleted = isCompletedOrOnHoldOrDiscarded(b);
+        
+        if (aIsCompleted !== bIsCompleted) {
+          // 完了・保留・廃棄でない方を前に
+          return Number(aIsCompleted) - Number(bIsCompleted);
+        }
+        
+        // 3. 同じグループ内では元の順序を維持
+        return 0;
       });
   }
 
