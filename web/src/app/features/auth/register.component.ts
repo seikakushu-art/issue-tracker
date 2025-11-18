@@ -97,6 +97,7 @@ import { UserProfileService } from '../../core/user-profile.service';
                 required
                 placeholder="パスワードを入力（6文字以上）"
                 [disabled]="loading"
+                [class.input-warning]="passwordWarning"
               >
               <button
                 type="button"
@@ -107,6 +108,10 @@ import { UserProfileService } from '../../core/user-profile.service';
               >
                 <span class="password-toggle-icon">{{ showPassword ? '👁️' : '👁️‍🗨️' }}</span>
               </button>
+            </div>
+            <div *ngIf="passwordWarning" class="username-warning">
+              <i class="icon-warning"></i>
+              {{ passwordWarning }}
             </div>
           </div>
 
@@ -460,6 +465,7 @@ export class RegisterComponent implements OnDestroy {
   showConfirmPassword = false;
   usernameWarning = '';
   passwordMismatchWarning = '';
+  passwordWarning = '';
 
   /** 選択中のアイコン画像を一時的に保持 */
   selectedIconFile: File | null = null;
@@ -539,7 +545,24 @@ export class RegisterComponent implements OnDestroy {
    */
   onPasswordChange(value: string): void {
     this.registerForm.password = value;
+    this.checkPasswordLength();
     this.checkPasswordMatch();
+  }
+
+  /**
+   * パスワードの長さをチェック
+   */
+  private checkPasswordLength(): void {
+    if (!this.registerForm.password) {
+      this.passwordWarning = '';
+      return;
+    }
+
+    if (this.registerForm.password.length < 6) {
+      this.passwordWarning = 'パスワードは6文字以上で入力してください';
+    } else {
+      this.passwordWarning = '';
+    }
   }
 
   /**
