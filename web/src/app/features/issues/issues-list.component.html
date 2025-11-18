@@ -107,6 +107,12 @@
       ></app-smart-filter-panel>
     </div>
     <div class="filter-group">
+      <div class="sort-hint-tooltip">
+        <span class="sort-hint-icon" aria-label="並び替えのヒント">ℹ️</span>
+        <div class="tooltip-content">
+          <p>「開始日・終了日・期間」項目は設定された課題を優先して並べ替えます。</p>
+        </div>
+      </div>
       <span>並び替え:</span>
       <select [(ngModel)]="sortBy" (change)="sortIssues()">
         <option value="name">名称</option>

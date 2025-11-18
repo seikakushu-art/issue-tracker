@@ -123,6 +123,70 @@
   gap: 8px;
 }
 
+.sort-hint-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+
+  .sort-hint-icon {
+    font-size: 1rem;
+    color: #64748b;
+    transition: color 0.2s ease;
+  }
+
+  &:hover .sort-hint-icon {
+    color: #2563eb;
+  }
+
+  .tooltip-content {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #ffffff;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    min-width: 280px;
+    max-width: 320px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 1001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #1e293b;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      white-space: normal;
+
+      &:not(:last-child) {
+        margin-bottom: 0.25rem;
+      }
+    }
+  }
+
+  &:hover .tooltip-content {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
 .filter-group--smart {
   position: relative;
   display: flex;

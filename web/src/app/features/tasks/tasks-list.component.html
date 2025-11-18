@@ -112,6 +112,18 @@
       </select>
     </div>
     <div class="filter-group">
+      <label>
+        <input type="checkbox" [(ngModel)]="showArchived" (change)="filterTasks()">
+        アーカイブ済みも表示
+      </label>
+    </div>
+    <div class="filter-group">
+      <div class="sort-hint-tooltip">
+        <span class="sort-hint-icon" aria-label="並び替えのヒント">ℹ️</span>
+        <div class="tooltip-content">
+          <p>「開始日・終了日・期間」項目は設定されたタスクを優先して並べ替えます。</p>
+        </div>
+      </div>
       <span>並び替え:</span>
       <select [(ngModel)]="sortBy" (change)="sortTasks()">
         <option value="title">名称</option>
@@ -126,12 +138,6 @@
         <option value="asc">昇順</option>
         <option value="desc">降順</option>
       </select>
-    </div>
-    <div class="filter-group">
-      <label>
-        <input type="checkbox" [(ngModel)]="showArchived" (change)="filterTasks()">
-        アーカイブ済みも表示
-      </label>
     </div>
   </div>
 
