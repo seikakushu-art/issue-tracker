@@ -147,14 +147,19 @@ export class GlobalSearchComponent implements OnInit {
       const validProjects = projects.filter(
         (project): project is Project & { id: string } => Boolean(project.id),
       ).filter((project) => includeArchived || !project.archived);
-      const projectItems = validProjects.map((project) => this.createItem({
-        id: project.id!,
-        type: 'project',
-        title: project.name,
-        context: project.goal ? `ゴール: ${project.goal}` : undefined,
-        description: project.description,
-        routerLink: ['/projects', project.id!],
-      }));
+      const projectItems = validProjects.map((project) => {
+        const item = this.createItem({
+          id: project.id!,
+          type: 'project',
+          title: project.name,
+          context: project.goal ? `ゴール: ${project.goal}` : undefined,
+          description: project.description,
+          routerLink: ['/projects', project.id!],
+        });
+        // プロジェクトのcontext（ゴール：ラベル）は検索対象から除外
+        item.contextLower = null;
+        return item;
+      });
 
       const issuesByProject = await Promise.all(
         validProjects.map(async (project) => {
