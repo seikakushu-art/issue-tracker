@@ -2531,6 +2531,22 @@ export class TasksListComponent implements OnInit, OnDestroy {
     return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
   }
 
+  /** 日付入力フィールドの最小値（現在から10年前） */
+  getMinDate(): string {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 10);
+    date.setMonth(0, 1);
+    return date.toISOString().split('T')[0];
+  }
+
+  /** 日付入力フィールドの最大値（現在から10年後） */
+  getMaxDate(): string {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() + 10);
+    date.setMonth(11, 31);
+    return date.toISOString().split('T')[0];
+  }
+
   /**
    * 日付入力フィールドをクリックしたときにカレンダーピッカーを開く
    */

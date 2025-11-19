@@ -98,6 +98,9 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   readonly tokyoTimezone = 'Asia/Tokyo';
   readonly dayCellWidth = 28;
   readonly labelColumnWidth = 280;
+  /** ガントチャートで表示可能な日付範囲（年数） */
+  private readonly MAX_YEARS_BEFORE = 10;
+  private readonly MAX_YEARS_AFTER = 10;
 
   projectHierarchy: GanttProjectGroup[] = [];
   availableProjects: Project[] = [];
@@ -580,6 +583,14 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   private buildTimeline(allDates: Date[]): void {
     const today = this.toTokyoDate(new Date());
+    // 日付範囲の制限を計算（現在からMAX_YEARS_BEFORE年前からMAX_YEARS_AFTER年後まで）
+    const minAllowedDate = new Date(today);
+    minAllowedDate.setUTCFullYear(today.getUTCFullYear() - this.MAX_YEARS_BEFORE);
+    minAllowedDate.setUTCMonth(0, 1);
+    const maxAllowedDate = new Date(today);
+    maxAllowedDate.setUTCFullYear(today.getUTCFullYear() + this.MAX_YEARS_AFTER);
+    maxAllowedDate.setUTCMonth(11, 31);
+    
     // 今年の1月1日と12月31日を基準にする（東京時間で計算）
     const year = today.getUTCFullYear();
     const yearStart = new Date(Date.UTC(year, 0, 1));
@@ -596,9 +607,16 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
       const max = sorted[sorted.length - 1];
       const computedStart = this.startOfWeek(min);
       const computedEnd = this.endOfWeek(max);
-      // タスクの日付が今年の範囲外の場合は拡張する
-      this.timelineStart = computedStart.getTime() < baseStart.getTime() ? computedStart : baseStart;
-      this.timelineEnd = computedEnd.getTime() > baseEnd.getTime() ? computedEnd : baseEnd;
+      // タスクの日付が今年の範囲外の場合は拡張するが、制限範囲内に収める
+      const candidateStart = computedStart.getTime() < baseStart.getTime() ? computedStart : baseStart;
+      const candidateEnd = computedEnd.getTime() > baseEnd.getTime() ? computedEnd : baseEnd;
+      // 制限範囲内にクランプ
+      this.timelineStart = candidateStart.getTime() < minAllowedDate.getTime() 
+        ? this.startOfWeek(minAllowedDate) 
+        : candidateStart;
+      this.timelineEnd = candidateEnd.getTime() > maxAllowedDate.getTime() 
+        ? this.endOfWeek(maxAllowedDate) 
+        : candidateEnd;
     }
 
     const days: TimelineDay[] = [];
