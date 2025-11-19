@@ -2530,4 +2530,57 @@ export class TasksListComponent implements OnInit, OnDestroy {
     const diff = end - start;
     return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
   }
+
+  /**
+   * 日付入力フィールドをクリックしたときにカレンダーピッカーを開く
+   */
+  openDatePicker(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    // showPicker()がサポートされている場合は使用（Chrome、Edge、Safari 16+など）
+    if ('showPicker' in input && typeof (input as HTMLInputElement & { showPicker?: () => Promise<void> }).showPicker === 'function') {
+      try {
+        (input as HTMLInputElement & { showPicker: () => Promise<void> }).showPicker();
+      } catch {
+        // showPicker()が失敗した場合は、フォーカスを設定してカレンダーを開く
+        input.focus();
+      }
+    } else {
+      // showPicker()がサポートされていない場合は、フォーカスを設定
+      input.focus();
+    }
+  }
+
+  /**
+   * 日付入力フィールドでのキーボード入力を防ぐ（カレンダーピッカーは有効）
+   * Tab、Enter、矢印キーなどは許可する
+   */
+  preventDateInput(event: KeyboardEvent): void {
+    // Tab、Enter、矢印キー、Delete、Backspace、Escapeなどは許可
+    const allowedKeys = [
+      'Tab',
+      'Enter',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'Delete',
+      'Backspace',
+      'Escape',
+      'Home',
+      'End',
+    ];
+    
+    // Ctrl/Cmd + A (全選択)、Ctrl/Cmd + C (コピー)、Ctrl/Cmd + V (貼り付け)などは許可
+    if (event.ctrlKey || event.metaKey) {
+      return;
+    }
+    
+    // 許可されたキーは通過
+    if (allowedKeys.includes(event.key)) {
+      return;
+    }
+    
+    // その他のキー入力を防ぐ
+    event.preventDefault();
+  }
 }

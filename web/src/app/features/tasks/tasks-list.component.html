@@ -796,6 +796,9 @@
             type="date"
             [(ngModel)]="taskForm.startDate"
             name="startDate"
+            (click)="openDatePicker($event)"
+            (keydown)="preventDateInput($event)"
+            (paste)="$event.preventDefault()"
           >
         </div>
         <div class="form-group">
@@ -805,6 +808,9 @@
             type="date"
             [(ngModel)]="taskForm.endDate"
             name="endDate"
+            (click)="openDatePicker($event)"
+            (keydown)="preventDateInput($event)"
+            (paste)="$event.preventDefault()"
           >
         </div>
       </div>
