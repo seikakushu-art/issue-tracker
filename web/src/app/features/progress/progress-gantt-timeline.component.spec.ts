@@ -43,8 +43,22 @@ describe('ProgressGanttTimelineComponent', () => {
 
   it('ドラッグ操作でスクロールできる', () => {
     const viewport = component.nativeElement!;
-    viewport.scrollLeft = 10;
-    viewport.scrollTop = 5;
+    Object.defineProperty(viewport, 'scrollLeft', { value: 10, writable: true, configurable: true });
+    Object.defineProperty(viewport, 'scrollTop', { value: 5, writable: true, configurable: true });
+    const scrollToSpy = spyOn(viewport, 'scrollTo').and.callFake((optionsOrX?: ScrollToOptions | number, y?: number) => {
+      if (typeof optionsOrX === 'object' && optionsOrX !== null) {
+        const options = optionsOrX as ScrollToOptions;
+        if (options.left !== undefined) {
+          Object.defineProperty(viewport, 'scrollLeft', { value: options.left, writable: true, configurable: true });
+        }
+        if (options.top !== undefined) {
+          Object.defineProperty(viewport, 'scrollTop', { value: options.top, writable: true, configurable: true });
+        }
+      } else if (typeof optionsOrX === 'number' && typeof y === 'number') {
+        Object.defineProperty(viewport, 'scrollLeft', { value: optionsOrX, writable: true, configurable: true });
+        Object.defineProperty(viewport, 'scrollTop', { value: y, writable: true, configurable: true });
+      }
+    });
     (viewport as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture = jasmine.createSpy('setPointerCapture');
     (viewport as unknown as { releasePointerCapture: (id: number) => void }).releasePointerCapture = jasmine.createSpy(
       'releasePointerCapture',
@@ -70,8 +84,8 @@ describe('ProgressGanttTimelineComponent', () => {
       preventDefault,
     } as unknown as PointerEvent);
 
-    expect(viewport.scrollLeft).toBe(8);
-    expect(viewport.scrollTop).toBe(7);
+    expect(scrollToSpy).toHaveBeenCalled();
+    expect(scrollToSpy.calls.mostRecent().args[0]).toEqual(jasmine.objectContaining({ left: 8, top: 7 }));
     expect(preventDefault).toHaveBeenCalled();
 
     component.onPointerUp({ pointerId: 1 } as unknown as PointerEvent);
