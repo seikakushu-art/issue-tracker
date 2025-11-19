@@ -155,7 +155,7 @@ export class DashboardService {
         : this.calculateAverageProgress(activeTasks);
 
       const highPriorityBacklog = activeTasks.filter((task) =>
-        (task.importance === 'Critical' || task.importance === 'High') &&
+        (task.importance === 'Critical' || task.importance === 'High' || task.importance === 'Medium') &&
         task.status !== 'completed',
       ).length;
 

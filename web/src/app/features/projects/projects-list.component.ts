@@ -208,8 +208,9 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
       this.currentUid = await this.projectsService.getSignedInUid();
       this.projects = await this.projectsService.listMyProjects();
       await this.loadIssueCounts();
+      await this.loadProjectTasks(); // タスク数を表示するためにタスクを読み込む
       await this.loadMemberProfiles(this.projects);
-      // プロジェクト一覧画面では参加メンバーと期限のみでフィルターするため、タスクとタグの読み込みは不要
+      // プロジェクト一覧画面では参加メンバーと期限のみでフィルターするため、タグの読み込みは不要
       this.filterProjects();
       if (this.showInviteModal && this.inviteProject?.id) {
         const refreshed = this.projects.find(project => project.id === this.inviteProject?.id);
@@ -1225,10 +1226,15 @@ export class ProjectsListComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * タスク数を取得（実装予定）
+   * タスク数を取得
    */
   getTaskCount(projectId: string): number {
-    return this.issueCountMap[projectId] ?? 0;
+    const tasks = this.projectTasksMap[projectId] ?? [];
+    // showArchivedがfalseの場合はアーカイブされたタスクを除外
+    const filteredTasks = this.showArchived
+      ? tasks
+      : tasks.filter((task) => !task.archived);
+    return filteredTasks.length;
   }
 
   /** プロジェクト期間（日数）を算出する（開始・終了がそろっていない場合は0） */
