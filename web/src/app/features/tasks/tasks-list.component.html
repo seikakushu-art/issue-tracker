@@ -387,7 +387,17 @@
     </section>
 
     <section class="detail-section">
-      <h3>チェックリスト <span class="checklist-count">({{ selectedTask.checklist.length }}/200)</span> <span class="checklist-hint">チェックリスト項目は100文字以内で入力してください</span></h3>
+      <h3>
+        チェックリスト <span class="checklist-count">({{ selectedTask.checklist.length }}/200)</span>
+        <div class="info-tooltip">
+          <span class="info-icon" aria-label="チェックリストのヒント">ℹ️</span>
+          <div class="tooltip-content">
+            <p>チェックリストの完了・追加に応じて</p>
+            <p>進捗とステータスが変わります。</p>
+          </div>
+        </div>
+        <span class="checklist-note">チェックリスト項目は100文字以内で入力してください</span>
+      </h3>
       <div *ngIf="selectedTask.checklist.length > 0; else emptyChecklist">
         <div class="detail-checklist-item" *ngFor="let item of selectedTask.checklist">
           <label>

@@ -1762,6 +1762,21 @@ export class TasksListComponent implements OnInit, OnDestroy {
       }
     }
 
+    // 完了ステータスに変更する場合、未完成のチェックリストがあるかチェック
+    if (this.taskForm.status === 'completed') {
+      const checklist = this.taskForm.checklist.filter(item => item.text.trim() !== '');
+      if (checklist.length > 0) {
+        const incompleteCount = checklist.filter(item => !item.completed).length;
+        if (incompleteCount > 0) {
+          const message = `未完成のチェックリスト項目が${incompleteCount}件あります。\n完了ステータスに変更すると進捗率が100%になりますが、よろしいですか？\n\n後でチェックリストを編集すると、進捗率とステータスはチェックリスト基準で更新されます。`;
+          const shouldComplete = confirm(message);
+          if (!shouldComplete) {
+            return; // キャンセルした場合は処理を中断
+          }
+        }
+      }
+    }
+
     this.saving = true;
     try {
       const taskData = {
@@ -1972,7 +1987,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
         if (checklist.length > 0) {
           const incompleteCount = checklist.filter(item => !item.completed).length;
           if (incompleteCount > 0) {
-            const message = `未完成のチェックリスト項目が${incompleteCount}件あります。\n完了ステータスに変更すると進捗率が100%になりますが、よろしいですか？`;
+            const message = `未完成のチェックリスト項目が${incompleteCount}件あります。\n完了ステータスに変更すると進捗率が100%になりますが、よろしいですか？\n\n後でチェックリストを編集すると、進捗率とステータスはチェックリスト基準で更新されます。`;
             const shouldComplete = confirm(message);
             if (!shouldComplete) {
               return; // キャンセルした場合は処理を中断
