@@ -18,6 +18,7 @@ import { firstValueFrom, TimeoutError } from 'rxjs';
 import { filter, take, timeout } from 'rxjs/operators';
 import { BulletinPost, Project, Role } from '../../models/schema';
 import { ProjectsService } from '../projects/projects.service';
+import { UserDirectoryService } from '../../core/user-directory.service';
 
 interface ListOptions {
   limit?: number;
@@ -33,6 +34,7 @@ export class BoardService {
   private readonly db = inject(Firestore);
   private readonly auth = inject(Auth);
   private readonly projectsService = inject(ProjectsService);
+  private readonly userDirectoryService = inject(UserDirectoryService);
 
   private authReady: Promise<void> | null = null;
 
@@ -297,6 +299,23 @@ export class BoardService {
       const right = b.createdAt ? b.createdAt.getTime() : 0;
       return right - left;
     });
+
+    // 投稿者の最新プロフィール情報を取得してauthorPhotoUrlを更新
+    const authorIds = Array.from(new Set(posts.map((post) => post.authorId).filter(Boolean)));
+    if (authorIds.length > 0) {
+      const profiles = await this.userDirectoryService.getProfiles(authorIds);
+      const profileMap = new Map(profiles.map((profile) => [profile.uid, profile]));
+      
+      // 各投稿のauthorPhotoUrlを最新のプロフィール情報で更新
+      for (const post of posts) {
+        const profile = profileMap.get(post.authorId);
+        if (profile) {
+          // 常に最新のプロフィール情報でauthorPhotoUrlを更新
+          // （ユーザーがアイコンを設定・削除した場合に反映される）
+          post.authorPhotoUrl = profile.photoURL;
+        }
+      }
+    }
 
     // 500件を超えているかチェック
     const hasMore = posts.length > requestedLimit;
