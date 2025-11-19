@@ -175,7 +175,7 @@ export class TasksListComponent implements OnInit, OnDestroy {
    * チェックリスト完了時に表示する確認メッセージ。
    * UI からもサービス層からも参照しやすいように定数化しておく。
    */
-  private readonly checklistCompletionConfirmMessage = 'チェックリストがすべてクリアしました。タスクを完了しますか？';
+  private readonly checklistCompletionConfirmMessage = 'チェックリストがすべてクリアしました。タスクを「完了」ステータスにしますか？';
 
   // 重要度表示用
   private importanceDisplay: Record<Importance, { label: string; weight: number }> = {
@@ -2072,6 +2072,29 @@ export class TasksListComponent implements OnInit, OnDestroy {
     }
 
     this.taskForm.checklist.splice(index, 1);
+  }
+
+  /** チェックリスト項目のチェック状態が変更されたときの処理 */
+  onChecklistItemChanged(index: number, checked: boolean): void {
+    // チェックボックスの状態を更新（ngModelで既に更新されているが、明示的に設定）
+    this.taskForm.checklist[index].completed = checked;
+
+    // テキストが空の項目は除外してチェック
+    const validChecklist = this.taskForm.checklist.filter(item => item.text.trim() !== '');
+    
+    // すべてのチェックリストが完了したか確認
+    const allCompleted = validChecklist.length > 0 && validChecklist.every(item => item.completed);
+    
+    // すべて完了していて、かつ現在のステータスが「完了」または「破棄」でない場合
+    if (allCompleted && this.taskForm.status !== 'completed' && this.taskForm.status !== 'discarded') {
+      const shouldComplete = this.confirmChecklistCompletion();
+      if (shouldComplete) {
+        // 「はい」を選択した場合、ステータスを「完了」に変更
+        this.taskForm.status = 'completed';
+      }
+      // 「いいえ」を選択した場合、チェックリストはすべてチェックされたままにする
+      // （チェックボックスの状態は変更しない）
+    }
   }
 
   /** ID生成 */

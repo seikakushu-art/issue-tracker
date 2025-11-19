@@ -81,7 +81,7 @@ import {
      * チェックリストがすべて完了した際に表示する確認文言。
      * UI から複数箇所で利用するためフィールドで保持する。
      */
-     private readonly checklistCompletionConfirmMessage = 'チェックリストがすべてクリアしました。タスクを完了しますか？';
+     private readonly checklistCompletionConfirmMessage = 'チェックリストがすべてクリアしました。タスクを「完了」ステータスにしますか？';
   
     currentUid: string | null = null;
     currentRole: Role | null = null;

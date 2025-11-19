@@ -241,7 +241,10 @@ export class TasksService {
     await this.checkTitleUniqueness(projectId, issueId, input.title);
 
     const checklist = input.checklist || [];
-    const progress = this.calculateProgressFromChecklist(checklist);
+    // 完了ステータスの場合は進捗率を必ず100%にする
+    const progress = input.status === 'completed' 
+      ? 100 
+      : this.calculateProgressFromChecklist(checklist, input.status);
 
     const initialAssignees = Array.isArray(input.assigneeIds)
       ? input.assigneeIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
