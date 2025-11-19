@@ -57,7 +57,7 @@ export class ProjectsService {
       const record = issueDoc.data() as Record<string, unknown>;
       const issueStart = normalizeDate(record['startDate']);
       if (issueStart && issueStart < projectStart) {
-        throw new Error('プロジェクトの開始日は配下の課題・タスクの開始日をカバーするよう設定してください');
+        throw new Error('プロジェクトの開始日は配下の課題・タスク（アーカイブも含む）の開始日をカバーするよう設定してください');
       }
     }
 
@@ -72,7 +72,7 @@ export class ProjectsService {
       const record = taskDoc.data() as Record<string, unknown>;
       const taskStart = normalizeDate(record['startDate']);
       if (taskStart && taskStart < projectStart) {
-        throw new Error('プロジェクトの開始日は配下の課題・タスクの開始日をカバーするよう設定してください');
+        throw new Error('プロジェクトの開始日は配下の課題・タスク（アーカイブも含む）の開始日をカバーするよう設定してください');
       }
     }
   }
@@ -83,7 +83,7 @@ export class ProjectsService {
       const record = issueDoc.data() as Record<string, unknown>;
       const issueEnd = normalizeDate(record['endDate']);
       if (issueEnd && issueEnd > projectEnd) {
-        throw new Error('プロジェクトの終了日は配下の課題・タスクの終了日をカバーするよう設定してください');
+        throw new Error('プロジェクトの終了日は配下の課題・タスク（アーカイブも含む）の終了日をカバーするよう設定してください');
       }
     }
 
@@ -98,7 +98,7 @@ export class ProjectsService {
       const record = taskDoc.data() as Record<string, unknown>;
       const taskEnd = normalizeDate(record['endDate']);
       if (taskEnd && taskEnd > projectEnd) {
-        throw new Error('プロジェクトの終了日は配下の課題・タスクの終了日をカバーするよう設定してください');
+        throw new Error('プロジェクトの終了日は配下の課題・タスク（アーカイブも含む）の終了日をカバーするよう設定してください');
       }
     }
   }

@@ -99,7 +99,7 @@ export class IssuesService {
       const record = docSnap.data() as Record<string, unknown>;
       const taskStart = normalizeDate(record['startDate']);
       if (taskStart && taskStart < issueStart) {
-        throw new Error('課題の開始日は配下のタスクの開始日をカバーするよう設定してください');
+        throw new Error('課題の開始日は配下のタスク（アーカイブも含む）の開始日をカバーするよう設定してください');
       }
     }
   }
@@ -114,7 +114,7 @@ export class IssuesService {
       const record = docSnap.data() as Record<string, unknown>;
       const taskEnd = normalizeDate(record['endDate']);
       if (taskEnd && taskEnd > issueEnd) {
-        throw new Error('課題の終了日は配下のタスクの終了日をカバーするよう設定してください');
+        throw new Error('課題の終了日は配下のタスク（アーカイブも含む）の終了日をカバーするよう設定してください');
       }
     }
   }
