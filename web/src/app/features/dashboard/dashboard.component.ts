@@ -906,12 +906,30 @@ export class DashboardComponent implements OnInit {
       case 'overdue_first':
       default:
         return cloned.sort((a, b) => {
+          // 期間未設定かつ課題・タスクがないプロジェクトを最後に
+          const aIsEmpty = !a.startDate && !a.endDate && a.issueCount === 0;
+          const bIsEmpty = !b.startDate && !b.endDate && b.issueCount === 0;
+          if (aIsEmpty !== bIsEmpty) {
+            return aIsEmpty ? 1 : -1;
+          }
+          // 通常の並び替え
           if (a.overdue === b.overdue) {
-            if (a.progress === b.progress) {
-              // 進捗率が同じ場合は重要タスク数（多い順）で並ぶ
-              return b.highPriorityBacklog - a.highPriorityBacklog;
+            // 第1.5優先: 終了日が近いほど先頭へ（終了日がない場合は最後に）
+            const aEndDate = a.endDate ? new Date(a.endDate).getTime() : null;
+            const bEndDate = b.endDate ? new Date(b.endDate).getTime() : null;
+            if (aEndDate !== bEndDate) {
+              // 終了日がない場合は最後に
+              if (!aEndDate) return 1;
+              if (!bEndDate) return -1;
+              // 終了日が早い（小さい）順に並ぶ
+              return aEndDate - bEndDate;
             }
-            return a.progress - b.progress;
+            // 第2優先: 進捗率（低い順）
+            if (a.progress !== b.progress) {
+              return a.progress - b.progress;
+            }
+            // 第3優先: 重要タスク数（多い順）
+            return b.highPriorityBacklog - a.highPriorityBacklog;
           }
           return a.overdue ? -1 : 1;
         });

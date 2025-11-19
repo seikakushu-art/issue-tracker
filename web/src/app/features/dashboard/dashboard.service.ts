@@ -148,14 +148,15 @@ export class DashboardService {
       const memberCount = (project.memberIds ?? []).length;
 
       const allTasks = project.issues.flatMap((issue) => issue.tasks);
+      // アーカイブ/破棄されたタスクを除外したアクティブタスクのみを使用
+      const activeTasks = allTasks.filter((task) => !task.archived && task.status !== 'discarded');
       const progress = typeof project.progress === 'number'
         ? project.progress
-        : this.calculateAverageProgress(allTasks);
+        : this.calculateAverageProgress(activeTasks);
 
-      const highPriorityBacklog = allTasks.filter((task) =>
+      const highPriorityBacklog = activeTasks.filter((task) =>
         (task.importance === 'Critical' || task.importance === 'High') &&
-        task.status !== 'completed' &&
-        task.status !== 'discarded',
+        task.status !== 'completed',
       ).length;
 
       // プロジェクトの終了日が過ぎているかチェック
@@ -166,9 +167,33 @@ export class DashboardService {
         progress < 100
       );
 
+      // プロジェクト内の課題に遅延しているものがあるかチェック
+      // アーカイブされた課題は除外
+      const hasOverdueIssue = project.issues.some((issue) => {
+        if (issue.archived) {
+          return false;
+        }
+        if (!issue.endDate) {
+          return false;
+        }
+        const issueEndDate = this.normalizeDate(issue.endDate);
+        if (!issueEndDate) {
+          return false;
+        }
+        // 課題の進捗率が100%の場合は遅延と見なさない
+        const issueProgress = issue.progress ?? 0;
+        if (issueProgress >= 100) {
+          return false;
+        }
+        // 課題の終了日が過ぎているかチェック（東京時間ベース）
+        const daysUntil = this.daysUntilDeadline(now, issueEndDate);
+        return daysUntil < 0;
+      });
+
       // プロジェクト内のタスクに遅延しているものがあるかチェック
-      const hasOverdueTask = allTasks.some((task) => {
-        if (task.status === 'completed' || task.status === 'discarded') {
+      // アーカイブ/破棄/完了されたタスクは除外
+      const hasOverdueTask = activeTasks.some((task) => {
+        if (task.status === 'completed') {
           return false;
         }
         if (!task.endDate) {
@@ -183,12 +208,12 @@ export class DashboardService {
         return daysUntil < 0;
       });
 
-      const overdue = projectOverdue || hasOverdueTask;
+      const overdue = projectOverdue || hasOverdueIssue || hasOverdueTask;
 
       const elapsedRatio = this.calculateElapsedRatio(project.startDate ?? null, project.endDate ?? null, now);
       const warningLevel = this.resolveWarningLevel(progress, elapsedRatio);
 
-      const statusBars = this.buildStatusBars(allTasks);
+      const statusBars = this.buildStatusBars(activeTasks);
 
       return {
         projectId: project.id!,
