@@ -59,15 +59,6 @@ import { AuthService } from '../../core/auth.service';
           </div>
 
           <div class="form-actions">
-            <button
-              *ngIf="originalPhotoUrl || iconToDelete"
-              type="button"
-              class="btn btn-danger btn--small"
-              (click)="deleteIcon()"
-              [disabled]="loading"
-            >
-              アイコンを削除
-            </button>
             <button type="submit" class="btn btn-primary" [disabled]="loading">
               {{ loading ? '保存中...' : '変更を保存' }}
             </button>
@@ -199,11 +190,6 @@ import { AuthService } from '../../core/auth.service';
       border-radius: 50%;
       object-fit: cover;
       border: 3px solid #e2e8f0;
-    }
-
-    .btn--small {
-      padding: 6px 12px;
-      font-size: 13px;
     }
 
     .icon-preview__placeholder {
@@ -338,11 +324,10 @@ export class UserSettingsComponent implements OnDestroy {
 
   username = '';
   iconPreviewUrl: string | null = null;
-  originalPhotoUrl: string | null = null;
+  private originalPhotoUrl: string | null = null;
   private iconObjectUrl: string | null = null;
   private iconInputElement: HTMLInputElement | null = null;
   selectedIconFile: File | null = null;
-  iconToDelete = false;
 
   loading = false;
   errorMessage = '';
@@ -377,7 +362,7 @@ export class UserSettingsComponent implements OnDestroy {
 
     this.username = resolvedUsername;
   this.originalPhotoUrl = resolvedPhotoUrl;
-    if (!this.selectedIconFile && !this.iconToDelete) {
+  if (!this.selectedIconFile) {
       this.iconPreviewUrl = resolvedPhotoUrl;
     }
   }
@@ -391,20 +376,12 @@ export class UserSettingsComponent implements OnDestroy {
     this.successMessage = '';
 
     try {
-      let photoFile: File | null | undefined;
-      if (this.iconToDelete) {
-        photoFile = null;
-      } else {
-        photoFile = this.selectedIconFile ?? undefined;
-      }
-
       await this.userProfileService.updateUserAvatar({
-        photoFile,
+        photoFile: this.selectedIconFile ?? undefined,
       });
 
       this.successMessage = 'プロフィールを更新しました。';
       this.selectedIconFile = null;
-      this.iconToDelete = false;
       this.revokeIconPreview();
       this.iconPreviewUrl = null;
       this.applyUserProfile();
@@ -457,28 +434,12 @@ export class UserSettingsComponent implements OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
     this.selectedIconFile = null;
-    this.iconToDelete = false;
     this.revokeIconPreview();
     this.iconPreviewUrl = null;
     if (this.iconInputElement) {
       this.iconInputElement.value = '';
     }
     this.applyUserProfile();
-  }
-
-  /**
-   * アイコンを削除する
-   */
-  deleteIcon(): void {
-    this.iconToDelete = true;
-    this.selectedIconFile = null;
-    this.revokeIconPreview();
-    this.iconPreviewUrl = null;
-    if (this.iconInputElement) {
-      this.iconInputElement.value = '';
-    }
-    this.errorMessage = '';
-    this.successMessage = '';
   }
 
   /**
@@ -491,7 +452,6 @@ export class UserSettingsComponent implements OnDestroy {
     const file = input.files?.[0];
     if (!file) {
       this.selectedIconFile = null;
-      this.iconToDelete = false;
       this.revokeIconPreview();
       this.iconPreviewUrl = this.originalPhotoUrl;
       if (this.iconInputElement) {
@@ -504,7 +464,6 @@ export class UserSettingsComponent implements OnDestroy {
       this.errorMessage = '画像ファイルを選択してください。';
       input.value = '';
       this.selectedIconFile = null;
-      this.iconToDelete = false;
       this.revokeIconPreview();
       this.iconPreviewUrl = this.originalPhotoUrl;
       return;
@@ -514,7 +473,6 @@ export class UserSettingsComponent implements OnDestroy {
       this.errorMessage = 'アイコン画像は 2MB 以下のファイルを選択してください。';
       input.value = '';
       this.selectedIconFile = null;
-      this.iconToDelete = false;
       this.revokeIconPreview();
       this.iconPreviewUrl = this.originalPhotoUrl;
       return;
@@ -522,7 +480,6 @@ export class UserSettingsComponent implements OnDestroy {
 
     this.errorMessage = '';
     this.selectedIconFile = file;
-    this.iconToDelete = false;
     this.updateIconPreview(file);
   }
 

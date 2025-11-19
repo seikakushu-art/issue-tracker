@@ -179,8 +179,15 @@ export class IssuesService {
     // 名称重複チェック
     await this.checkNameUniqueness(projectId, input.name);
 
-     // プロジェクト期間内チェック
-     await this.validateWithinProjectPeriod(
+    // 日付バリデーション: 開始日は終了日以前（Firestoreに触る前に実行）
+    if (input.startDate && input.endDate) {
+      if (input.startDate > input.endDate) {
+        throw new Error('開始日は終了日以前である必要があります');
+      }
+    }
+
+    // プロジェクト期間内チェック
+    await this.validateWithinProjectPeriod(
       projectId,
       input.startDate ?? null,
       input.endDate ?? null,
@@ -209,15 +216,6 @@ export class IssuesService {
     }
     if (input.themeColor !== undefined && input.themeColor !== null && input.themeColor !== '') {
       payload['themeColor'] = input.themeColor;
-    }
-
-    // バリデーション: 開始日は終了日以前
-    if (payload['startDate'] && payload['endDate']) {
-      const start = payload['startDate'] as Date;
-      const end = payload['endDate'] as Date;
-      if (start > end) {
-        throw new Error('開始日は終了日以前である必要があります');
-      }
     }
 
     // Firestoreサブコレクションとして登録: projects/{projectId}/issues/{issueId}

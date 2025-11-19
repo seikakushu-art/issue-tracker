@@ -239,24 +239,6 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
     return getAvatarColor(value);
   }
 
-  /**
-   * アイコン画像の読み込みエラー時にフォールバック表示に切り替える
-   */
-  onAvatarError(post: BoardPostView): void {
-    // authorPhotoUrlをnullに設定してフォールバック表示に切り替え
-    const currentPosts = this.posts();
-    const updatedPosts = currentPosts.map((p) =>
-      p.id === post.id ? { ...p, authorPhotoUrl: null } : p,
-    );
-    this.posts.set(updatedPosts);
-
-    const allPosts = this.allPosts();
-    const updatedAllPosts = allPosts.map((p) =>
-      p.id === post.id ? { ...p, authorPhotoUrl: null } : p,
-    );
-    this.allPosts.set(updatedAllPosts);
-  }
-
   isProjectSelected(projectId: string): boolean {
     return this.postForm.projectIds.includes(projectId);
   }
