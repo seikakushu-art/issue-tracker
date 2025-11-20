@@ -243,6 +243,14 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
     return this.postForm.projectIds.includes(projectId);
   }
 
+  isProjectDisabled(projectId: string): boolean {
+    if (this.submitting()) {
+      return true;
+    }
+    // 5件選択済みで、かつこのプロジェクトが未選択の場合、無効化
+    return this.postForm.projectIds.length >= 5 && !this.isProjectSelected(projectId);
+  }
+
   toggleProjectSelection(projectId: string, selected: boolean): void {
     const current = this.postForm.projectIds;
     const next = new Set(current);
@@ -267,6 +275,17 @@ export class BoardListComponent implements OnInit, AfterViewChecked {
   onProjectCheckboxChange(projectId: string, event: Event): void {
     const target = event.target as HTMLInputElement | null;
     const checked = target?.checked ?? false;
+    
+    // 5件選択済みで、新しいプロジェクトを選択しようとする場合
+    if (checked && this.postForm.projectIds.length >= 5 && !this.isProjectSelected(projectId)) {
+      // チェックボックスの状態を元に戻す
+      if (target) {
+        target.checked = false;
+      }
+      this.formError.set('プロジェクトは最大5件まで選択できます');
+      return;
+    }
+    
     this.toggleProjectSelection(projectId, checked);
   }
 

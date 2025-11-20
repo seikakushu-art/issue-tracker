@@ -51,7 +51,7 @@
                   [value]="project.id"
                   (change)="onProjectCheckboxChange(project.id, $event)"
                   [checked]="isProjectSelected(project.id)"
-                  [disabled]="submitting()"
+                  [disabled]="isProjectDisabled(project.id)"
                 />
                 <span>{{ project.name }}</span>
               </label>
