@@ -60,7 +60,7 @@ export class GlobalSearchComponent implements OnInit {
   };
 
   readonly filteredResults = computed(() => {
-    const keyword = this.query().trim().toLowerCase();
+    const keyword = this.normalizeForSearch(this.query().trim());
     const allItems = this.items();
     const typeFilters = this.typeFilters();
     
@@ -148,17 +148,17 @@ export class GlobalSearchComponent implements OnInit {
         (project): project is Project & { id: string } => Boolean(project.id),
       ).filter((project) => includeArchived || !project.archived);
       const projectItems = validProjects.map((project) => {
-        const item = this.createItem({
+        // ゴールの内容だけを検索対象に含める（「ゴール：」プレフィックスは除外）
+        const goalLower = project.goal?.trim();
+        return this.createItem({
           id: project.id!,
           type: 'project',
           title: project.name,
           context: project.goal ? `ゴール: ${project.goal}` : undefined,
           description: project.description,
           routerLink: ['/projects', project.id!],
+          contextLowerOverride: goalLower ? this.normalizeForSearch(goalLower) : null,
         });
-        // プロジェクトのcontext（ゴール：ラベル）は検索対象から除外
-        item.contextLower = null;
-        return item;
       });
 
       const issuesByProject = await Promise.all(
@@ -294,6 +294,13 @@ export class GlobalSearchComponent implements OnInit {
     }
   }
 
+  /**
+   * 検索用に文字列を正規化（全角アルファベット・数字を半角に統一）
+   */
+  private normalizeForSearch(text: string): string {
+    return text.normalize('NFKC').toLowerCase();
+  }
+
   private createItem(input: {
     id: string;
     type: SearchResultType;
@@ -303,6 +310,7 @@ export class GlobalSearchComponent implements OnInit {
     routerLink: (string | number)[];
     fragment?: string;
     queryParams?: Record<string, string>;
+    contextLowerOverride?: string | null;
   }): SearchResultItem {
     const title = input.title ?? '';
     const context = input.context?.trim() || undefined;
@@ -316,9 +324,11 @@ export class GlobalSearchComponent implements OnInit {
       routerLink: [...input.routerLink],
       fragment: input.fragment ?? undefined,
       queryParams: input.queryParams,
-      titleLower: title.toLowerCase(),
-      contextLower: context ? context.toLowerCase() : null,
-      descriptionLower: description ? description.toLowerCase() : null,
+      titleLower: this.normalizeForSearch(title),
+      contextLower: input.contextLowerOverride !== undefined 
+        ? (input.contextLowerOverride ? this.normalizeForSearch(input.contextLowerOverride) : null)
+        : (context ? this.normalizeForSearch(context) : null),
+      descriptionLower: description ? this.normalizeForSearch(description) : null,
     };
   }
 
@@ -338,31 +348,162 @@ export class GlobalSearchComponent implements OnInit {
     }));
   }
 
+  /**
+   * context用のハイライト（プロジェクトのゴールの場合、「ゴール：」プレフィックスを除外）
+   */
+  highlightContext(context: string | undefined | null): SafeHtml {
+    if (!context) {
+      return this.sanitizer.bypassSecurityTrustHtml('');
+    }
+    
+    // 「ゴール：」プレフィックスを検出
+    const goalPrefix = 'ゴール: ';
+    if (context.startsWith(goalPrefix)) {
+      const goalContent = context.slice(goalPrefix.length);
+      const prefixHtml = this.escapeHtml(goalPrefix);
+      // ゴールの内容だけをハイライト
+      const keyword = this.query().trim();
+      if (!keyword) {
+        return this.sanitizer.bypassSecurityTrustHtml(prefixHtml + this.escapeHtml(goalContent));
+      }
+      
+      const normalizedContent = this.normalizeForSearch(goalContent);
+      const normalizedKeyword = this.normalizeForSearch(keyword);
+      if (!normalizedKeyword || !normalizedContent.includes(normalizedKeyword)) {
+        return this.sanitizer.bypassSecurityTrustHtml(prefixHtml + this.escapeHtml(goalContent));
+      }
+      
+      // ゴールの内容をハイライト
+      const segments: string[] = [prefixHtml];
+      let contentIndex = 0;
+      let normalizedIndex = 0;
+      
+      // 正規化された文字列でマッチ位置を探す
+      let matchIndex = normalizedContent.indexOf(normalizedKeyword, 0);
+      
+      while (matchIndex !== -1) {
+        // マッチ開始位置に対応する元の文字列の位置を探す
+        let startOriginalIndex = 0;
+        let currentNormalizedIndex = 0;
+        for (let i = 0; i < goalContent.length; i++) {
+          const charNormalized = this.normalizeForSearch(goalContent[i]);
+          if (currentNormalizedIndex + charNormalized.length > matchIndex) {
+            startOriginalIndex = i;
+            break;
+          }
+          currentNormalizedIndex += charNormalized.length;
+        }
+        
+        // マッチ終了位置に対応する元の文字列の位置を探す
+        const endNormalizedIndex = matchIndex + normalizedKeyword.length;
+        let endOriginalIndex = goalContent.length;
+        currentNormalizedIndex = 0;
+        for (let i = 0; i < goalContent.length; i++) {
+          const charNormalized = this.normalizeForSearch(goalContent[i]);
+          currentNormalizedIndex += charNormalized.length;
+          if (currentNormalizedIndex >= endNormalizedIndex) {
+            endOriginalIndex = i + 1;
+            break;
+          }
+        }
+        
+        // マッチ前の部分
+        if (contentIndex < startOriginalIndex) {
+          segments.push(this.escapeHtml(goalContent.slice(contentIndex, startOriginalIndex)));
+        }
+        
+        // マッチ部分
+        segments.push(`<mark>${this.escapeHtml(goalContent.slice(startOriginalIndex, endOriginalIndex))}</mark>`);
+        
+        contentIndex = endOriginalIndex;
+        matchIndex = normalizedContent.indexOf(normalizedKeyword, endNormalizedIndex);
+      }
+      
+      // 残りの部分
+      if (contentIndex < goalContent.length) {
+        segments.push(this.escapeHtml(goalContent.slice(contentIndex)));
+      }
+      
+      return this.sanitizer.bypassSecurityTrustHtml(segments.join(''));
+    }
+    
+    return this.highlight(context);
+  }
+
   highlight(text: string | undefined | null): SafeHtml {
     const content = text ?? '';
     const keyword = this.query().trim();
     if (!keyword) {
       return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(content));
     }
-    const lowerContent = content.toLowerCase();
-    const lowerKeyword = keyword.toLowerCase();
-    let searchIndex = 0;
-    let matchIndex = lowerContent.indexOf(lowerKeyword, searchIndex);
-    if (matchIndex === -1) {
+    
+    const normalizedContent = this.normalizeForSearch(content);
+    const normalizedKeyword = this.normalizeForSearch(keyword);
+    if (!normalizedKeyword || !normalizedContent.includes(normalizedKeyword)) {
       return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(content));
     }
+    
+    // 正規化された文字列でマッチ位置を探し、元の文字列でハイライト
     const segments: string[] = [];
+    let contentIndex = 0;
+    let normalizedIndex = 0;
+    
+    // 各文字の正規化後の位置をマッピング
+    const charMap: Array<{ originalStart: number; originalEnd: number }> = [];
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+      const normalized = this.normalizeForSearch(char);
+      const start = normalizedIndex;
+      normalizedIndex += normalized.length;
+      charMap.push({ originalStart: i, originalEnd: i + 1 });
+    }
+    
+    // 正規化された文字列でマッチ位置を探す
+    let matchIndex = normalizedContent.indexOf(normalizedKeyword, 0);
+    
     while (matchIndex !== -1) {
-      const before = content.slice(searchIndex, matchIndex);
-      const match = content.slice(matchIndex, matchIndex + keyword.length);
-      segments.push(this.escapeHtml(before));
-      segments.push(`<mark>${this.escapeHtml(match)}</mark>`);
-      searchIndex = matchIndex + keyword.length;
-      matchIndex = lowerContent.indexOf(lowerKeyword, searchIndex);
+      // マッチ開始位置に対応する元の文字列の位置を探す
+      let startOriginalIndex = 0;
+      let currentNormalizedIndex = 0;
+      for (let i = 0; i < content.length; i++) {
+        const charNormalized = this.normalizeForSearch(content[i]);
+        if (currentNormalizedIndex + charNormalized.length > matchIndex) {
+          startOriginalIndex = i;
+          break;
+        }
+        currentNormalizedIndex += charNormalized.length;
+      }
+      
+      // マッチ終了位置に対応する元の文字列の位置を探す
+      const endNormalizedIndex = matchIndex + normalizedKeyword.length;
+      let endOriginalIndex = content.length;
+      currentNormalizedIndex = 0;
+      for (let i = 0; i < content.length; i++) {
+        const charNormalized = this.normalizeForSearch(content[i]);
+        currentNormalizedIndex += charNormalized.length;
+        if (currentNormalizedIndex >= endNormalizedIndex) {
+          endOriginalIndex = i + 1;
+          break;
+        }
+      }
+      
+      // マッチ前の部分
+      if (contentIndex < startOriginalIndex) {
+        segments.push(this.escapeHtml(content.slice(contentIndex, startOriginalIndex)));
+      }
+      
+      // マッチ部分
+      segments.push(`<mark>${this.escapeHtml(content.slice(startOriginalIndex, endOriginalIndex))}</mark>`);
+      
+      contentIndex = endOriginalIndex;
+      matchIndex = normalizedContent.indexOf(normalizedKeyword, endNormalizedIndex);
     }
-    if (searchIndex < content.length) {
-      segments.push(this.escapeHtml(content.slice(searchIndex)));
+    
+    // 残りの部分
+    if (contentIndex < content.length) {
+      segments.push(this.escapeHtml(content.slice(contentIndex)));
     }
+    
     return this.sanitizer.bypassSecurityTrustHtml(segments.join(''));
   }
 

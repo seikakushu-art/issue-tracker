@@ -56,7 +56,7 @@
           class="result-card">
           <span class="result-card__type type-chip type-chip--{{ item.type }}">{{ labelFor(item.type) }}</span>
           <span class="result-card__title" [innerHTML]="highlight(item.title)"></span>
-          <span class="result-card__context" *ngIf="item.context">{{ item.context }}</span>
+          <span class="result-card__context" *ngIf="item.context" [innerHTML]="highlightContext(item.context)"></span>
           <span class="result-card__description" *ngIf="item.description" [innerHTML]="highlight(item.description)"></span>
         </a>
       </li>
