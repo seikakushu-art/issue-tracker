@@ -208,6 +208,10 @@ export class IssuesListComponent implements OnInit, OnDestroy {
   }
 
   canCreateIssue(): boolean {
+    // アーカイブされたプロジェクトでは課題を作成できない
+    if (this.projectDetails?.archived) {
+      return false;
+    }
     return this.currentRole === 'admin' || this.currentRole === 'member';
   }
 
@@ -637,6 +641,11 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
    * 新規課題作成モーダルを開く
    */
   openCreateModal() {
+    // アーカイブされたプロジェクトでは課題を作成できない
+    if (this.projectDetails?.archived) {
+      alert('アーカイブされたプロジェクトでは新しい課題を作成できません');
+      return;
+    }
     if (!this.canCreateIssue()) {
       alert('課題を作成する権限がありません');
       return;
@@ -738,6 +747,11 @@ private async loadMemberProfiles(memberIds: string[]): Promise<void> {
         return;
       }
     } else {
+      // アーカイブされたプロジェクトでは課題を作成できない
+      if (this.projectDetails?.archived) {
+        alert('アーカイブされたプロジェクトでは新しい課題を作成できません');
+        return;
+      }
       if (!this.canCreateIssue()) {
         alert('課題を作成する権限がありません');
         return;

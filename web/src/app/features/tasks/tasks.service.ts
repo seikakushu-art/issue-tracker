@@ -230,6 +230,17 @@ export class TasksService {
   ): Promise<string> {
     const { project, uid } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
     
+    // アーカイブされた課題ではタスクを作成できない
+    const issueRef = doc(this.db, `projects/${projectId}/issues/${issueId}`);
+    const issueSnap = await getDoc(issueRef);
+    if (!issueSnap.exists()) {
+      throw new Error('対象の課題が見つかりません');
+    }
+    const issueData = issueSnap.data() as { archived?: boolean };
+    if (issueData.archived) {
+      throw new Error('アーカイブされた課題では新しいタスクを作成できません');
+    }
+    
     // アクティブなタスク数の上限チェック（300件）
     const activeTaskCount = await this.countActiveTasks(projectId, issueId);
     const MAX_ACTIVE_TASKS = 300;

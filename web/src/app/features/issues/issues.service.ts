@@ -167,7 +167,12 @@ export class IssuesService {
     themeColor?: string;
   }): Promise<string> {
     const user = await this.requireUser();
-    await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+    const { project } = await this.projectsService.ensureProjectRole(projectId, ['admin', 'member']);
+    
+    // アーカイブされたプロジェクトでは課題を作成できない
+    if (project.archived) {
+      throw new Error('アーカイブされたプロジェクトでは新しい課題を作成できません');
+    }
     
     // アクティブな課題数の上限チェック（50件）
     const activeIssueCount = await this.countActiveIssues(projectId);

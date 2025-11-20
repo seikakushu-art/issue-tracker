@@ -1687,6 +1687,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 新規作成モーダルを開く */
   openCreateModal() {
+    // アーカイブされた課題ではタスクを作成できない
+    if (this.issueDetails?.archived) {
+      alert('アーカイブされた課題では新しいタスクを作成できません');
+      return;
+    }
     if (!this.canCreateTask()) {
       alert('タスクを作成する権限がありません');
       return;
@@ -1769,9 +1774,16 @@ export class TasksListComponent implements OnInit, OnDestroy {
         alert('このタスクを編集する権限がありません');
         return;
       }
-    } else if (!this.canCreateTask()) {
-      alert('タスクを作成する権限がありません');
-      return;
+    } else {
+      // アーカイブされた課題ではタスクを作成できない
+      if (this.issueDetails?.archived) {
+        alert('アーカイブされた課題では新しいタスクを作成できません');
+        return;
+      }
+      if (!this.canCreateTask()) {
+        alert('タスクを作成する権限がありません');
+        return;
+      }
     }
 
     const trimmedTitle = this.taskForm.title?.trim() || '';
