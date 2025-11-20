@@ -2388,9 +2388,17 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
     const updated = this.tasks.find(task => task.id === this.selectedTaskId);
     if (updated) {
-      this.selectedTask = updated;
-      // 楽観的更新の状態をマージ
-      this.applyOptimisticChecklistUpdatesToTask(updated);
+      // タスクをコピーしてから selectedTask に設定（参照の共有を防ぐ）
+      // サーバーから取得したタスクのチェックリストを完全に置き換える（重複を防ぐ）
+      const serverChecklist = Array.isArray(updated.checklist) ? updated.checklist : [];
+      this.selectedTask = {
+        ...updated,
+        checklist: [...serverChecklist],
+        tagIds: updated.tagIds ? [...updated.tagIds] : [],
+        assigneeIds: updated.assigneeIds ? [...updated.assigneeIds] : [],
+      };
+      // 楽観的更新の状態をマージ（完了状態のみ）
+      this.applyOptimisticChecklistUpdatesToTask(this.selectedTask);
     } else {
       this.selectedTaskId = null;
       this.selectedTask = null;
@@ -2567,12 +2575,27 @@ export class TasksListComponent implements OnInit, OnDestroy {
     const newItemId = this.generateId();
     const newItemText = text;
     this.newChecklistText = '';
+    const newItem = { id: newItemId, text: newItemText, completed: false };
     // UIを即座に更新（楽観的更新）
-    this.selectedTask.checklist.push({ id: newItemId, text: newItemText, completed: false });
+    if (!this.selectedTask.checklist) {
+      this.selectedTask.checklist = [];
+    }
+    // 既に同じIDの項目が存在する場合は追加しない（重複を防ぐ）
+    const itemExistsInSelected = this.selectedTask.checklist.some((item) => item.id === newItemId);
+    if (!itemExistsInSelected) {
+      this.selectedTask.checklist.push(newItem);
+    }
     // タスクリスト内のタスクも更新
     const taskInList = this.tasks.find((t) => t.id === this.selectedTask!.id);
     if (taskInList) {
-      taskInList.checklist.push({ id: newItemId, text: newItemText, completed: false });
+      if (!taskInList.checklist) {
+        taskInList.checklist = [];
+      }
+      // 既に同じIDの項目が存在する場合は追加しない（重複を防ぐ）
+      const itemExistsInList = taskInList.checklist.some((item) => item.id === newItemId);
+      if (!itemExistsInList) {
+        taskInList.checklist.push(newItem);
+      }
     }
     // キューに追加して順次処理
     await this.queueChecklistUpdate(async () => {
@@ -2580,8 +2603,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
       if (!currentTask) {
         return;
       }
+      const currentChecklist = currentTask.checklist ?? [];
+      // 既に同じIDの項目が存在する場合は追加しない（重複を防ぐ）
+      const itemExists = currentChecklist.some((item) => item.id === newItemId);
+      if (itemExists) {
+        return;
+      }
       const updatedChecklist = [
-        ...currentTask.checklist,
+        ...currentChecklist,
         { id: newItemId, text: newItemText, completed: false }
       ];
       await this.persistChecklist(currentTask, updatedChecklist);

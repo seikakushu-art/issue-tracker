@@ -622,6 +622,11 @@ import {
           return;
         }
         const currentChecklist = currentTask.checklist ?? [];
+        // 既に同じIDの項目が存在する場合は追加しない（重複を防ぐ）
+        const itemExists = currentChecklist.some((item) => item.id === newItemId);
+        if (itemExists) {
+          return;
+        }
         const nextChecklist: ChecklistItem[] = [
           ...currentChecklist,
           { id: newItemId, text: newItemText, completed: false },
