@@ -373,39 +373,19 @@ export class GlobalSearchComponent implements OnInit {
         return this.sanitizer.bypassSecurityTrustHtml(prefixHtml + this.escapeHtml(goalContent));
       }
       
-      // ゴールの内容をハイライト
-      const segments: string[] = [prefixHtml];
-      let contentIndex = 0;
-      let normalizedIndex = 0;
+      // 正規化位置から元の文字列位置へのマッピングを一度だけ作成
+      const positionMap = this.createNormalizedPositionMap(goalContent);
       
       // 正規化された文字列でマッチ位置を探す
+      const segments: string[] = [prefixHtml];
+      let contentIndex = 0;
       let matchIndex = normalizedContent.indexOf(normalizedKeyword, 0);
       
       while (matchIndex !== -1) {
-        // マッチ開始位置に対応する元の文字列の位置を探す
-        let startOriginalIndex = 0;
-        let currentNormalizedIndex = 0;
-        for (let i = 0; i < goalContent.length; i++) {
-          const charNormalized = this.normalizeForSearch(goalContent[i]);
-          if (currentNormalizedIndex + charNormalized.length > matchIndex) {
-            startOriginalIndex = i;
-            break;
-          }
-          currentNormalizedIndex += charNormalized.length;
-        }
-        
-        // マッチ終了位置に対応する元の文字列の位置を探す
+        // マッピングを使って元の文字列位置を取得
+        const startOriginalIndex = positionMap[matchIndex] ?? 0;
         const endNormalizedIndex = matchIndex + normalizedKeyword.length;
-        let endOriginalIndex = goalContent.length;
-        currentNormalizedIndex = 0;
-        for (let i = 0; i < goalContent.length; i++) {
-          const charNormalized = this.normalizeForSearch(goalContent[i]);
-          currentNormalizedIndex += charNormalized.length;
-          if (currentNormalizedIndex >= endNormalizedIndex) {
-            endOriginalIndex = i + 1;
-            break;
-          }
-        }
+        const endOriginalIndex = (positionMap[endNormalizedIndex - 1] ?? goalContent.length - 1) + 1;
         
         // マッチ前の部分
         if (contentIndex < startOriginalIndex) {
@@ -430,6 +410,22 @@ export class GlobalSearchComponent implements OnInit {
     return this.highlight(context);
   }
 
+  /**
+   * 正規化位置から元の文字列位置への変換マッピングを作成
+   */
+  private createNormalizedPositionMap(content: string): number[] {
+    const map: number[] = [];
+    let normalizedIndex = 0;
+    for (let i = 0; i < content.length; i++) {
+      const charNormalized = this.normalizeForSearch(content[i]);
+      for (let j = 0; j < charNormalized.length; j++) {
+        map[normalizedIndex + j] = i;
+      }
+      normalizedIndex += charNormalized.length;
+    }
+    return map;
+  }
+
   highlight(text: string | undefined | null): SafeHtml {
     const content = text ?? '';
     const keyword = this.query().trim();
@@ -443,49 +439,19 @@ export class GlobalSearchComponent implements OnInit {
       return this.sanitizer.bypassSecurityTrustHtml(this.escapeHtml(content));
     }
     
-    // 正規化された文字列でマッチ位置を探し、元の文字列でハイライト
-    const segments: string[] = [];
-    let contentIndex = 0;
-    let normalizedIndex = 0;
-    
-    // 各文字の正規化後の位置をマッピング
-    const charMap: Array<{ originalStart: number; originalEnd: number }> = [];
-    for (let i = 0; i < content.length; i++) {
-      const char = content[i];
-      const normalized = this.normalizeForSearch(char);
-      const start = normalizedIndex;
-      normalizedIndex += normalized.length;
-      charMap.push({ originalStart: i, originalEnd: i + 1 });
-    }
+    // 正規化位置から元の文字列位置へのマッピングを一度だけ作成
+    const positionMap = this.createNormalizedPositionMap(content);
     
     // 正規化された文字列でマッチ位置を探す
+    const segments: string[] = [];
+    let contentIndex = 0;
     let matchIndex = normalizedContent.indexOf(normalizedKeyword, 0);
     
     while (matchIndex !== -1) {
-      // マッチ開始位置に対応する元の文字列の位置を探す
-      let startOriginalIndex = 0;
-      let currentNormalizedIndex = 0;
-      for (let i = 0; i < content.length; i++) {
-        const charNormalized = this.normalizeForSearch(content[i]);
-        if (currentNormalizedIndex + charNormalized.length > matchIndex) {
-          startOriginalIndex = i;
-          break;
-        }
-        currentNormalizedIndex += charNormalized.length;
-      }
-      
-      // マッチ終了位置に対応する元の文字列の位置を探す
+      // マッピングを使って元の文字列位置を取得
+      const startOriginalIndex = positionMap[matchIndex] ?? 0;
       const endNormalizedIndex = matchIndex + normalizedKeyword.length;
-      let endOriginalIndex = content.length;
-      currentNormalizedIndex = 0;
-      for (let i = 0; i < content.length; i++) {
-        const charNormalized = this.normalizeForSearch(content[i]);
-        currentNormalizedIndex += charNormalized.length;
-        if (currentNormalizedIndex >= endNormalizedIndex) {
-          endOriginalIndex = i + 1;
-          break;
-        }
-      }
+      const endOriginalIndex = (positionMap[endNormalizedIndex - 1] ?? content.length - 1) + 1;
       
       // マッチ前の部分
       if (contentIndex < startOriginalIndex) {
