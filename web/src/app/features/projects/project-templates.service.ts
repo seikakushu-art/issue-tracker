@@ -260,9 +260,7 @@ export class ProjectTemplatesService {
     const results: ProjectTemplateIssue[] = [];
     for (const issueDoc of issueDocs) {
       const issueRecord = issueDoc.data() as Record<string, unknown>;
-      if (typeof issueRecord['archived'] === 'boolean' && issueRecord['archived']) {
-        continue;
-      }
+      // アーカイブされた課題もテンプレートに含める（アーカイブされたプロジェクトからテンプレートを作成する場合に対応）
 
       const tasksSnapshot = await getDocs(collection(this.db, `projects/${projectId}/issues/${issueDoc.id}/tasks`));
       const tasks = this.buildTemplateTasks(tasksSnapshot.docs.map((docSnap) => docSnap.data()));
@@ -306,9 +304,7 @@ export class ProjectTemplatesService {
       return null;
     }
     const record = raw as Record<string, unknown>;
-    if (typeof record['archived'] === 'boolean' && record['archived']) {
-      return null;
-    }
+    // アーカイブされたタスクもテンプレートに含める（アーカイブされたプロジェクトからテンプレートを作成する場合に対応）
 
     const title = this.normalizeRequiredString(record['title']);
     if (!title) {
