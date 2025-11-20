@@ -1174,8 +1174,11 @@ import {
           }
         }
 
+        // 削除操作かどうかを判定（更新後のチェックリストにupdatedItemIdが存在しない場合は削除操作）
+        const isDeletion = updatedItemId !== undefined && !checklist.some(item => item.id === updatedItemId);
+        
         // ステータス遷移ロジックは updateChecklist に委譲
-        await this.tasksService.updateChecklist(this.projectId, this.issueId, currentTask.id, checklist);
+        await this.tasksService.updateChecklist(this.projectId, this.issueId, currentTask.id, checklist, isDeletion);
         // 更新が完了したら楽観的更新の状態をクリア
         if (updatedItemId) {
           this.optimisticChecklistUpdates.delete(updatedItemId);

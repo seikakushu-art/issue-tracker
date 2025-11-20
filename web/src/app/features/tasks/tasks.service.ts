@@ -1258,20 +1258,29 @@ export class TasksService {
    * - 進行中: 「期間内」OR「チェックリストに完成した項目がある」
    * - 完了: すべてのチェックリストは完了した
    * - 保留・破棄: 手動設定のみ（自動遷移しない）
+   * - 完了: チェックリスト項目を削除した場合は維持、チェック状態を変更した場合は再計算
    * @param task タスクデータ
    * @param checklist チェックリスト（省略時はタスクのチェックリストを使用）
    * @param startDate 開始日（省略時はタスクの開始日を使用）
    * @param endDate 終了日（省略時はタスクの終了日を使用）
+   * @param isDeletion 削除操作かどうか（削除操作の場合は完了状態を維持）
    * @returns 新しいステータス
    */
   private calculateStatusFromConditions(
     task: Task,
     checklist?: ChecklistItem[],
     startDate?: Date | null,
-    endDate?: Date | null
+    endDate?: Date | null,
+    isDeletion: boolean = false
   ): TaskStatus {
     // 破棄の場合は自動遷移しない
     if (task.status === 'discarded') {
+      return task.status;
+    }
+    
+    // 完了の場合は、削除操作の場合は自動遷移しない（チェックリスト項目を削除しても完了のまま）
+    // チェック状態を変更した場合は再計算する
+    if (task.status === 'completed' && isDeletion) {
       return task.status;
     }
     
@@ -1330,12 +1339,14 @@ export class TasksService {
    * @param issueId 課題ID
    * @param taskId タスクID
    * @param checklist 更新後のチェックリスト
+   * @param isDeletion 削除操作かどうか（削除操作の場合は完了状態を維持）
    */
   async updateChecklist(
     projectId: string,
     issueId: string,
     taskId: string,
-    checklist: ChecklistItem[]
+    checklist: ChecklistItem[],
+    isDeletion: boolean = false
   ): Promise<void> {
     const task = await this.getTask(projectId, issueId, taskId);
     if (!task) {
@@ -1343,7 +1354,7 @@ export class TasksService {
     }
 
     // ステータスを自動遷移
-    const newStatus = this.calculateStatusFromConditions(task, checklist);
+    const newStatus = this.calculateStatusFromConditions(task, checklist, undefined, undefined, isDeletion);
 
     // 完了ステータスの場合は進捗率を必ず100%にする
     const progress = newStatus === 'completed' ? 100 : this.calculateProgressFromChecklist(checklist);

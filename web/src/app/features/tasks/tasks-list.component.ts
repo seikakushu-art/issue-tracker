@@ -2764,8 +2764,11 @@ export class TasksListComponent implements OnInit, OnDestroy {
         }
       }
 
+      // 削除操作かどうかを判定（更新後のチェックリストにitemIdが存在しない場合は削除操作）
+      const isDeletion = itemId !== undefined && !checklist.some(item => item.id === itemId);
+      
       // ステータス遷移ロジックは updateChecklist に委譲
-      await this.tasksService.updateChecklist(this.projectId, this.issueId, task.id, checklist);
+      await this.tasksService.updateChecklist(this.projectId, this.issueId, task.id, checklist, isDeletion);
       // 更新が完了したら楽観的更新の状態をクリア
       if (taskId && itemId) {
         const taskUpdates = this.optimisticChecklistUpdates.get(taskId);
