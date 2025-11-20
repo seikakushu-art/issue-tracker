@@ -330,7 +330,7 @@
           placeholder="コメントを入力（最大5000文字）"
           [maxlength]="5000"
           [disabled]="commentSubmitting || commentLimitReached"
-          (input)="commentError = ''"
+          (input)="commentError = ''; syncMentionsFromText()"
           aria-label="コメントを入力"
         ></textarea>
 

@@ -360,6 +360,35 @@ import {
     isMentionSelected(uid: string): boolean {
       return this.commentForm.mentions.includes(uid);
     }
+
+    /**
+     * テキスト欄の内容からメンションを解析して、mentions配列を同期する
+     */
+    syncMentionsFromText(): void {
+      const text = this.commentForm.text;
+      if (!text) {
+        this.commentForm.mentions = [];
+        return;
+      }
+
+      // テキスト内の@usernameパターンを検出
+      const mentionPattern = /@(\S+)/g;
+      const foundMentions = new Set<string>();
+      let match: RegExpExecArray | null;
+
+      while ((match = mentionPattern.exec(text)) !== null) {
+        const mentionText = match[1]; // @を除いたユーザー名部分
+        
+        // mentionableMembersから該当するメンバーを探す
+        const member = this.mentionableMembers.find(m => m.username === mentionText);
+        if (member?.uid) {
+          foundMentions.add(member.uid);
+        }
+      }
+
+      // mentions配列を更新（テキストに存在するメンションのみを保持）
+      this.commentForm.mentions = Array.from(foundMentions);
+    }
   
     toggleMention(member: UserDirectoryProfile): void {
       if (this.commentLimitReached) {

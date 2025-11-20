@@ -238,7 +238,8 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
 
   handleTaskHover(task: Task | null): void {
     this.hoveredTask = task;
-    this.hoveredTaskRange = task ? this.getTaskDayRange(task) : null;
+    // 開始日と終了日の両方が設定されているタスクのみハイライトする
+    this.hoveredTaskRange = task && this.hasValidTaskPeriod(task) ? this.getTaskDayRange(task) : null;
     if (task !== null) {
       this.hoveredDayIndex = null;
     }
@@ -248,7 +249,10 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   handleTaskLabelHover(task: Task): void {
     // マウスがタスク名に移動したときにスクロール
     this.handleTaskHover(task);
-    this.focusTaskOnTimeline(task);
+    // 開始日と終了日の両方が設定されているタスクのみスクロールする
+    if (this.hasValidTaskPeriod(task)) {
+      this.focusTaskOnTimeline(task);
+    }
   }
 
   selectTask(issue: GanttIssue, task: Task): void {
@@ -500,7 +504,11 @@ export class ProgressGanttComponent implements OnInit, AfterViewInit {
   }
 
   isTaskHighlighted(task: Task): boolean {
-    return this.isTaskHovered(task) || this.isTaskInHoveredDay(task);
+    // 日付セルにマウスを合わせている時はタスクをハイライトしない
+    if (this.hoveredDayIndex !== null) {
+      return false;
+    }
+    return this.isTaskHovered(task);
   }
 
   private isTaskHovered(task: Task): boolean {
