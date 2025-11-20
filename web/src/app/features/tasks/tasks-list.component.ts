@@ -87,6 +87,14 @@ export class TasksListComponent implements OnInit, OnDestroy {
   pendingAttachmentId: string | null = null;
   pendingOpenDetail = false;
   newChecklistText = '';
+  /** チェックリスト更新のキュー */
+  private checklistUpdateQueue: (() => Promise<void>)[] = [];
+  /** チェックリスト更新が処理中かどうか */
+  private checklistUpdating = false;
+  /** 楽観的更新の状態を保持（taskId -> Map<itemId, completed>） */
+  private optimisticChecklistUpdates = new Map<string, Map<string, boolean>>();
+  /** 進捗率更新のデバウンスタイマー */
+  private progressUpdateTimer: ReturnType<typeof setTimeout> | null = null;
   currentRole: Role | null = null;
   currentUid: string | null = null;
   currentUserProfile: UserDirectoryProfile | null = null;
@@ -225,6 +233,10 @@ export class TasksListComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.progressUpdateTimer) {
+      clearTimeout(this.progressUpdateTimer);
+      this.progressUpdateTimer = null;
+    }
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -272,6 +284,8 @@ export class TasksListComponent implements OnInit, OnDestroy {
       this.issueDetails = issue;
       this.projectDetails = project;
       this.tasks = tasks;
+      // 楽観的更新の状態をマージ
+      this.applyOptimisticChecklistUpdates();
       this.currentRole = project?.roles?.[uid] ?? null;
       this.sanitizeAllTagSelections();
       this.filterTasks();
@@ -2363,9 +2377,40 @@ export class TasksListComponent implements OnInit, OnDestroy {
     const updated = this.tasks.find(task => task.id === this.selectedTaskId);
     if (updated) {
       this.selectedTask = updated;
+      // 楽観的更新の状態をマージ
+      this.applyOptimisticChecklistUpdatesToTask(updated);
     } else {
       this.selectedTaskId = null;
       this.selectedTask = null;
+    }
+  }
+
+  /**
+   * 楽観的更新の状態をすべてのタスクに適用
+   */
+  private applyOptimisticChecklistUpdates(): void {
+    for (const task of this.tasks) {
+      if (task.id) {
+        this.applyOptimisticChecklistUpdatesToTask(task);
+      }
+    }
+  }
+
+  /**
+   * 楽観的更新の状態を特定のタスクに適用
+   */
+  private applyOptimisticChecklistUpdatesToTask(task: Task): void {
+    if (!task.id) {
+      return;
+    }
+    const taskUpdates = this.optimisticChecklistUpdates.get(task.id);
+    if (taskUpdates && task.checklist) {
+      for (const item of task.checklist) {
+        const optimisticCompleted = taskUpdates.get(item.id);
+        if (optimisticCompleted !== undefined) {
+          item.completed = optimisticCompleted;
+        }
+      }
     }
   }
 
@@ -2458,14 +2503,38 @@ export class TasksListComponent implements OnInit, OnDestroy {
 
   /** 詳細パネルからチェックリストの完了状態を切り替える */
   async toggleChecklistItem(task: Task, itemId: string, completed: boolean) {
-    if (!this.canEditTask(task)) {
+    if (!this.canEditTask(task) || !task.id) {
       alert('チェックリストを更新する権限がありません');
       return;
     }
-    const updatedChecklist = task.checklist.map(item =>
-      item.id === itemId ? { ...item, completed } : item
-    );
-    await this.persistChecklist(task, updatedChecklist);
+    // 楽観的更新の状態を保存
+    if (!this.optimisticChecklistUpdates.has(task.id)) {
+      this.optimisticChecklistUpdates.set(task.id, new Map());
+    }
+    this.optimisticChecklistUpdates.get(task.id)!.set(itemId, completed);
+    // UIを即座に更新（楽観的更新）
+    const item = task.checklist.find((item) => item.id === itemId);
+    if (item) {
+      item.completed = completed;
+    }
+    // 詳細パネルで選択中のタスクも更新
+    if (this.selectedTask && this.selectedTask.id === task.id) {
+      const selectedItem = this.selectedTask.checklist.find((item) => item.id === itemId);
+      if (selectedItem) {
+        selectedItem.completed = completed;
+      }
+    }
+    // キューに追加して順次処理
+    await this.queueChecklistUpdate(async () => {
+      const currentTask = await this.tasksService.getTask(this.projectId, this.issueId, task.id!);
+      if (!currentTask) {
+        return;
+      }
+      const updatedChecklist = currentTask.checklist.map(item =>
+        item.id === itemId ? { ...item, completed } : item
+      );
+      await this.persistChecklist(currentTask, updatedChecklist, task.id!, itemId);
+    });
   }
 
   /** 詳細パネルからチェックリスト項目を追加 */
@@ -2483,13 +2552,28 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const updatedChecklist = [
-      ...this.selectedTask.checklist,
-      { id: this.generateId(), text, completed: false }
-    ];
-
-    await this.persistChecklist(this.selectedTask, updatedChecklist);
+    const newItemId = this.generateId();
+    const newItemText = text;
     this.newChecklistText = '';
+    // UIを即座に更新（楽観的更新）
+    this.selectedTask.checklist.push({ id: newItemId, text: newItemText, completed: false });
+    // タスクリスト内のタスクも更新
+    const taskInList = this.tasks.find((t) => t.id === this.selectedTask!.id);
+    if (taskInList) {
+      taskInList.checklist.push({ id: newItemId, text: newItemText, completed: false });
+    }
+    // キューに追加して順次処理
+    await this.queueChecklistUpdate(async () => {
+      const currentTask = await this.tasksService.getTask(this.projectId, this.issueId, this.selectedTask!.id!);
+      if (!currentTask) {
+        return;
+      }
+      const updatedChecklist = [
+        ...currentTask.checklist,
+        { id: newItemId, text: newItemText, completed: false }
+      ];
+      await this.persistChecklist(currentTask, updatedChecklist);
+    });
   }
 
   /** 詳細パネルからチェックリスト項目を削除 */
@@ -2502,12 +2586,107 @@ export class TasksListComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const updatedChecklist = this.selectedTask.checklist.filter(item => item.id !== itemId);
-    await this.persistChecklist(this.selectedTask, updatedChecklist);
+    // UIを即座に更新（楽観的更新）
+    const index = this.selectedTask.checklist.findIndex((item) => item.id === itemId);
+    if (index !== -1) {
+      this.selectedTask.checklist.splice(index, 1);
+    }
+    // タスクリスト内のタスクも更新
+    const taskInList = this.tasks.find((t) => t.id === this.selectedTask!.id);
+    if (taskInList) {
+      const listIndex = taskInList.checklist.findIndex((item) => item.id === itemId);
+      if (listIndex !== -1) {
+        taskInList.checklist.splice(listIndex, 1);
+      }
+    }
+    // キューに追加して順次処理
+    await this.queueChecklistUpdate(async () => {
+      const currentTask = await this.tasksService.getTask(this.projectId, this.issueId, this.selectedTask!.id!);
+      if (!currentTask) {
+        return;
+      }
+      const updatedChecklist = currentTask.checklist.filter(item => item.id !== itemId);
+      await this.persistChecklist(currentTask, updatedChecklist, this.selectedTask!.id!, itemId);
+      // 削除時も楽観的更新の状態をクリア
+      if (this.selectedTask!.id) {
+        const taskUpdates = this.optimisticChecklistUpdates.get(this.selectedTask!.id);
+        if (taskUpdates) {
+          taskUpdates.delete(itemId);
+          if (taskUpdates.size === 0) {
+            this.optimisticChecklistUpdates.delete(this.selectedTask!.id);
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * チェックリスト更新をキューに追加して順次処理する
+   * 連続クリック時の競合状態を防ぐため
+   */
+  private async queueChecklistUpdate(updateFn: () => Promise<void>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.checklistUpdateQueue.push(async () => {
+        try {
+          await updateFn();
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.processChecklistQueue();
+    });
+  }
+
+  /**
+   * チェックリスト更新キューを順次処理する
+   */
+  private async processChecklistQueue(): Promise<void> {
+    if (this.checklistUpdating || this.checklistUpdateQueue.length === 0) {
+      return;
+    }
+
+    this.checklistUpdating = true;
+    try {
+      while (this.checklistUpdateQueue.length > 0) {
+        const updateFn = this.checklistUpdateQueue.shift();
+        if (updateFn) {
+          await updateFn();
+        }
+      }
+      // キューが空になったら、進捗率を一気に更新（デバウンス）
+      this.scheduleProgressUpdate();
+    } finally {
+      this.checklistUpdating = false;
+    }
+  }
+
+  /**
+   * 進捗率の更新をスケジュール（デバウンス）
+   * 短時間で複数の操作がある場合、最後の操作から50ms後に進捗率を一気に更新
+   */
+  private scheduleProgressUpdate(): void {
+    if (this.progressUpdateTimer) {
+      clearTimeout(this.progressUpdateTimer);
+    }
+    this.progressUpdateTimer = setTimeout(() => {
+      void this.updateAllProgress();
+      this.progressUpdateTimer = null;
+    }, 50);
+  }
+
+  /**
+   * すべての進捗率を一気に更新
+   */
+  private async updateAllProgress(): Promise<void> {
+    // データを再読み込みして進捗率を更新
+    await this.loadData();
+    this.refreshSelectedTask();
+    await this.updateIssueProgress();
   }
 
   /** チェックリスト更新をFirestoreに反映 */
-  private async persistChecklist(task: Task, checklist: ChecklistItem[]): Promise<void> {
+  private async persistChecklist(task: Task, checklist: ChecklistItem[], taskId?: string, itemId?: string): Promise<void> {
     if (!task.id) {
       return;
     }
@@ -2529,22 +2708,47 @@ export class TasksListComponent implements OnInit, OnDestroy {
             progress: 100,
             status: task.status, // 現在のステータスを明示的に設定して自動遷移を防ぐ
           });
-          await this.loadData();
-          this.refreshSelectedTask();
-          await this.updateIssueProgress();
+          // 更新が完了したら楽観的更新の状態をクリア
+          if (taskId && itemId) {
+            const taskUpdates = this.optimisticChecklistUpdates.get(taskId);
+            if (taskUpdates) {
+              taskUpdates.delete(itemId);
+              if (taskUpdates.size === 0) {
+                this.optimisticChecklistUpdates.delete(taskId);
+              }
+            }
+          }
+          // loadData、refreshSelectedTask、updateIssueProgressはキューが空になったら一気に実行される
           return;
         }
       }
 
       // ステータス遷移ロジックは updateChecklist に委譲
       await this.tasksService.updateChecklist(this.projectId, this.issueId, task.id, checklist);
-
-      await this.loadData();
-      this.refreshSelectedTask();
-      await this.updateIssueProgress();
+      // 更新が完了したら楽観的更新の状態をクリア
+      if (taskId && itemId) {
+        const taskUpdates = this.optimisticChecklistUpdates.get(taskId);
+        if (taskUpdates) {
+          taskUpdates.delete(itemId);
+          if (taskUpdates.size === 0) {
+            this.optimisticChecklistUpdates.delete(taskId);
+          }
+        }
+      }
+      // loadData、refreshSelectedTask、updateIssueProgressはキューが空になったら一気に実行される
     } catch (error) {
       console.error('チェックリストの更新に失敗しました:', error);
       alert('チェックリストの更新に失敗しました');
+      // エラー時も楽観的更新の状態をクリア
+      if (taskId && itemId) {
+        const taskUpdates = this.optimisticChecklistUpdates.get(taskId);
+        if (taskUpdates) {
+          taskUpdates.delete(itemId);
+          if (taskUpdates.size === 0) {
+            this.optimisticChecklistUpdates.delete(taskId);
+          }
+        }
+      }
     }
   }
 

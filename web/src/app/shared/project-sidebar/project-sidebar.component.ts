@@ -1,10 +1,13 @@
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ProjectsService } from '../../features/projects/projects.service';
-import { Project } from '../../models/schema';
+import { Project, Role } from '../../models/schema';
 import { IssuesService } from '../../features/issues/issues.service';
+import { Firestore, collection, query, where, onSnapshot, Unsubscribe } from '@angular/fire/firestore';
+import { Auth, onAuthStateChanged } from '@angular/fire/auth';
+import { normalizeDate } from '../date-utils';
 
 /**
  * プロジェクトを一覧表示するサイドバー。
@@ -17,10 +20,12 @@ import { IssuesService } from '../../features/issues/issues.service';
   templateUrl: './project-sidebar.component.html',
   styleUrls: ['./project-sidebar.component.scss'],
 })
-export class ProjectSidebarComponent implements OnInit {
+export class ProjectSidebarComponent implements OnInit, OnDestroy {
   private projectsService = inject(ProjectsService);
   private router = inject(Router);
   private issuesService = inject(IssuesService);
+  private db = inject(Firestore);
+  private auth = inject(Auth);
 
   /** 現在選択中のプロジェクトID。アクティブ表示に利用する。 */
   @Input() currentProjectId: string | null = null;
@@ -52,38 +57,114 @@ export class ProjectSidebarComponent implements OnInit {
   /** サイドバーの折り畳み状態 */
   collapsed = false;
 
+  /** Firestoreリアルタイムリスナーの購読解除関数 */
+  private unsubscribe: Unsubscribe | undefined;
+
   /** localStorage用のキー */
   private readonly SORT_BY_KEY = 'project-sidebar-sort-by';
   private readonly SORT_ORDER_KEY = 'project-sidebar-sort-order';
   private readonly COLLAPSED_KEY = 'project-sidebar-collapsed';
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void {
     this.loadSortPreferences();
     this.loadCollapsedState();
-    await this.loadProjects();
+    this.setupRealtimeListener();
+  }
+
+  ngOnDestroy(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = undefined;
+    }
   }
 
   /**
-   * Firestoreからプロジェクト一覧を取得し、名称昇順で並べる。
-   * アーカイブされたプロジェクトは除外する。
+   * Firestoreのリアルタイムリスナーを設定する
    */
-  private async loadProjects(): Promise<void> {
+  private setupRealtimeListener(): void {
     this.loading = true;
     this.loadError = '';
-    try {
-      const projects = await this.projectsService.listMyProjects();
-      // アーカイブされたプロジェクトを除外
-      this.rawProjects = projects.filter(project => !project.archived);
-      this.applySorting();
-      // 課題数ソートで必要となる情報は裏で取得し、完了したら必要に応じて再ソートする。
-      void this.prepareIssueCounts(this.rawProjects);
-    } catch (error) {
-      console.error('プロジェクト一覧の取得に失敗しました:', error);
-      this.projects = [];
-      this.loadError = 'プロジェクト一覧を読み込めませんでした';
-    } finally {
-      this.loading = false;
-    }
+
+    onAuthStateChanged(this.auth, (user) => {
+      // 既存の購読を解除
+      if (this.unsubscribe) {
+        this.unsubscribe();
+        this.unsubscribe = undefined;
+      }
+
+      if (!user) {
+        this.loading = false;
+        this.projects = [];
+        this.rawProjects = [];
+        return;
+      }
+
+      const q = query(
+        collection(this.db, 'projects'),
+        where('memberIds', 'array-contains', user.uid)
+      );
+
+      this.unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          try {
+            const projects = snapshot.docs.map((doc) =>
+              this.hydrateProject(doc.id, doc.data() as Project, user.uid)
+            );
+            // アーカイブされたプロジェクトを除外
+            this.rawProjects = projects.filter(project => !project.archived);
+            this.applySorting();
+            // 課題数ソートで必要となる情報は裏で取得し、完了したら必要に応じて再ソートする。
+            void this.prepareIssueCounts(this.rawProjects);
+            this.loadError = '';
+          } catch (error) {
+            console.error('プロジェクト一覧の処理に失敗しました:', error);
+            this.loadError = 'プロジェクト一覧を読み込めませんでした';
+          } finally {
+            this.loading = false;
+          }
+        },
+        (error) => {
+          console.error('プロジェクト一覧の取得に失敗しました:', error);
+          this.loading = false;
+          this.loadError = 'プロジェクト一覧を読み込めませんでした';
+          this.projects = [];
+          this.rawProjects = [];
+        }
+      );
+    });
+  }
+
+  /**
+   * Firestoreから受け取った生のプロジェクトデータを画面で扱いやすい形に整形する
+   * ProjectsServiceのhydrateProjectと同じロジック
+   */
+  private hydrateProject(id: string, data: Project, uid: string): Project {
+    const dataRecord = data as unknown as Record<string, unknown>;
+    const memberIds = (dataRecord['memberIds'] as string[] | undefined) ?? [];
+    const roles = (dataRecord['roles'] as Record<string, Role> | undefined) ?? {};
+    const project: Project = {
+      ...data,
+      id,
+      memberIds,
+      roles,
+      startDate: normalizeDate(dataRecord['startDate']),
+      endDate: normalizeDate(dataRecord['endDate']),
+      createdAt: normalizeDate(dataRecord['createdAt']),
+      progress: (dataRecord['progress'] as number) ?? 0,
+      archived: (dataRecord['archived'] as boolean) ?? false,
+      pinnedBy: (dataRecord['pinnedBy'] as string[] | undefined) ?? [],
+    };
+    project.currentRole = this.resolveRoleForUser(project, uid) ?? undefined;
+    return project;
+  }
+
+  /**
+   * プロジェクトからユーザーの役割を解決する
+   */
+  private resolveRoleForUser(project: Project, uid: string): Role | null {
+    const roles = project.roles ?? {};
+    return roles[uid] ?? null;
   }
 
   /** 並び替え指定が変わったときに都度適用する。 */
@@ -202,13 +283,13 @@ export class ProjectSidebarComponent implements OnInit {
       case 'name':
         return project.name || '';
       case 'startDate':
-        return this.normalizeToDate(project.startDate) ?? new Date(0);
+        return normalizeDate(project.startDate) ?? new Date(0);
       case 'endDate':
-        return this.normalizeToDate(project.endDate) ?? new Date(0);
+        return normalizeDate(project.endDate) ?? new Date(0);
       case 'progress':
         return project.progress ?? 0;
       case 'createdAt':
-        return this.normalizeToDate(project.createdAt) ?? new Date(0);
+        return normalizeDate(project.createdAt) ?? new Date(0);
       case 'period':
         return this.getProjectDuration(project);
       case 'issueCount':
@@ -222,8 +303,8 @@ export class ProjectSidebarComponent implements OnInit {
 
   /** プロジェクト期間（日数）を算出する。 */
   private getProjectDuration(project: Project): number {
-    const start = this.normalizeToDate(project.startDate);
-    const end = this.normalizeToDate(project.endDate);
+    const start = normalizeDate(project.startDate);
+    const end = normalizeDate(project.endDate);
     if (!start || !end) {
       return 0;
     }
@@ -231,27 +312,6 @@ export class ProjectSidebarComponent implements OnInit {
     return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
   }
 
-  /** Timestamp互換の値をDate型へ整形する。 */
-  private normalizeToDate(value: unknown): Date | null {
-    if (!value) {
-      return null;
-    }
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime()) ? null : value;
-    }
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'toDate' in value &&
-      typeof (value as { toDate: () => Date }).toDate === 'function'
-    ) {
-      const converted = (value as { toDate: () => Date }).toDate();
-      return Number.isNaN(converted.getTime()) ? null : converted;
-    }
-
-    const parsed = new Date(value as string);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
 
   /** 課題数が必要な場合にまとめて取得しキャッシュする。 */
   private async prepareIssueCounts(projects: Project[]): Promise<void> {

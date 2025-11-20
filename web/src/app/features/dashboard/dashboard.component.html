@@ -110,7 +110,17 @@
         <!-- ウィジェット①: プロジェクトカード -->
         <section class="widget widget--projects" aria-labelledby="projects-title">
             <div class="widget__header">
-                <h2 id="projects-title">プロジェクト進捗</h2>
+                <h2 id="projects-title">
+                    プロジェクト進捗
+                    <div class="info-tooltip">
+                        <span class="info-icon" aria-label="進捗差分の計算方法">ℹ️</span>
+                        <div class="tooltip-content">
+                            <p>進捗差分は、プロジェクトの進捗率と経過時間の割合（経過率）の差分を表示します。</p>
+                            <p>開始日と終了日が設定されている場合のみ計算されます。</p>
+                            <p>期間が設定されていない場合は「期間なし」と表示されます。</p>
+                        </div>
+                    </div>
+                </h2>
                 <div class="widget__actions">
                     <button type="button" class="button button--chip" *ngFor="let option of projectSortOptions"
                         [class.button--chip-active]="selectedSort() === option.value"
@@ -144,7 +154,7 @@
                                 </svg>
                                 <div class="project-card__progress-text">
                                     <strong>{{ project.progress | number: '1.0-0' }}%</strong>
-                                    <span>{{ getProgressDelta(project) || '進捗確認済み' }}</span>
+                                    <span>進捗差分：{{ getProgressDelta(project) || '期間なし' }}</span>
                                 </div>
                             </div>
                             <ul class="project-card__stats">

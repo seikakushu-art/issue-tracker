@@ -5,6 +5,7 @@ import {
     EventEmitter,
     Input,
     OnChanges,
+    OnDestroy,
     Output,
     SimpleChanges,
     inject,
@@ -51,7 +52,7 @@ import {
     styleUrls: ['./task-detail-panel.component.scss'],
     changeDetection: ChangeDetectionStrategy.OnPush,
   })
-  export class TaskDetailPanelComponent implements OnChanges {
+  export class TaskDetailPanelComponent implements OnChanges, OnDestroy {
     private tasksService = inject(TasksService);
     private tagsService = inject(TagsService);
     private issuesService = inject(IssuesService);
@@ -90,7 +91,16 @@ import {
     mentionableMembers: UserDirectoryProfile[] = [];
   
     newChecklistText = '';
-  
+
+    /** チェックリスト更新のキュー */
+    private checklistUpdateQueue: (() => Promise<void>)[] = [];
+    /** チェックリスト更新が処理中かどうか */
+    private checklistUpdating = false;
+    /** 楽観的更新の状態を保持（itemId -> completed） */
+    private optimisticChecklistUpdates = new Map<string, boolean>();
+    /** 進捗率更新のデバウンスタイマー */
+    private progressUpdateTimer: ReturnType<typeof setTimeout> | null = null;
+
     attachments: TaskAttachmentView[] = [];
     attachmentsLoading = false;
     attachmentsError = '';
@@ -135,6 +145,13 @@ import {
       }
       if (changes['projectId'] || changes['issueId'] || changes['taskId'] || changes['visible']) {
         void this.loadDetails();
+      }
+    }
+
+    ngOnDestroy(): void {
+      if (this.progressUpdateTimer) {
+        clearTimeout(this.progressUpdateTimer);
+        this.progressUpdateTimer = null;
       }
     }
   
@@ -548,10 +565,28 @@ import {
       if (!this.task || !this.canEditTask(this.task)) {
         return;
       }
-      const nextChecklist = (this.task.checklist ?? []).map((item) =>
-        item.id === itemId ? { ...item, completed } : item,
-      );
-      await this.persistChecklist(nextChecklist);
+      // 楽観的更新の状態を保存
+      this.optimisticChecklistUpdates.set(itemId, completed);
+      // UIを即座に更新（楽観的更新）
+      if (this.task.checklist) {
+        const item = this.task.checklist.find((item) => item.id === itemId);
+        if (item) {
+          item.completed = completed;
+          this.cdr.markForCheck();
+        }
+      }
+      // キューに追加して順次処理
+      await this.queueChecklistUpdate(async () => {
+        const currentTask = await this.tasksService.getTask(this.projectId!, this.issueId!, this.taskId!);
+        if (!currentTask) {
+          return;
+        }
+        const currentChecklist = currentTask.checklist ?? [];
+        const nextChecklist = currentChecklist.map((item) =>
+          item.id === itemId ? { ...item, completed } : item,
+        );
+        await this.persistChecklist(nextChecklist, itemId);
+      });
     }
   
     async addChecklistItem(): Promise<void> {
@@ -571,20 +606,54 @@ import {
         alert('チェックリスト項目は最大200個までです');
         return;
       }
-      const nextChecklist: ChecklistItem[] = [
-        ...currentChecklist,
-        { id: this.generateChecklistId(), text, completed: false },
-      ];
+      const newItemId = this.generateChecklistId();
+      const newItemText = text;
       this.newChecklistText = '';
-      await this.persistChecklist(nextChecklist);
+      // UIを即座に更新（楽観的更新）
+      if (!this.task.checklist) {
+        this.task.checklist = [];
+      }
+      this.task.checklist.push({ id: newItemId, text: newItemText, completed: false });
+      this.cdr.markForCheck();
+      // キューに追加して順次処理
+      await this.queueChecklistUpdate(async () => {
+        const currentTask = await this.tasksService.getTask(this.projectId!, this.issueId!, this.taskId!);
+        if (!currentTask) {
+          return;
+        }
+        const currentChecklist = currentTask.checklist ?? [];
+        const nextChecklist: ChecklistItem[] = [
+          ...currentChecklist,
+          { id: newItemId, text: newItemText, completed: false },
+        ];
+        await this.persistChecklist(nextChecklist);
+      });
     }
   
     async removeChecklistItem(itemId: string): Promise<void> {
       if (!this.task || !this.canEditTask(this.task)) {
         return;
       }
-      const nextChecklist = (this.task.checklist ?? []).filter((item) => item.id !== itemId);
-      await this.persistChecklist(nextChecklist);
+      // UIを即座に更新（楽観的更新）
+      if (this.task.checklist) {
+        const index = this.task.checklist.findIndex((item) => item.id === itemId);
+        if (index !== -1) {
+          this.task.checklist.splice(index, 1);
+          this.cdr.markForCheck();
+        }
+      }
+      // キューに追加して順次処理
+      await this.queueChecklistUpdate(async () => {
+        const currentTask = await this.tasksService.getTask(this.projectId!, this.issueId!, this.taskId!);
+        if (!currentTask) {
+          return;
+        }
+        const currentChecklist = currentTask.checklist ?? [];
+        const nextChecklist = currentChecklist.filter((item) => item.id !== itemId);
+        await this.persistChecklist(nextChecklist, itemId);
+        // 削除時も楽観的更新の状態をクリア
+        this.optimisticChecklistUpdates.delete(itemId);
+      });
     }
   
     async toggleArchive(task: Task): Promise<void> {
@@ -1000,38 +1069,119 @@ import {
       }
       return true;
     }
-  
-    private async persistChecklist(checklist: ChecklistItem[]): Promise<void> {
-      if (!this.task || !this.projectId || !this.issueId || !this.task.id) {
+
+    /**
+     * チェックリスト更新をキューに追加して順次処理する
+     * 連続クリック時の競合状態を防ぐため
+     */
+    private async queueChecklistUpdate(updateFn: () => Promise<void>): Promise<void> {
+      return new Promise((resolve, reject) => {
+        this.checklistUpdateQueue.push(async () => {
+          try {
+            await updateFn();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+        this.processChecklistQueue();
+      });
+    }
+
+    /**
+     * チェックリスト更新キューを順次処理する
+     */
+    private async processChecklistQueue(): Promise<void> {
+      if (this.checklistUpdating || this.checklistUpdateQueue.length === 0) {
         return;
       }
-      if (!this.canEditTask(this.task)) {
+
+      this.checklistUpdating = true;
+      try {
+        while (this.checklistUpdateQueue.length > 0) {
+          const updateFn = this.checklistUpdateQueue.shift();
+          if (updateFn) {
+            await updateFn();
+          }
+        }
+        // キューが空になったら、進捗率を一気に更新（デバウンス）
+        this.scheduleProgressUpdate();
+      } finally {
+        this.checklistUpdating = false;
+      }
+    }
+
+    /**
+     * 進捗率の更新をスケジュール（デバウンス）
+     * 短時間で複数の操作がある場合、最後の操作から50ms後に進捗率を一気に更新
+     */
+    private scheduleProgressUpdate(): void {
+      if (this.progressUpdateTimer) {
+        clearTimeout(this.progressUpdateTimer);
+      }
+      this.progressUpdateTimer = setTimeout(() => {
+        void this.updateAllProgress();
+        this.progressUpdateTimer = null;
+      }, 50);
+    }
+
+    /**
+     * すべての進捗率を一気に更新
+     */
+    private async updateAllProgress(): Promise<void> {
+      // タスクを再取得して進捗率を更新
+      await this.refreshTask();
+    }
+  
+    private async persistChecklist(checklist: ChecklistItem[], updatedItemId?: string): Promise<void> {
+      if (!this.projectId || !this.issueId || !this.taskId) {
+        return;
+      }
+
+      // 最新のタスク状態を取得してから更新（キューイングと組み合わせて競合を防ぐ）
+      const currentTask = await this.tasksService.getTask(this.projectId, this.issueId, this.taskId);
+      if (!currentTask || !currentTask.id) {
+        return;
+      }
+      if (!this.canEditTask(currentTask)) {
         return;
       }
 
       try {
         // すべてのチェックリストが完了した場合、完了確認のダイアログを表示
         const allCompleted = checklist.length > 0 && checklist.every((item) => item.completed);
-        if (allCompleted && this.task.status !== 'completed' && this.task.status !== 'discarded') {
+        if (allCompleted && currentTask.status !== 'completed' && currentTask.status !== 'discarded') {
           const shouldComplete = this.confirmChecklistCompletion();
           if (!shouldComplete) {
             // 「いいえ」を選んだ場合、チェックリストは完成したまま、進捗率を100%にし、ステータスはそのまま
             // ステータスを明示的に現在のステータスに設定して、自動遷移を防ぐ
-            await this.tasksService.updateTask(this.projectId, this.issueId, this.task.id, {
+            await this.tasksService.updateTask(this.projectId, this.issueId, currentTask.id, {
               checklist,
               progress: 100,
-              status: this.task.status, // 現在のステータスを明示的に設定して自動遷移を防ぐ
+              status: currentTask.status, // 現在のステータスを明示的に設定して自動遷移を防ぐ
             });
-            await this.refreshTask();
+            // 更新が完了したら楽観的更新の状態をクリア
+            if (updatedItemId) {
+              this.optimisticChecklistUpdates.delete(updatedItemId);
+            }
+            // refreshTaskはキューが空になったら一気に実行される
             return;
           }
         }
 
         // ステータス遷移ロジックは updateChecklist に委譲
-        await this.tasksService.updateChecklist(this.projectId, this.issueId, this.task.id, checklist);
-        await this.refreshTask();
+        await this.tasksService.updateChecklist(this.projectId, this.issueId, currentTask.id, checklist);
+        // 更新が完了したら楽観的更新の状態をクリア
+        if (updatedItemId) {
+          this.optimisticChecklistUpdates.delete(updatedItemId);
+        }
+        // refreshTaskはキューが空になったら一気に実行される
       } catch (error) {
         console.error('チェックリストの更新に失敗しました:', error);
+        // エラー時も楽観的更新の状態をクリア
+        if (updatedItemId) {
+          this.optimisticChecklistUpdates.delete(updatedItemId);
+        }
       } finally {
         this.cdr.markForCheck();
       }
@@ -1044,6 +1194,15 @@ import {
       try {
         const refreshed = await this.tasksService.getTask(this.projectId, this.issueId, this.taskId);
         this.task = this.normalizeTask(refreshed);
+        // 楽観的更新の状態をマージ
+        if (this.task && this.task.checklist && this.optimisticChecklistUpdates.size > 0) {
+          for (const item of this.task.checklist) {
+            const optimisticCompleted = this.optimisticChecklistUpdates.get(item.id);
+            if (optimisticCompleted !== undefined) {
+              item.completed = optimisticCompleted;
+            }
+          }
+        }
         if (this.task) {
           this.taskChanged.emit(this.task);
         }
